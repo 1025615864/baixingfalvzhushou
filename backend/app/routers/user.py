@@ -19,15 +19,17 @@ from ..schemas.user import (
     SmsSendRequest,
     SmsVerifyRequest,
     SmsSendResponse,
+    TokenRefreshRequest, TokenRefreshResponse,
 )
 from ..schemas.quota import UserQuotaDailyResponse, UserQuotaUsageListResponse
 from ..services.user_service import user_service
 from ..services.forum_service import forum_service
 from ..services.email_service import email_service
 from ..services.cache_service import cache_service
-from ..utils.security import create_access_token, verify_password, hash_password
+from ..utils.security import create_access_token, create_refresh_token, decode_refresh_token, verify_password, hash_password
 from ..utils.deps import get_current_user, require_admin, require_user_verified
 from ..utils.rate_limiter import rate_limit, RateLimitConfig
+from ..utils.csrf import generate_csrf_token
 from ..config import get_settings
 from ..services.quota_service import quota_service
 
@@ -174,10 +176,95 @@ async def login(login_data: UserLogin, db: Annotated[AsyncSession, Depends(get_d
     )
 
 
+@router.post("/logout", response_model=MessageResponse, summary="用户登出")
+async def logout(current_user: Annotated[User, Depends(get_current_user)]):
+    """
+    用户登出接口
+
+    注意：由于使用JWT Token，服务器端无法主动使Token失效。
+    前端应在收到登出成功响应后清除本地存储的Token。
+    """
+    return MessageResponse(message="登出成功", success=True)
+
+
+@router.post("/auth/refresh", response_model=TokenRefreshResponse, summary="刷新访问令牌")
+async def refresh_token(request: TokenRefreshRequest):
+    """
+    刷新访问令牌
+
+    使用refresh_token获取新的access_token。
+
+    - **refresh_token**: 可选，如果不提供则从Cookie读取
+    """
+    refresh_token = request.refresh_token
+
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="refresh_token是必需的"
+        )
+
+    # 验证refresh token
+    payload = decode_refresh_token(refresh_token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="无效的refresh_token"
+        )
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="无效的token payload"
+        )
+
+    # 创建新的access token
+    new_access_token = create_access_token(data={"sub": str(user_id)})
+
+    return TokenRefreshResponse(
+        access_token=new_access_token,
+        token_type="bearer",
+        expires_in=settings.access_token_expire_minutes * 60,
+        message="Token刷新成功"
+    )
+
+
 @router.get("/me", response_model=UserResponse, summary="获取当前用户信息")
 async def get_me(current_user: Annotated[User, Depends(get_current_user)]):
     """获取当前登录用户的信息"""
     return UserResponse.model_validate(current_user)
+
+
+@router.get("/me/csrf-token", summary="获取CSRF Token")
+async def get_csrf_token(
+    current_user: Annotated[User, Depends(get_current_user)]
+):
+    """
+    获取CSRF Token
+
+    用于前端在需要CSRF保护的请求中使用。
+
+    返回的token需要在以下HTTP方法中使用：
+    - POST
+    - PUT
+    - PATCH
+    - DELETE
+
+    使用方式：
+    1. 将token放在请求头：X-CSRF-Token: <token>
+    2. 或将token放在表单字段中：csrf_token=<token>
+
+    注意：token有效期为24小时，过期后需要重新获取。
+    """
+    # 为当前用户生成CSRF token
+    session_id = str(current_user.id)
+    csrf_token = generate_csrf_token(session_id)
+
+    return {
+        "csrf_token": csrf_token,
+        "expires_in_hours": settings.csrf_token_expire_hours,
+    }
 
 
 @router.get("/me/quotas", response_model=UserQuotaDailyResponse, summary="获取当前用户配额")
@@ -622,3 +709,4 @@ async def confirm_password_reset(
     
     logger.info("Password reset completed for user: %s", user.id)
     return MessageResponse(message="密码重置成功")
+

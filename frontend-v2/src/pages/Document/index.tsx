@@ -122,7 +122,7 @@ export function DocumentPage(): JSX.Element {
               onClick={(item): void => {
                 // 类型守卫：只处理DocumentItem类型
                 if ('documentType' in item) {
-                  void (item as DocumentItem);
+                  void item;
                 }
               }}
             />

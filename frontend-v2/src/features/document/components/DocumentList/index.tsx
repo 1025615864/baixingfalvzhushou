@@ -60,12 +60,12 @@ export function DocumentList({ onSelect, onDownload }: DocumentListProps): JSX.E
           onClick={(doc): void => {
             // DocumentList只处理DocumentItem类型，类型守卫确保安全
             if ('documentType' in doc) {
-              onSelect?.(doc as DocumentItem);
+              onSelect?.(doc);
             }
           }}
           onDownload={(doc): void => {
             if ('documentType' in doc) {
-              onDownload?.(doc as DocumentItem);
+              onDownload?.(doc);
             }
           }}
         />

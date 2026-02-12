@@ -32,9 +32,10 @@ export function DocumentCard({ document, onClick, onDownload }: DocumentCardProp
   const docStatus: DocumentStatus = isFullDocument(document) ? document.status : 'draft';
   const docType: DocumentFileType = isFullDocument(document) ? document.type : 'other';
   const status = statusConfig[docStatus];
-  const typeLabel = isFullDocument(document) 
-    ? typeNames[docType] ?? docType 
-    : (document as DocumentItem).documentType;
+  // 使用类型守卫后，else分支中TypeScript知道document是DocumentItem类型
+  const typeLabel = isFullDocument(document)
+    ? typeNames[docType] ?? docType
+    : document.documentType;
 
   const handleClick = (): void => {
     onClick?.(document);

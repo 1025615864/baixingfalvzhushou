@@ -243,8 +243,7 @@ export async function apiUpdateCurrentUser(
   data: UpdateProfileDTO
 ): Promise<User> {
   const response = await apiClient.put<BackendUserResponse>(`${API_BASE}/me`, {
-    nickname: data.name,
-    avatar: data.bio, // 如果avatar与bio不同，需调整
+    nickname: data.nickname,
     phone: data.phone,
   });
 

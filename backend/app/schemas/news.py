@@ -17,7 +17,8 @@ class NewsCreate(BaseModel):
     author: str | None = Field(None, max_length=50, description="作者")
     is_top: bool = Field(default=False, description="是否置顶")
     is_published: bool = Field(default=True, description="是否发布")
-    review_status: str | None = Field(None, description="审核状态：pending/approved/rejected")
+    review_status: str | None = Field(
+        None, description="审核状态：pending/approved/rejected")
     review_reason: str | None = Field(None, max_length=200, description="审核原因")
     scheduled_publish_at: datetime | None = Field(None, description="定时发布时间")
     scheduled_unpublish_at: datetime | None = Field(None, description="定时下线时间")
@@ -81,7 +82,7 @@ class NewsResponse(BaseModel):
     scheduled_unpublish_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
-    
+
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
 
@@ -104,7 +105,7 @@ class NewsListItem(BaseModel):
     is_top: bool
     published_at: datetime | None = None
     created_at: datetime
-    
+
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
 
@@ -167,8 +168,11 @@ class NewsFavoriteResponse(BaseModel):
 
 
 class NewsSubscriptionCreate(BaseModel):
-    sub_type: str = Field(..., description="订阅类型：category/keyword")
+    sub_type: str = Field(
+        default="category",
+        description="订阅类型：category/keyword")
     value: str = Field(..., min_length=1, max_length=100, description="订阅值")
+    category: str | None = Field(None, description="订阅类别（兼容字段）")
 
 
 class NewsSubscriptionResponse(BaseModel):
@@ -505,11 +509,12 @@ class NewsTopicReportItem(BaseModel):
     id: int
     title: str
     is_active: bool
-    sort_order: int
-    manual_item_count: int
-    manual_view_count: int
-    manual_favorite_count: int
-    manual_conversion_rate: float
+    news_count: int = 0
+    sort_order: int = 0
+    manual_item_count: int = 0
+    manual_view_count: int = 0
+    manual_favorite_count: int = 0
+    manual_conversion_rate: float = 0.0
 
 
 class NewsTopicReportResponse(BaseModel):

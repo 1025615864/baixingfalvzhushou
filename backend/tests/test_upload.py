@@ -2,8 +2,17 @@ import pytest
 from httpx import AsyncClient
 
 
+@pytest.fixture(autouse=True)
+def clear_storage_cache():
+    """Clear storage provider cache before each test"""
+    from app.services import storage_service
+    storage_service.get_storage_provider.cache_clear()
+    yield
+    storage_service.get_storage_provider.cache_clear()
+
+
 @pytest.mark.asyncio
-async def test_upload_image_local_provider_serves_file(client: AsyncClient, test_session, monkeypatch, tmp_path):
+async def test_upload_image_local_provider_serves_file(client: AsyncClient, test_session, monkeypatch, tmp_path_fixed):
     from app.models.user import User
     from app.utils.security import create_access_token, hash_password
     from app.routers import upload as upload_router
@@ -24,7 +33,7 @@ async def test_upload_image_local_provider_serves_file(client: AsyncClient, test
     token = create_access_token({"sub": str(user.id)})
     headers = {"Authorization": f"Bearer {token}"}
 
-    provider = LocalStorageProvider(base_dir=str(tmp_path))
+    provider = LocalStorageProvider(base_dir=str(tmp_path_fixed))
     monkeypatch.setattr(upload_router, "get_storage_provider", lambda: provider)
 
     png_bytes = b"\x89PNG\r\n\x1a\n" + b"0" * 16
@@ -37,7 +46,7 @@ async def test_upload_image_local_provider_serves_file(client: AsyncClient, test
 
 
 @pytest.mark.asyncio
-async def test_upload_image_moderation_rejects(client: AsyncClient, test_session, monkeypatch, tmp_path):
+async def test_upload_image_moderation_rejects(client: AsyncClient, test_session, monkeypatch, tmp_path_fixed):
     from app.models.user import User
     from app.utils.security import create_access_token, hash_password
     from app.routers import upload as upload_router
@@ -58,7 +67,7 @@ async def test_upload_image_moderation_rejects(client: AsyncClient, test_session
     token = create_access_token({"sub": str(user.id)})
     headers = {"Authorization": f"Bearer {token}"}
 
-    provider = LocalStorageProvider(base_dir=str(tmp_path))
+    provider = LocalStorageProvider(base_dir=str(tmp_path_fixed))
     monkeypatch.setattr(upload_router, "get_storage_provider", lambda: provider)
     monkeypatch.setenv("UPLOAD_IMAGE_MODERATION_ENABLED", "1")
     monkeypatch.setenv("UPLOAD_IMAGE_MODERATION_FAIL_OPEN", "0")
@@ -80,7 +89,7 @@ async def test_upload_image_moderation_rejects(client: AsyncClient, test_session
 
 
 @pytest.mark.asyncio
-async def test_upload_image_moderation_error_fail_closed(client: AsyncClient, test_session, monkeypatch, tmp_path):
+async def test_upload_image_moderation_error_fail_closed(client: AsyncClient, test_session, monkeypatch, tmp_path_fixed):
     from app.models.user import User
     from app.utils.security import create_access_token, hash_password
     from app.routers import upload as upload_router
@@ -101,7 +110,7 @@ async def test_upload_image_moderation_error_fail_closed(client: AsyncClient, te
     token = create_access_token({"sub": str(user.id)})
     headers = {"Authorization": f"Bearer {token}"}
 
-    provider = LocalStorageProvider(base_dir=str(tmp_path))
+    provider = LocalStorageProvider(base_dir=str(tmp_path_fixed))
     monkeypatch.setattr(upload_router, "get_storage_provider", lambda: provider)
     monkeypatch.setenv("UPLOAD_IMAGE_MODERATION_ENABLED", "1")
     monkeypatch.setenv("UPLOAD_IMAGE_MODERATION_FAIL_OPEN", "0")
@@ -123,7 +132,7 @@ async def test_upload_image_moderation_error_fail_closed(client: AsyncClient, te
 
 
 @pytest.mark.asyncio
-async def test_upload_image_moderation_error_fail_open(client: AsyncClient, test_session, monkeypatch, tmp_path):
+async def test_upload_image_moderation_error_fail_open(client: AsyncClient, test_session, monkeypatch, tmp_path_fixed):
     from app.models.user import User
     from app.utils.security import create_access_token, hash_password
     from app.routers import upload as upload_router
@@ -144,7 +153,7 @@ async def test_upload_image_moderation_error_fail_open(client: AsyncClient, test
     token = create_access_token({"sub": str(user.id)})
     headers = {"Authorization": f"Bearer {token}"}
 
-    provider = LocalStorageProvider(base_dir=str(tmp_path))
+    provider = LocalStorageProvider(base_dir=str(tmp_path_fixed))
     monkeypatch.setattr(upload_router, "get_storage_provider", lambda: provider)
     monkeypatch.setenv("UPLOAD_IMAGE_MODERATION_ENABLED", "1")
     monkeypatch.setenv("UPLOAD_IMAGE_MODERATION_FAIL_OPEN", "1")
@@ -202,7 +211,7 @@ async def test_upload_image_local_provider_blocked_when_require_object_storage(
     client: AsyncClient,
     test_session,
     monkeypatch,
-    tmp_path,
+    tmp_path_fixed,
 ):
     from app.models.user import User
     from app.utils.security import create_access_token, hash_password
@@ -224,7 +233,7 @@ async def test_upload_image_local_provider_blocked_when_require_object_storage(
     token = create_access_token({"sub": str(user.id)})
     headers = {"Authorization": f"Bearer {token}"}
 
-    provider = LocalStorageProvider(base_dir=str(tmp_path))
+    provider = LocalStorageProvider(base_dir=str(tmp_path_fixed))
     monkeypatch.setattr(upload_router, "get_storage_provider", lambda: provider)
     monkeypatch.setenv("UPLOAD_REQUIRE_OBJECT_STORAGE", "1")
     monkeypatch.delenv("UPLOAD_ALLOW_LOCAL_STORAGE", raising=False)
@@ -239,7 +248,7 @@ async def test_upload_image_local_provider_blocked_when_require_object_storage(
 
 
 @pytest.mark.asyncio
-async def test_upload_image_virus_scan_found_rejected(client: AsyncClient, test_session, monkeypatch, tmp_path):
+async def test_upload_image_virus_scan_found_rejected(client: AsyncClient, test_session, monkeypatch, tmp_path_fixed):
     from app.models.user import User
     from app.utils.security import create_access_token, hash_password
     from app.routers import upload as upload_router
@@ -260,7 +269,7 @@ async def test_upload_image_virus_scan_found_rejected(client: AsyncClient, test_
     token = create_access_token({"sub": str(user.id)})
     headers = {"Authorization": f"Bearer {token}"}
 
-    provider = LocalStorageProvider(base_dir=str(tmp_path))
+    provider = LocalStorageProvider(base_dir=str(tmp_path_fixed))
     monkeypatch.setattr(upload_router, "get_storage_provider", lambda: provider)
     monkeypatch.setenv("UPLOAD_VIRUS_SCAN_ENABLED", "1")
     monkeypatch.setenv("UPLOAD_VIRUS_SCAN_FAIL_OPEN", "0")
@@ -280,7 +289,7 @@ async def test_upload_image_virus_scan_found_rejected(client: AsyncClient, test_
 
 
 @pytest.mark.asyncio
-async def test_upload_image_virus_scan_error_fail_closed(client: AsyncClient, test_session, monkeypatch, tmp_path):
+async def test_upload_image_virus_scan_error_fail_closed(client: AsyncClient, test_session, monkeypatch, tmp_path_fixed):
     from app.models.user import User
     from app.utils.security import create_access_token, hash_password
     from app.routers import upload as upload_router
@@ -301,7 +310,7 @@ async def test_upload_image_virus_scan_error_fail_closed(client: AsyncClient, te
     token = create_access_token({"sub": str(user.id)})
     headers = {"Authorization": f"Bearer {token}"}
 
-    provider = LocalStorageProvider(base_dir=str(tmp_path))
+    provider = LocalStorageProvider(base_dir=str(tmp_path_fixed))
     monkeypatch.setattr(upload_router, "get_storage_provider", lambda: provider)
     monkeypatch.setenv("UPLOAD_VIRUS_SCAN_ENABLED", "1")
     monkeypatch.setenv("UPLOAD_VIRUS_SCAN_FAIL_OPEN", "0")
@@ -321,7 +330,7 @@ async def test_upload_image_virus_scan_error_fail_closed(client: AsyncClient, te
 
 
 @pytest.mark.asyncio
-async def test_upload_image_virus_scan_error_fail_open(client: AsyncClient, test_session, monkeypatch, tmp_path):
+async def test_upload_image_virus_scan_error_fail_open(client: AsyncClient, test_session, monkeypatch, tmp_path_fixed):
     from app.models.user import User
     from app.utils.security import create_access_token, hash_password
     from app.routers import upload as upload_router
@@ -342,7 +351,7 @@ async def test_upload_image_virus_scan_error_fail_open(client: AsyncClient, test
     token = create_access_token({"sub": str(user.id)})
     headers = {"Authorization": f"Bearer {token}"}
 
-    provider = LocalStorageProvider(base_dir=str(tmp_path))
+    provider = LocalStorageProvider(base_dir=str(tmp_path_fixed))
     monkeypatch.setattr(upload_router, "get_storage_provider", lambda: provider)
     monkeypatch.setenv("UPLOAD_VIRUS_SCAN_ENABLED", "1")
     monkeypatch.setenv("UPLOAD_VIRUS_SCAN_FAIL_OPEN", "1")

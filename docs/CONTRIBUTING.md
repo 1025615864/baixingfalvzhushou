@@ -1,59 +1,118 @@
-# 贡献指南（CONTRIBUTING）
+# 贡献指南
 
-本指南面向仓库贡献者，聚焦“如何按现有项目约定新增功能且不破坏可交付性”。
+感谢您考虑为百姓法律助手项目贡献代码！
 
-## 1. 本地开发
+## 开发规范
 
-推荐使用仓库根：
+### 代码风格
 
-- `start-dev.ps1`
+#### Python (后端)
+- 遵循 PEP 8 规范
+- 使用类型注解
+- 中文注释关键逻辑
+- 函数长度不超过 100 行
 
-详见：`docs/guides/DEV_GUIDE.md`
+#### TypeScript/React (前端)
+- 遵循 ESLint 配置
+- 使用 TypeScript 严格模式
+- 组件使用函数式写法
+- 合理拆分组件
 
-## 2. 新增后端 API
+### 提交规范
 
-- 路由文件：`backend/app/routers/<module>.py`
-- 聚合入口：`backend/app/routers/__init__.py`
-- 数据库写入：优先在 `backend/app/services/` 封装业务逻辑
+使用 Conventional Commits 格式：
 
-鉴权：
+```
+<type>(<scope>): <description>
 
-- 需要登录：依赖 `get_current_user`
-- 需要管理员：依赖 `require_admin`
-- 敏感操作：可额外加 `require_user_verified` / `require_phone_verified` / `require_email_verified`
+[optional body]
 
-响应：
+[optional footer]
+```
 
-- 前端默认使用 Envelope（`X-Api-Envelope: 1`），后端 `EnvelopeMiddleware` 会自动包装
+**类型**：
+- `feat`: 新功能
+- `fix`: Bug 修复
+- `docs`: 文档更新
+- `style`: 代码格式调整
+- `refactor`: 重构
+- `test`: 测试相关
+- `chore`: 构建/工具
 
-## 3. 新增数据模型与迁移
+**示例**：
+```
+feat(user): 添加手机号登录功能
 
-- Model：`backend/app/models/<name>.py`
-- init_db 导入列表：`backend/app/database.py` 的 `init_db()` 会 import models
+fix(payment): 修复支付回调重复处理问题
+```
 
-迁移：
+## 开发流程
 
-- 生产（`DEBUG=false`）要求数据库在 Alembic head
-- 使用 `python backend/scripts/alembic_cmd.py upgrade head`
+### 1. Fork 项目
 
-详见：`docs/DATABASE.md`
+```bash
+# 访问 https://github.com/your-username/baixing-assistant
+# 点击 Fork 按钮
+```
 
-## 4. SystemConfig 使用规范
+### 2. 克隆代码
 
-- 仅用于业务开关/非敏感参数
-- 禁止写入 secret（OPENAI_API_KEY 等）
-- providers 配置中也禁止包含 api_key 字段
+```bash
+git clone https://github.com/YOUR_USERNAME/baixing-assistant.git
+cd baixing-assistant
+```
 
-详见：`docs/guides/CONFIG_REFERENCE.md`
+### 3. 创建分支
 
-## 5. 前端开发规范
+```bash
+# 基于主分支创建功能分支
+git checkout -b feature/your-feature-name
+```
 
-- API 统一走 `frontend/src/api/client.ts`
-- WebSocket 统一走 `frontend/src/hooks/useWebSocket.ts`
+### 4. 开发与测试
 
-## 6. 测试与门禁
+```bash
+# 后端开发
+cd backend
+py -m pytest tests/your_test.py -v
 
-- 后端：`pytest backend/tests/ -v`
-- 前端：`npm --prefix frontend run build`
-- E2E：`npm --prefix frontend run test:e2e`
-- 预提交：`.pre-commit-config.yaml`
+# 前端开发
+cd frontend
+npm run test:unit
+```
+
+### 5. 提交代码
+
+```bash
+git add .
+git commit -m "feat(scope): description"
+git push origin feature/your-feature-name
+```
+
+### 6. 创建 PR
+
+在 GitHub 上创建 Pull Request，描述您的改动。
+
+## 测试要求
+
+### 后端测试
+- 新增功能需配套单元测试
+- 测试覆盖率不低于 62%
+- 运行命令：`py -m pytest --cov=app`
+
+### 前端测试
+- 关键组件需编写测试
+- E2E 测试覆盖核心流程
+- 运行命令：`npm run test:unit`
+
+## 代码审查
+
+- PR 至少需要 1 人审查
+- 所有 CI 检查通过
+- 解决所有评论后再合并
+
+## 行为准则
+
+- 尊重他人意见
+- 友好沟通
+- 积极反馈

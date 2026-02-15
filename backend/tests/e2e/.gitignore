@@ -1,0 +1,33 @@
+# Playwright测试生成的文件
+test-results/
+playwright-report/
+playwright/.cache/
+
+# 截图和视频
+*.png
+*.webm
+*.zip
+
+# Node.js依赖
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 环境变量
+.env.local
+.env.*.local
+
+# 缓存
+.cache/

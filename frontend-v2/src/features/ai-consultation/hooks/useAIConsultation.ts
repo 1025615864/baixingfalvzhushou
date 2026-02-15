@@ -57,7 +57,7 @@ export function useSessions(params: GetSessionsRequest = {}) {
 export function useSession(sessionId: string | undefined) {
   return useQuery<AISession>({
     queryKey: AI_CONSULTATION_QUERY_KEYS.session(sessionId || ''),
-    queryFn: () => apiGetSession(sessionId),
+    queryFn: () => apiGetSession(sessionId!),
     enabled: !!sessionId,
     staleTime: 10 * 1000, // 10秒缓存
   });

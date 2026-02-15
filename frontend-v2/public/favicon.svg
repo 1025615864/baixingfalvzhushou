@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1433e1"/>
+      <stop offset="50%" style="stop-color:#1a44f5"/>
+      <stop offset="100%" style="stop-color:#3366ff"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="100" height="100" rx="20" fill="url(#bg)"/>
+  <!-- Scale Icon -->
+  <g fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Center pole -->
+    <line x1="50" y1="25" x2="50" y2="75"/>
+    <!-- Base -->
+    <line x1="35" y1="75" x2="65" y2="75"/>
+    <!-- Top beam -->
+    <line x1="25" y1="35" x2="75" y2="35"/>
+    <!-- Left scale -->
+    <path d="M25 35 L20 55 Q25 60 30 55 L35 35"/>
+    <!-- Right scale -->
+    <path d="M75 35 L70 55 Q75 60 80 55 L85 35"/>
+    <!-- Top circle -->
+    <circle cx="50" cy="25" r="5" fill="white"/>
+  </g>
+</svg>

@@ -1,0 +1,95 @@
+# ============================================
+# 开发环境 Docker Compose
+# 简化版 - 用于本地开发测试
+# ============================================
+
+name: baixing-dev
+
+services:
+  # PostgreSQL数据库
+  db:
+    image: postgres:15-alpine
+    container_name: baixing_dev_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-baixing_dev_2024}
+      POSTGRES_DB: ${POSTGRES_DB:-baixing_law}
+    volumes:
+      - baixing_dev_postgres:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    container_name: baixing_dev_redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-baixing_redis_2024} --maxmemory 256mb
+    volumes:
+      - baixing_dev_redis:/data
+    ports:
+      - "16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-baixing_redis_2024}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 后端服务
+  backend:
+    image: baixing-dev-backend:latest
+    container_name: baixing_dev_backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-baixing_dev_2024}@db:5432/${POSTGRES_DB:-baixing_law}
+      SECRET_KEY: ${JWT_SECRET_KEY:-dev-jwt-secret-key-for-local-testing-only-32chars}
+      ALGORITHM: HS256
+      DEBUG: "true"
+      REDIS_URL: redis://:${REDIS_PASSWORD:-baixing_redis_2024}@redis:6379/0
+      CSRF_SECRET_KEY: ${CSRF_SECRET_KEY:-dev-csrf-secret-key-for-local-testing-32chars}
+      PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-dev-webhook-secret}
+      METRICS_AUTH_TOKEN: ${METRICS_AUTH_TOKEN:-dev-metrics-token}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      AI_MODEL: ${AI_MODEL:-gpt-3.5-turbo}
+      ENVIRONMENT: development
+      # CORS 配置 - JSON格式
+      CORS_ALLOW_ORIGINS: '["http://localhost:3000","http://localhost:5173","http://127.0.0.1:3000"]'
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - baixing_dev_uploads:/app/uploads
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # 前端服务 (可选 - 网络问题时可本地运行)
+  # frontend:
+  #   build:
+  #     context: ./frontend-v2
+  #     dockerfile: Dockerfile
+  #   container_name: baixing_dev_frontend
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - backend
+  #   environment:
+  #     - VITE_API_BASE_URL=/api
+  #     - VITE_WS_URL=ws://localhost:8000/ws
+
+volumes:
+  baixing_dev_postgres:
+  baixing_dev_redis:
+  baixing_dev_uploads:

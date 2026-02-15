@@ -6,7 +6,7 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_storage_service_helpers_and_local_provider(tmp_path):
+async def test_storage_service_helpers_and_local_provider(tmp_path_fixed):
     from app.services import storage_service
 
     assert storage_service._norm_provider(None) == "local"
@@ -17,7 +17,7 @@ async def test_storage_service_helpers_and_local_provider(tmp_path):
     assert storage_service._join_url("http://a/", "/b/", "c") == "http://a/b/c"
     assert storage_service._join_url("http://a", "", "  ") == "http://a"
 
-    provider = storage_service.LocalStorageProvider(base_dir=str(tmp_path), api_prefix="/api/upload")
+    provider = storage_service.LocalStorageProvider(base_dir=str(tmp_path_fixed), api_prefix="/api/upload")
 
     obj = await provider.put_bytes(
         category="images",

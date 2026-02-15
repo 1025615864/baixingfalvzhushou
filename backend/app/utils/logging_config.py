@@ -12,7 +12,7 @@ def setup_logging(
 ) -> None:
     """
     配置日志系统
-    
+
     Args:
         log_level: 日志级别
         log_dir: 日志目录
@@ -20,25 +20,25 @@ def setup_logging(
     """
     # 创建日志目录
     log_path = Path(log_dir)
-    log_path.mkdir(exist_ok=True)
-    
+    log_path.mkdir(parents=True, exist_ok=True)
+
     # 日志格式
     log_format = "%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d | %(message)s"
     date_format = "%Y-%m-%d %H:%M:%S"
-    
+
     # 获取根日志器
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
-    
+
     # 清除现有处理器
     root_logger.handlers.clear()
-    
+
     # 控制台处理器
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.DEBUG)
     console_handler.setFormatter(logging.Formatter(log_format, date_format))
     root_logger.addHandler(console_handler)
-    
+
     # 文件处理器 - 普通日志
     today = datetime.now().strftime("%Y-%m-%d")
     file_handler = logging.FileHandler(
@@ -48,7 +48,7 @@ def setup_logging(
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(logging.Formatter(log_format, date_format))
     root_logger.addHandler(file_handler)
-    
+
     # 文件处理器 - 错误日志
     error_handler = logging.FileHandler(
         log_path / f"{app_name}_error_{today}.log",
@@ -57,23 +57,23 @@ def setup_logging(
     error_handler.setLevel(logging.ERROR)
     error_handler.setFormatter(logging.Formatter(log_format, date_format))
     root_logger.addHandler(error_handler)
-    
+
     # 降低第三方库日志级别
     logging.getLogger("uvicorn").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
-    
+
     logging.info("Logging configured: level=%s, dir=%s", log_level, log_dir)
 
 
 class RequestLogger:
     """请求日志记录器"""
-    
+
     def __init__(self, logger_name: str = "api"):
         self.logger = logging.getLogger(logger_name)
-    
+
     def log_request(
         self,
         method: str,
@@ -91,7 +91,7 @@ class RequestLogger:
         if extra:
             msg += f" {extra}"
         self.logger.info(msg)
-    
+
     def log_response(
         self,
         method: str,
@@ -104,14 +104,14 @@ class RequestLogger:
         msg = f"RESPONSE {method} {path} status={status_code} duration={duration_ms:.2f}ms"
         if user_id:
             msg += f" user={user_id}"
-        
+
         if status_code >= 500:
             self.logger.error(msg)
         elif status_code >= 400:
             self.logger.warning(msg)
         else:
             self.logger.info(msg)
-    
+
     def log_error(
         self,
         method: str,

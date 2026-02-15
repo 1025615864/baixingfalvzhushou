@@ -12,7 +12,7 @@ class _FixedDateTime:
         return datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 
 
-def test_setup_logging_creates_handlers_and_files(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_setup_logging_creates_handlers_and_files(tmp_path_fixed, monkeypatch: pytest.MonkeyPatch) -> None:
     # Save current root logger state to avoid leaking changes to other tests.
     root = logging.getLogger()
     old_level = root.level
@@ -20,7 +20,7 @@ def test_setup_logging_creates_handlers_and_files(tmp_path, monkeypatch: pytest.
 
     monkeypatch.setattr(mod, "datetime", _FixedDateTime)
 
-    log_dir = tmp_path / "logs"
+    log_dir = tmp_path_fixed / "logs"
     log_dir.mkdir()
     try:
         mod.setup_logging(log_level="DEBUG", log_dir=str(log_dir), app_name="app")
@@ -45,7 +45,19 @@ def test_setup_logging_creates_handlers_and_files(tmp_path, monkeypatch: pytest.
         assert logging.getLogger("httpx").level == logging.WARNING
         assert logging.getLogger("httpcore").level == logging.WARNING
     finally:
-        root.handlers = old_handlers
+        # Close all file handlers to release file handles before cleanup
+        for handler in root.handlers:
+            if isinstance(handler, logging.FileHandler):
+                handler.close()
+        
+        # Remove all handlers added during this test
+        root.handlers.clear()
+        
+        # Restore original handlers
+        for handler in old_handlers:
+            root.addHandler(handler)
+        
+        # Restore original log level
         root.setLevel(old_level)
 
 

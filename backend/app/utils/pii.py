@@ -36,7 +36,8 @@ def sanitize_pii(text: str) -> str:
     s = _ID15_RE.sub("【身份证号已脱敏】", s)
     s = _PHONE_RE.sub("【手机号已脱敏】", s)
 
-    # Bank card numbers (heuristic): 16-19 digits, not already replaced, not phone (11) and not ID.
+    # Bank card numbers (heuristic): 16-19 digits, not already replaced, not
+    # phone (11) and not ID.
     def _bank_repl(m: re.Match[str]) -> str:
         digits = m.group(0)
         if len(digits) == 11 and digits.startswith("1"):

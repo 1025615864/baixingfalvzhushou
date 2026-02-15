@@ -1,22 +1,39 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
+logger = logging.getLogger(__name__)
+
 try:
     import sentry_sdk
 except Exception:  # pragma: no cover
+    logger.exception("Failed to import sentry_sdk")
     sentry_sdk = None
 
 
 class SentryContextMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
-        if sentry_sdk is None or (not bool(getattr(sentry_sdk, "is_initialized", lambda: False)())):
+    async def dispatch(self, request: Request, call_next: Callable[[
+                       Request], Awaitable[Response]]) -> Response:
+        if sentry_sdk is None or (
+            not bool(
+                getattr(
+                    sentry_sdk,
+                    "is_initialized",
+                lambda: False)())):
             return await call_next(request)
 
-        request_id = str(getattr(getattr(request, "state", None), "request_id", "") or "").strip()
+        request_id = str(
+            getattr(
+                getattr(
+                    request,
+                    "state",
+                    None),
+                "request_id",
+                "") or "").strip()
         user_id = getattr(getattr(request, "state", None), "user_id", None)
 
         with sentry_sdk.configure_scope() as scope:

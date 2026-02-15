@@ -160,13 +160,12 @@ async def test_payment_cancel_order_branches(client, test_session):
 
 @pytest.mark.asyncio
 async def test_payment_pricing_uses_system_config(client, test_session):
-    test_session.add(SystemConfig(key="VIP_DEFAULT_DAYS", value="15", category="payment"))
-    test_session.add(SystemConfig(key="VIP_DEFAULT_PRICE", value="19.9", category="payment"))
-    test_session.add(SystemConfig(key="LIGHT_CONSULT_REVIEW_PRICE", value="9.9", category="payment"))
-    test_session.add(SystemConfig(key="AI_CHAT_PACK_OPTIONS_JSON", value='{"50":49.0,"10":12.0}', category="payment"))
-    test_session.add(
-        SystemConfig(key="DOCUMENT_GENERATE_PACK_OPTIONS_JSON", value='{"100":79.0}', category="payment")
-    )
+    test_session.add(SystemConfig(key="vip_days", value="15", category="payment"))
+    test_session.add(SystemConfig(key="vip_price", value="19.9", category="payment"))
+    test_session.add(SystemConfig(key="light_consult_review_price", value="9.9", category="payment"))
+    test_session.add(SystemConfig(key="ai_chat_pack_10_price", value="12.0", category="payment"))
+    test_session.add(SystemConfig(key="ai_chat_pack_50_price", value="49.0", category="payment"))
+    test_session.add(SystemConfig(key="doc_pack_100_price", value="79.0", category="payment"))
     await test_session.commit()
 
     resp = await client.get("/api/payment/pricing")
@@ -178,10 +177,10 @@ async def test_payment_pricing_uses_system_config(client, test_session):
     assert data["services"]["light_consult_review"]["price"] == 9.9
 
     ai_list = data["packs"]["ai_chat"]
-    assert [x["count"] for x in ai_list] == [10, 50]
+    assert [x["count"] for x in ai_list] == [10, 50, 100]
 
     doc_list = data["packs"]["document_generate"]
-    assert [x["count"] for x in doc_list] == [100]
+    assert [x["count"] for x in doc_list] == [5, 20, 50]
 
 
 @pytest.mark.asyncio

@@ -4,18 +4,17 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.main import app
+from app.config import get_settings
 from app.models.payment import PaymentOrder, PaymentStatus
 from app.models.system import SystemConfig
 from app.models.user import User
 from app.utils.deps import require_admin
+from tests.helpers.test_data_factory import UserFactory
 
 
 @pytest.mark.asyncio
 async def test_payment_admin_channel_status_updated_at_and_refresh_flag(client, test_session, monkeypatch):
-    admin = User(username="pay_cfg_admin", email="pay_cfg_admin@example.com", nickname="pay_cfg_admin", hashed_password="x", role="admin")
-    test_session.add(admin)
-    await test_session.commit()
-    await test_session.refresh(admin)
+    admin = await UserFactory.create_user(test_session, username="pay_cfg_admin", role="admin")
 
     async def override_admin():
         return admin
@@ -23,25 +22,25 @@ async def test_payment_admin_channel_status_updated_at_and_refresh_flag(client, 
     app.dependency_overrides[require_admin] = override_admin
 
     try:
-        import app.routers.payment_legacy as legacy
+        settings = get_settings()
 
-        monkeypatch.setattr(legacy.settings, "frontend_base_url", "https://front.example.com/", raising=False)
+        monkeypatch.setattr(settings, "frontend_base_url", "https://front.example.com/", raising=False)
 
-        monkeypatch.setattr(legacy.settings, "alipay_app_id", "app", raising=False)
-        monkeypatch.setattr(legacy.settings, "alipay_public_key", "pub", raising=False)
-        monkeypatch.setattr(legacy.settings, "alipay_private_key", "priv", raising=False)
-        monkeypatch.setattr(legacy.settings, "alipay_notify_url", "https://example.com/notify", raising=False)
+        monkeypatch.setattr(settings, "alipay_app_id", "app", raising=False)
+        monkeypatch.setattr(settings, "alipay_public_key", "pub", raising=False)
+        monkeypatch.setattr(settings, "alipay_private_key", "priv", raising=False)
+        monkeypatch.setattr(settings, "alipay_notify_url", "https://example.com/notify", raising=False)
 
-        monkeypatch.setattr(legacy.settings, "wechatpay_mch_id", "mch", raising=False)
-        monkeypatch.setattr(legacy.settings, "wechatpay_mch_serial_no", "serial", raising=False)
-        monkeypatch.setattr(legacy.settings, "wechatpay_private_key", "key", raising=False)
-        monkeypatch.setattr(legacy.settings, "wechatpay_api_v3_key", "0123456789abcdef0123456789abcdef", raising=False)
+        monkeypatch.setattr(settings, "wechatpay_mch_id", "mch", raising=False)
+        monkeypatch.setattr(settings, "wechatpay_mch_serial_no", "serial", raising=False)
+        monkeypatch.setattr(settings, "wechatpay_private_key", "key", raising=False)
+        monkeypatch.setattr(settings, "wechatpay_api_v3_key", "0123456789abcdef0123456789abcdef", raising=False)
 
-        monkeypatch.setattr(legacy.settings, "ikunpay_pid", "pid", raising=False)
-        monkeypatch.setattr(legacy.settings, "ikunpay_key", "key", raising=False)
-        monkeypatch.setattr(legacy.settings, "ikunpay_notify_url", "https://example.com/notify2", raising=False)
+        monkeypatch.setattr(settings, "ikunpay_pid", "pid", raising=False)
+        monkeypatch.setattr(settings, "ikunpay_key", "key", raising=False)
+        monkeypatch.setattr(settings, "ikunpay_notify_url", "https://example.com/notify2", raising=False)
 
-        monkeypatch.setattr(legacy.settings, "payment_webhook_secret", "whsec_test", raising=False)
+        monkeypatch.setattr(settings, "payment_webhook_secret", "whsec_test", raising=False)
 
         monkeypatch.setenv("WECHATPAY_CERT_REFRESH_ENABLED", "1")
 
@@ -86,10 +85,7 @@ async def test_payment_admin_channel_status_updated_at_and_refresh_flag(client, 
 
 @pytest.mark.asyncio
 async def test_payment_admin_env_updates_and_empty_returns_400(client, test_session, monkeypatch):
-    admin = User(username="pay_env_admin", email="pay_env_admin@example.com", nickname="pay_env_admin", hashed_password="x", role="admin")
-    test_session.add(admin)
-    await test_session.commit()
-    await test_session.refresh(admin)
+    admin = await UserFactory.create_user(test_session, username="pay_env_admin", role="admin")
 
     async def override_admin():
         return admin
@@ -130,10 +126,8 @@ async def test_payment_admin_env_updates_and_empty_returns_400(client, test_sess
 
 @pytest.mark.asyncio
 async def test_payment_admin_stats_revenue_and_today(client, test_session, monkeypatch):
-    admin = User(username="pay_stats_admin", email="pay_stats_admin@example.com", nickname="pay_stats_admin", hashed_password="x", role="admin")
-    user = User(username="pay_stats_user", email="pay_stats_user@example.com", nickname="pay_stats_user", hashed_password="x")
-    test_session.add_all([admin, user])
-    await test_session.commit()
+    admin = await UserFactory.create_user(test_session, username="pay_stats_admin", role="admin")
+    user = await UserFactory.create_user(test_session, username="pay_stats_user")
     await test_session.refresh(admin)
     await test_session.refresh(user)
 

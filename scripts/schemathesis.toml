@@ -1,0 +1,98 @@
+# Schemathesis Configuration
+# API Testing Configuration for 百姓法律助手
+
+[schema]
+# OpenAPI schema location - can be URL or file path
+# For local testing, use the exported OpenAPI JSON file
+source = "http://localhost:8080/openapi.json"
+
+# Alternative: Use local file if available
+# source = "backend/docs/api/openapi.json"
+
+[checks]
+# Enable all built-in checks
+all = true
+
+# Or specify individual checks:
+# response_schema = true  # Validate responses against schema
+# status_code = true     # Check for unexpected status codes
+# content_type = true    # Check Content-Type headers
+# operation_id = true     # Verify operationIds are unique
+
+[testing]
+# Base URL for API testing
+# Override with --base-url CLI argument
+base_url = "http://localhost:8080"
+
+# Default request headers
+[testing.headers]
+Authorization = "Bearer ${JWT_TOKEN}"
+Content-Type = "application/json"
+
+# Authentication configuration
+[authentication]
+# JWT token for authenticated endpoints
+jwt_token = "${JWT_TOKEN}"
+
+# Oauth2 configuration (if needed)
+# [authentication.oauth2]
+# token_url = "http://localhost:8080/api/auth/token"
+# client_id = "your-client-id"
+# client_secret = "your-client-secret"
+
+[report]
+# Output format for test reports
+format = "cli"
+
+# Generate JUnit XML report for CI/CD
+junit_xml = "test-results/schemathesis-junit.xml"
+
+# Generate JSON report
+json = "test-results/schemathesis-report.json"
+
+# Verbose output
+verbose = true
+
+# Show response bodies for failed tests
+show_response_for_failed = true
+
+[workers]
+# Number of parallel workers for faster testing
+# Adjust based on your system capabilities
+max_workers = 4
+
+[filter]
+# Exclude certain endpoints from testing
+exclude = [
+    "/health",
+    "/api/health",
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+    "/robots.txt",
+    "/sitemap.xml",
+]
+
+# Only test specific endpoints (optional)
+# include = [
+#     "/api/users",
+#     "/api/ai/chat",
+# ]
+
+[store]
+# Directory for storing generated cassettes (VCR.py style)
+cassettes_dir = "tests/schemathesis cassettes"
+
+[random]
+# Seed for random test order (reproducibility)
+seed = 42
+
+[validator]
+# Pydantic validation settings
+validate_schema = true
+
+# Fail on first error or continue testing
+fail_fast = false
+
+# Maximum number of test cases per operation
+max_response_time = 30  # seconds

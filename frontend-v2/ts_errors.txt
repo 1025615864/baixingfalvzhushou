@@ -1,0 +1,266 @@
+src/features/ai-consultation/components/ReadableMessage.tsx(84,10): error TS6133: '_getActionLabel' is declared but its value is never read.
+src/features/consultation/api/index.ts(30,19): error TS2339: Property 'data' does not exist on type 'Consultation'.
+src/features/consultation/api/index.ts(44,19): error TS2339: Property 'data' does not exist on type 'ConsultationListResponse'.
+src/features/consultation/api/index.ts(52,19): error TS2339: Property 'data' does not exist on type 'Consultation'.
+src/features/consultation/api/index.ts(66,19): error TS2339: Property 'data' does not exist on type 'ConsultationMessage'.
+src/features/consultation/api/index.ts(76,19): error TS2339: Property 'data' does not exist on type 'ConsultationMessage[]'.
+src/features/consultation/api/index.ts(84,19): error TS2339: Property 'data' does not exist on type 'Consultation'.
+src/features/consultation/api/index.ts(92,19): error TS2339: Property 'data' does not exist on type 'Consultation'.
+src/features/consultation/api/index.ts(100,19): error TS2339: Property 'data' does not exist on type 'Consultation'.
+src/features/document/components/DocumentCard/index.tsx(28,40): error TS2339: Property 'type' does not exist on type 'Document'.
+src/features/document/components/DocumentCard/index.tsx(28,58): error TS2339: Property 'type' does not exist on type 'Document'.
+src/features/document/components/DocumentCard/index.tsx(54,33): error TS2339: Property 'fileType' does not exist on type 'Document'.
+src/features/document/components/DocumentCard/index.tsx(69,23): error TS2339: Property 'description' does not exist on type 'Document'.
+src/features/document/components/DocumentCard/index.tsx(69,47): error TS2339: Property 'fileName' does not exist on type 'Document'.
+src/features/document/components/DocumentCard/index.tsx(75,46): error TS2339: Property 'fileSize' does not exist on type 'Document'.
+src/features/document/components/DocumentCard/index.tsx(90,21): error TS2339: Property 'tags' does not exist on type 'Document'.
+src/features/document/components/DocumentCard/index.tsx(90,38): error TS2339: Property 'tags' does not exist on type 'Document'.
+src/features/document/components/DocumentCard/index.tsx(92,25): error TS2339: Property 'tags' does not exist on type 'Document'.
+src/features/document/components/DocumentCard/index.tsx(92,35): error TS7006: Parameter 'tag' implicitly has an 'any' type.
+src/features/document/hooks/useDocuments.ts(3,25): error TS2724: '"../types"' has no exported member named 'DocumentFilters'. Did you mean 'DocumentItem'?
+src/features/document/hooks/useDocuments.ts(3,42): error TS2305: Module '"../types"' has no exported member 'UploadDocumentDTO'.
+src/features/document/hooks/useDocuments.ts(16,5): error TS2322: Type '"approved"' is not assignable to type 'DocumentStatus'.
+src/features/document/hooks/useDocuments.ts(31,5): error TS2322: Type '"approved"' is not assignable to type 'DocumentStatus'.
+src/features/document/hooks/useDocuments.ts(46,5): error TS2322: Type '"pending"' is not assignable to type 'DocumentStatus'.
+src/features/document/hooks/useDocuments.ts(61,5): error TS2322: Type '"approved"' is not assignable to type 'DocumentStatus'.
+src/features/document/hooks/useDocuments.ts(99,45): error TS2339: Property 'type' does not exist on type 'Document'.
+src/features/document/hooks/useDocuments.ts(113,18): error TS2339: Property 'description' does not exist on type 'Document'.
+src/features/document/hooks/useDocuments.ts(113,37): error TS2339: Property 'description' does not exist on type 'Document'.
+src/features/document/hooks/useDocuments.ts(114,17): error TS2339: Property 'tags' does not exist on type 'Document'.
+src/features/document/hooks/useDocuments.ts(114,29): error TS7006: Parameter 'tag' implicitly has an 'any' type.
+src/features/document/hooks/useDocuments.ts(146,9): error TS2322: Type '"pending"' is not assignable to type 'DocumentStatus'.
+src/features/document/index.ts(11,3): error TS2724: '"./types"' has no exported member named 'DocumentFilters'. Did you mean 'DocumentItem'?
+src/features/enterprise/api/index.ts(325,12): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'Promise<{ success: boolean; }>'.
+src/features/enterprise/components/ComplianceDashboard.tsx(6,1): error TS6133: 'EnterpriseInfo' is declared but its value is never read.
+src/features/enterprise/components/ComplianceReportList.tsx(570,13): error TS18047: 'aValue' is possibly 'null'.
+src/features/enterprise/components/ComplianceReportList.tsx(570,22): error TS18047: 'bValue' is possibly 'null'.
+src/features/enterprise/components/ComplianceReportList.tsx(571,13): error TS18047: 'aValue' is possibly 'null'.
+src/features/enterprise/components/ComplianceReportList.tsx(571,22): error TS18047: 'bValue' is possibly 'null'.
+src/features/enterprise/components/ComplianceReportList.tsx(580,9): error TS6133: '_handleSort' is declared but its value is never read.
+src/features/forum-admin/components/UserManagement.tsx(110,9): error TS6133: '_formatDuration' is declared but its value is never read.
+src/features/knowledge/api/index.ts(8,3): error TS6196: 'KnowledgeCategory' is declared but never used.
+src/features/knowledge/api/index.ts(9,3): error TS6196: 'ConsultationTemplate' is declared but never used.
+src/features/knowledge/components/KnowledgeCard/index.tsx(2,15): error TS2724: '"../../types"' has no exported member named 'KnowledgeItem'. Did you mean 'KnowledgeType'?
+src/features/knowledge/components/KnowledgeCard/index.tsx(43,29): error TS7006: Parameter 'tag' implicitly has an 'any' type.
+src/features/knowledge/components/KnowledgeList/index.tsx(3,15): error TS2724: '"../../types"' has no exported member named 'KnowledgeItem'. Did you mean 'KnowledgeType'?
+src/features/knowledge/hooks/useKnowledgeItems.ts(3,15): error TS2724: '"../types"' has no exported member named 'KnowledgeItem'. Did you mean 'KnowledgeType'?
+src/features/knowledge/hooks/useKnowledgeItems.ts(3,30): error TS2305: Module '"../types"' has no exported member 'KnowledgeSearchFilters'.
+src/features/knowledge/hooks/useKnowledgeItems.ts(124,29): error TS7006: Parameter 'tag' implicitly has an 'any' type.
+src/features/knowledge/index.ts(8,3): error TS2724: '"./types"' has no exported member named 'KnowledgeItem'. Did you mean 'KnowledgeType'?
+src/features/knowledge/index.ts(10,3): error TS2305: Module '"./types"' has no exported member 'KnowledgeSearchFilters'.
+src/features/lawyer-matching/api/index.ts(6,3): error TS6196: 'LawyerMatchResult' is declared but never used.
+src/features/lawyer-matching/api/index.ts(7,3): error TS6196: 'LawyerDetail' is declared but never used.
+src/features/lawyer-matching/api/index.ts(8,3): error TS6196: 'Booking' is declared but never used.
+src/features/lawyer-matching/api/index.ts(9,3): error TS6196: 'LawyerReview' is declared but never used.
+src/features/lawyer-matching/api/index.ts(10,3): error TS6196: 'ReviewStats' is declared but never used.
+src/features/lawyer-matching/components/LawyerOnlineStatus.tsx(121,3): error TS6133: 'showWaitTime' is declared but its value is never read.
+src/features/lawyer/components/LawyerCard/index.tsx(11,38): error TS2339: Property 'status' does not exist on type 'Lawyer'.
+src/features/lawyer/components/LawyerCard/index.tsx(54,78): error TS2339: Property 'lawFirm' does not exist on type 'Lawyer'.
+src/features/lawyer/components/LawyerCard/index.tsx(63,53): error TS2339: Property 'consultationCount' does not exist on type 'Lawyer'.
+src/features/lawyer/components/LawyerCard/index.tsx(68,14): error TS18047: 'lawyer.specialties' is possibly 'null'.
+src/features/lawyer/components/LawyerCard/index.tsx(68,33): error TS2339: Property 'map' does not exist on type 'string'.
+src/features/lawyer/components/LawyerCard/index.tsx(68,38): error TS7006: Parameter 'specialty' implicitly has an 'any' type.
+src/features/lawyer/components/LawyerCard/index.tsx(79,74): error TS2339: Property 'bio' does not exist on type 'Lawyer'.
+src/features/lawyer/components/LawyerCard/index.tsx(85,77): error TS2339: Property 'pricePerHour' does not exist on type 'Lawyer'.
+src/features/lawyer/components/LawyerCard/index.tsx(90,32): error TS2339: Property 'status' does not exist on type 'Lawyer'.
+src/features/lawyer/components/LawyerCard/index.tsx(94,23): error TS2339: Property 'status' does not exist on type 'Lawyer'.
+src/features/lawyer/hooks/useLawyers.ts(3,23): error TS2305: Module '"../types"' has no exported member 'LawyerFilters'.
+src/features/lawyer/hooks/useLawyers.ts(12,5): error TS2322: Type 'string[]' is not assignable to type 'string'.
+src/features/lawyer/hooks/useLawyers.ts(29,5): error TS2322: Type 'string[]' is not assignable to type 'string'.
+src/features/lawyer/hooks/useLawyers.ts(46,5): error TS2322: Type 'string[]' is not assignable to type 'string'.
+src/features/lawyer/hooks/useLawyers.ts(63,5): error TS2322: Type 'string[]' is not assignable to type 'string'.
+src/features/lawyer/hooks/useLawyers.ts(80,5): error TS2322: Type 'string[]' is not assignable to type 'string'.
+src/features/lawyer/hooks/useLawyers.ts(127,11): error TS18047: 'lawyer.specialties' is possibly 'null'.
+src/features/lawyer/hooks/useLawyers.ts(133,51): error TS2339: Property 'status' does not exist on type 'Lawyer'.
+src/features/lawyer/hooks/useLawyers.ts(143,51): error TS2339: Property 'pricePerHour' does not exist on type 'Lawyer'.
+src/features/lawyer/hooks/useLawyers.ts(152,20): error TS2339: Property 'lawFirm' does not exist on type 'Lawyer'.
+src/features/lawyer/hooks/useLawyers.ts(153,20): error TS2339: Property 'bio' does not exist on type 'Lawyer'.
+src/features/lawyer/index.ts(9,3): error TS2305: Module '"./types"' has no exported member 'LawyerSpecialty'.
+src/features/lawyer/index.ts(10,3): error TS2305: Module '"./types"' has no exported member 'LawyerStatus'.
+src/features/lawyer/index.ts(11,3): error TS2305: Module '"./types"' has no exported member 'LawyerFilters'.
+src/features/membership/components/MembershipBenefits.tsx(5,85): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
+src/features/membership/components/MembershipCard.tsx(5,55): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
+src/features/membership/components/UpgradePrompt.tsx(6,52): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
+src/features/membership/pages/VipPage.tsx(6,65): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
+src/features/news-admin/api/index.ts(8,3): error TS6196: 'NewsAdminListItem' is declared but never used.
+src/features/news-admin/api/index.ts(18,3): error TS6196: 'CreateNewsResponse' is declared but never used.
+src/features/news-admin/api/index.ts(20,3): error TS6196: 'UpdateNewsResponse' is declared but never used.
+src/features/news-admin/api/index.ts(22,3): error TS6196: 'ReviewNewsResponse' is declared but never used.
+src/features/news-admin/api/index.ts(28,3): error TS6196: 'ReviewCommentResponse' is declared but never used.
+src/features/news-admin/api/index.ts(29,3): error TS6196: 'GetTopicsResponse' is declared but never used.
+src/features/news-admin/api/index.ts(31,3): error TS6196: 'CreateTopicResponse' is declared but never used.
+src/features/news-admin/api/index.ts(33,3): error TS6196: 'UpdateTopicResponse' is declared but never used.
+src/features/news-admin/api/index.ts(34,3): error TS6196: 'GetSourcesResponse' is declared but never used.
+src/features/news-admin/api/index.ts(36,3): error TS6196: 'CreateSourceResponse' is declared but never used.
+src/features/news-admin/api/index.ts(38,3): error TS6196: 'GetSourceHealthResponse' is declared but never used.
+src/features/news-admin/api/index.ts(40,3): error TS6196: 'GetIngestRunsResponse' is declared but never used.
+src/features/news-admin/hooks/useNewsAdmin.ts(8,3): error TS6196: 'NewsArticle' is declared but never used.
+src/features/news-admin/pages/NewsAdminPage.tsx(304,9): error TS2322: Type 'NewsAdminListItem | null' is not assignable to type 'NewsArticle | null | undefined'.
+  Type 'NewsAdminListItem' is missing the following properties from type 'NewsArticle': content, favoriteCount, isFavorited
+src/features/news/components/NewsCard/index.tsx(2,15): error TS2305: Module '"../../types"' has no exported member 'News'.
+src/features/news/components/NewsList/index.tsx(3,15): error TS2305: Module '"../../types"' has no exported member 'News'.
+src/features/news/hooks/useNews.ts(3,15): error TS2305: Module '"../types"' has no exported member 'News'.
+src/features/news/hooks/useNews.ts(3,21): error TS2305: Module '"../types"' has no exported member 'NewsFilters'.
+src/features/news/hooks/useNews.ts(3,34): error TS2305: Module '"../types"' has no exported member 'NewsLikeDTO'.
+src/features/news/hooks/useNews.ts(125,29): error TS7006: Parameter 'tag' implicitly has an 'any' type.
+src/features/news/index.ts(8,3): error TS2305: Module '"./types"' has no exported member 'News'.
+src/features/news/index.ts(10,3): error TS2305: Module '"./types"' has no exported member 'NewsFilters'.
+src/features/order/api/index.ts(6,3): error TS2724: '"../types"' has no exported member named '_Order'. Did you mean 'Order'?
+src/features/payment/components/OrderCard/index.tsx(39,66): error TS2339: Property 'finalAmount' does not exist on type 'PaymentOrder'.
+src/features/payment/components/OrderCard/index.tsx(40,18): error TS2339: Property 'discountAmount' does not exist on type 'PaymentOrder'.
+src/features/payment/components/OrderCard/index.tsx(40,42): error TS2339: Property 'discountAmount' does not exist on type 'PaymentOrder'.
+src/features/payment/components/OrderCard/index.tsx(61,17): error TS2339: Property 'bank_card' does not exist on type '{ wechat: string; alipay: string; card: string; balance: string; }'.
+src/features/payment/components/OrderCard/index.tsx(61,17): error TS2339: Property 'credit_card' does not exist on type '{ wechat: string; alipay: string; card: string; balance: string; }'.
+src/features/payment/hooks/usePayments.ts(3,29): error TS2305: Module '"../types"' has no exported member 'CreateOrderDTO'.
+src/features/payment/hooks/usePayments.ts(3,45): error TS2305: Module '"../types"' has no exported member 'WalletBalance'.
+src/features/payment/hooks/usePayments.ts(3,60): error TS2305: Module '"../types"' has no exported member 'Transaction'.
+src/features/payment/hooks/usePayments.ts(16,5): error TS2322: Type '"completed"' is not assignable to type 'PaymentOrderStatus'.
+src/features/payment/hooks/usePayments.ts(31,5): error TS2322: Type '"completed"' is not assignable to type 'PaymentOrderStatus'.
+src/features/payment/hooks/usePayments.ts(43,5): error TS2353: Object literal may only specify known properties, and 'finalAmount' does not exist in type 'PaymentOrder'.
+src/features/payment/hooks/usePayments.ts(166,9): error TS2353: Object literal may only specify known properties, and 'finalAmount' does not exist in type 'PaymentOrder'.
+src/features/payment/index.ts(16,3): error TS2305: Module '"./types"' has no exported member 'PaymentStatus'.
+src/features/payment/index.ts(17,3): error TS2305: Module '"./types"' has no exported member 'WalletBalance'.
+src/features/payment/index.ts(18,3): error TS2305: Module '"./types"' has no exported member 'Transaction'.
+src/features/points/__tests__/usePoints.test.ts(34,10): error TS6133: 'createTestQueryClient' is declared but its value is never read.
+src/features/points/__tests__/usePoints.test.ts(132,42): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type '{}' is not assignable to parameter of type 'Attributes & { children: ReactNode; }'.
+      Property 'children' is missing in type '{}' but required in type '{ children: ReactNode; }'.
+src/features/points/components/CheckInRewards.tsx(128,21): error TS6133: '_isTomorrow' is declared but its value is never read.
+src/features/points/components/ExchangeConfirmDialog.tsx(7,8): error TS6133: 'React' is declared but its value is never read.
+src/features/points/components/ExchangeSuccess.tsx(53,13): error TS7030: Not all code paths return a value.
+src/features/points/components/PointsBalanceCard.tsx(8,20): error TS6133: 'CardSkeleton' is declared but its value is never read.
+src/features/points/components/PointsMall.tsx(342,15): error TS2322: Type '{ page: number; pageSize: number; total: number; totalPages: number; hasPreviousPage: boolean; hasNextPage: boolean; pageSizeOptions: number[]; onPageChange: (newPage: number, newPageSize: number) => void; showTotal: true; showPageSize: true; }' is not assignable to type 'IntrinsicAttributes & PaginationProps'.
+  Property 'page' does not exist on type 'IntrinsicAttributes & PaginationProps'.
+src/features/points/pages/PointsHistoryPage.tsx(24,26): error TS2322: Type '{ showContinuousDays: boolean; }' is not assignable to type 'IntrinsicAttributes & PointsBalanceProps'.
+  Property 'showContinuousDays' does not exist on type 'IntrinsicAttributes & PointsBalanceProps'. Did you mean 'continuousDays'?
+src/features/points/pages/PointsMallPage.tsx(38,30): error TS2322: Type '{ showContinuousDays: boolean; }' is not assignable to type 'IntrinsicAttributes & PointsBalanceProps'.
+  Property 'showContinuousDays' does not exist on type 'IntrinsicAttributes & PointsBalanceProps'. Did you mean 'continuousDays'?
+src/features/post/api/index.ts(7,3): error TS6196: 'PostListItem' is declared but never used.
+src/features/post/api/index.ts(12,3): error TS6196: 'CreatePostResponse' is declared but never used.
+src/features/post/api/index.ts(14,3): error TS6196: 'UpdatePostResponse' is declared but never used.
+src/features/post/api/index.ts(20,3): error TS6196: 'CreateCommentResponse' is declared but never used.
+src/features/post/api/index.ts(21,3): error TS6196: 'LikePostRequest' is declared but never used.
+src/features/post/api/index.ts(23,3): error TS6196: 'UnlikePostRequest' is declared but never used.
+src/features/post/api/index.ts(25,3): error TS6196: 'PinPostRequest' is declared but never used.
+src/features/post/api/index.ts(26,3): error TS6196: 'FeaturePostRequest' is declared but never used.
+src/features/post/api/index.ts(27,3): error TS6196: 'PostActionResponse' is declared but never used.
+src/features/post/pages/EditPostPage.tsx(113,11): error TS2322: Type '(data: UpdatePostRequest) => Promise<void>' is not assignable to type '(data: CreatePostRequest | UpdatePostRequest) => void | Promise<void>'.
+  Types of parameters 'data' and 'data' are incompatible.
+    Type 'CreatePostRequest | UpdatePostRequest' is not assignable to type 'UpdatePostRequest'.
+      Property 'id' is missing in type 'CreatePostRequest' but required in type 'UpdatePostRequest'.
+src/features/post/pages/NewPostPage.tsx(23,38): error TS2552: Cannot find name 'UpdatePostRequest'. Did you mean 'CreatePostRequest'?
+src/features/post/pages/PostDetailPage.tsx(8,1): error TS6133: 'PostEditor' is declared but its value is never read.
+src/features/post/pages/PostDetailPage.tsx(42,10): error TS6133: 'isEditing' is declared but its value is never read.
+src/features/post/pages/PostDetailPage.tsx(42,21): error TS6133: 'setIsEditing' is declared but its value is never read.
+src/features/post/pages/PostListPage.tsx(27,28): error TS6133: 'refetch' is declared but its value is never read.
+src/features/promotion/__tests__/api.test.ts(21,1): error TS6192: All imports in import declaration are unused.
+src/features/promotion/api/index.ts(115,3): error TS2739: Type '{ totalInvited: number; totalRegistered: number; totalRewards: number; pendingRewards: number; conversionRate: number; period: "all"; }' is missing the following properties from type 'PromotionStats': totalCommission, pendingCommission, paidCommission
+src/features/promotion/components/index.ts(9,15): error TS2724: '"./PromotionLink"' has no exported member named 'PromotionLinkProps'. Did you mean 'PromotionLink'?
+src/features/promotion/components/index.ts(15,31): error TS2307: Cannot find module './PromotionCard' or its corresponding type declarations.
+src/features/promotion/components/index.ts(16,41): error TS2307: Cannot find module './PromotionCard' or its corresponding type declarations.
+src/features/promotion/components/index.ts(22,38): error TS2307: Cannot find module './CreatePromotionModal' or its corresponding type declarations.
+src/features/promotion/components/index.ts(23,48): error TS2307: Cannot find module './CreatePromotionModal' or its corresponding type declarations.
+src/features/promotion/components/index.ts(26,33): error TS2307: Cannot find module './PromotionQRCode' or its corresponding type declarations.
+src/features/promotion/components/index.ts(27,43): error TS2307: Cannot find module './PromotionQRCode' or its corresponding type declarations.
+src/features/promotion/components/index.ts(33,33): error TS2307: Cannot find module './ChannelSelector' or its corresponding type declarations.
+src/features/promotion/components/index.ts(34,43): error TS2307: Cannot find module './ChannelSelector' or its corresponding type declarations.
+src/features/promotion/components/index.ts(37,35): error TS2307: Cannot find module './PromotionMaterial' or its corresponding type declarations.
+src/features/promotion/components/index.ts(38,45): error TS2307: Cannot find module './PromotionMaterial' or its corresponding type declarations.
+src/features/promotion/components/PromotionLink.tsx(35,29): error TS2345: Argument of type '{}' is not assignable to parameter of type 'void'.
+src/features/promotion/components/PromotionStats.tsx(71,66): error TS2339: Property 'totalClicks' does not exist on type 'PromotionStats'.
+src/features/promotion/components/PromotionStats.tsx(75,67): error TS2339: Property 'totalConversions' does not exist on type 'PromotionStats'.
+src/features/promotion/components/PromotionStats.tsx(100,8): error TS18048: 'stats.trend' is possibly 'undefined'.
+src/features/promotion/components/PromotionStats.tsx(102,33): error TS2345: Argument of type 'StatsTrendItem[] | undefined' is not assignable to parameter of type 'StatsTrendItem[]'.
+  Type 'undefined' is not assignable to type 'StatsTrendItem[]'.
+src/features/promotion/components/PromotionStats.tsx(113,24): error TS2769: No overload matches this call.
+  Overload 1 of 4, '(value: string | number | Date): Date', gave the following error.
+    Argument of type 'string | undefined' is not assignable to parameter of type 'string | number | Date'.
+      Type 'undefined' is not assignable to type 'string | number | Date'.
+  Overload 2 of 4, '(value: string | number): Date', gave the following error.
+    Argument of type 'string | undefined' is not assignable to parameter of type 'string | number'.
+      Type 'undefined' is not assignable to type 'string | number'.
+src/features/promotion/components/PromotionStats.tsx(114,19): error TS2769: No overload matches this call.
+  Overload 1 of 4, '(value: string | number | Date): Date', gave the following error.
+    Argument of type 'string | undefined' is not assignable to parameter of type 'string | number | Date'.
+      Type 'undefined' is not assignable to type 'string | number | Date'.
+  Overload 2 of 4, '(value: string | number): Date', gave the following error.
+    Argument of type 'string | undefined' is not assignable to parameter of type 'string | number'.
+      Type 'undefined' is not assignable to type 'string | number'.
+src/features/promotion/components/PromotionStatsDetail.tsx(102,10): error TS6133: '_calculatePercentage' is declared but its value is never read.
+src/features/promotion/components/PromotionStatsModal.tsx(58,33): error TS18048: 'stats.trend' is possibly 'undefined'.
+src/features/promotion/components/PromotionStatsModal.tsx(59,38): error TS18048: 'stats.trend' is possibly 'undefined'.
+src/features/promotion/components/PromotionStatsModal.tsx(60,9): error TS6133: 'maxCommission' is declared but its value is never read.
+src/features/promotion/components/PromotionStatsModal.tsx(60,37): error TS18048: 'stats.trend' is possibly 'undefined'.
+src/features/promotion/components/PromotionStatsModal.tsx(85,27): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/features/promotion/components/PromotionStatsModal.tsx(85,59): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/features/promotion/components/PromotionStatsModal.tsx(132,28): error TS2339: Property 'totalClicks' does not exist on type 'PromotionStats'.
+src/features/promotion/components/PromotionStatsModal.tsx(138,28): error TS2339: Property 'totalConversions' does not exist on type 'PromotionStats'.
+src/features/promotion/components/PromotionStatsModal.tsx(181,20): error TS18048: 'stats.trend' is possibly 'undefined'.
+src/features/promotion/components/PromotionStatsModal.tsx(204,20): error TS18048: 'stats.trend' is possibly 'undefined'.
+src/features/promotion/components/PromotionStatsModal.tsx(221,20): error TS18048: 'stats.trend' is possibly 'undefined'.
+src/features/promotion/components/PromotionStatsModal.tsx(250,20): error TS18048: 'stats.trend' is possibly 'undefined'.
+src/features/promotion/components/QRCodeGenerator.tsx(67,35): error TS7016: Could not find a declaration file for module 'qrcode'. 'd:/Git/百姓助手/frontend/frontend-v2/node_modules/qrcode/lib/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/qrcode` if it exists or add a new declaration (.d.ts) file containing `declare module 'qrcode';`
+src/features/promotion/components/QRCodeGenerator.tsx(104,35): error TS7016: Could not find a declaration file for module 'qrcode'. 'd:/Git/百姓助手/frontend/frontend-v2/node_modules/qrcode/lib/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/qrcode` if it exists or add a new declaration (.d.ts) file containing `declare module 'qrcode';`
+src/features/promotion/components/QRCodeGenerator.tsx(387,37): error TS7016: Could not find a declaration file for module 'qrcode'. 'd:/Git/百姓助手/frontend/frontend-v2/node_modules/qrcode/lib/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/qrcode` if it exists or add a new declaration (.d.ts) file containing `declare module 'qrcode';`
+src/features/promotion/hooks/useGenerateQRCode.ts(62,35): error TS7016: Could not find a declaration file for module 'qrcode'. 'd:/Git/百姓助手/frontend/frontend-v2/node_modules/qrcode/lib/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/qrcode` if it exists or add a new declaration (.d.ts) file containing `declare module 'qrcode';`
+src/features/promotion/hooks/useGenerateQRCode.ts(100,35): error TS7016: Could not find a declaration file for module 'qrcode'. 'd:/Git/百姓助手/frontend/frontend-v2/node_modules/qrcode/lib/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/qrcode` if it exists or add a new declaration (.d.ts) file containing `declare module 'qrcode';`
+src/features/promotion/hooks/useGenerateQRCode.ts(169,37): error TS7016: Could not find a declaration file for module 'qrcode'. 'd:/Git/百姓助手/frontend/frontend-v2/node_modules/qrcode/lib/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/qrcode` if it exists or add a new declaration (.d.ts) file containing `declare module 'qrcode';`
+src/features/search/components/SearchResults.tsx(9,20): error TS6196: 'SearchResultsType' is declared but never used.
+src/features/settlement/components/SettlementCard/index.tsx(24,34): error TS2339: Property 'startDate' does not exist on type 'SettlementRecord'.
+src/features/settlement/components/SettlementCard/index.tsx(24,97): error TS2339: Property 'endDate' does not exist on type 'SettlementRecord'.
+src/features/settlement/components/SettlementCard/index.tsx(29,27): error TS2551: Property 'netAmount' does not exist on type 'SettlementRecord'. Did you mean 'amount'?
+src/features/settlement/components/SettlementCard/index.tsx(37,73): error TS2339: Property 'totalIncome' does not exist on type 'SettlementRecord'.
+src/features/settlement/components/SettlementCard/index.tsx(41,73): error TS2339: Property 'platformFee' does not exist on type 'SettlementRecord'.
+src/features/settlement/components/SettlementCard/index.tsx(45,76): error TS2551: Property 'taxAmount' does not exist on type 'SettlementRecord'. Did you mean 'amount'?
+src/features/settlement/components/SettlementCard/index.tsx(54,21): error TS2339: Property 'completedAt' does not exist on type 'SettlementRecord'.
+src/features/settlement/hooks/useSettlements.ts(9,5): error TS2353: Object literal may only specify known properties, and 'userId' does not exist in type 'SettlementRecord'.
+src/features/settlement/hooks/useSettlements.ts(23,5): error TS2353: Object literal may only specify known properties, and 'userId' does not exist in type 'SettlementRecord'.
+src/features/settlement/hooks/useSettlements.ts(41,5): error TS2353: Object literal may only specify known properties, and 'userId' does not exist in type 'IncomeRecord'.
+src/features/settlement/hooks/useSettlements.ts(51,5): error TS2353: Object literal may only specify known properties, and 'userId' does not exist in type 'IncomeRecord'.
+src/features/settlement/hooks/useSettlements.ts(61,5): error TS2353: Object literal may only specify known properties, and 'userId' does not exist in type 'IncomeRecord'.
+src/features/settlement/hooks/useSettlements.ts(75,5): error TS2353: Object literal may only specify known properties, and 'userId' does not exist in type 'WithdrawalRequest'.
+src/features/settlement/hooks/useSettlements.ts(86,5): error TS2353: Object literal may only specify known properties, and 'userId' does not exist in type 'WithdrawalRequest'.
+src/features/system-config/components/ConfigEditor.tsx(6,62): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
+src/features/system-config/components/ConfigHistory.tsx(6,71): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
+src/features/system-config/components/ConfigList.tsx(6,74): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
+src/features/system-config/pages/SystemConfigPage.tsx(6,56): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
+src/pages/Document/index.tsx(10,5): error TS2322: Type '"certificate"' is not assignable to type '"" | DocumentType'.
+src/pages/Document/index.tsx(11,5): error TS2322: Type '"evidence"' is not assignable to type '"" | DocumentType'.
+src/pages/Document/index.tsx(18,5): error TS2322: Type '"pending"' is not assignable to type '"" | DocumentStatus'.
+src/pages/Document/index.tsx(19,5): error TS2322: Type '"approved"' is not assignable to type '"" | DocumentStatus'.
+src/pages/Document/index.tsx(20,5): error TS2322: Type '"rejected"' is not assignable to type '"" | DocumentStatus'.
+src/pages/Knowledge/index.tsx(8,5): error TS2322: Type '"labor"' is not assignable to type '"" | KnowledgeCategory'.
+src/pages/Knowledge/index.tsx(9,5): error TS2322: Type '"contract"' is not assignable to type '"" | KnowledgeCategory'.
+src/pages/Knowledge/index.tsx(10,5): error TS2322: Type '"marriage"' is not assignable to type '"" | KnowledgeCategory'.
+src/pages/Knowledge/index.tsx(11,5): error TS2322: Type '"property"' is not assignable to type '"" | KnowledgeCategory'.
+src/pages/Knowledge/index.tsx(12,5): error TS2322: Type '"consumer"' is not assignable to type '"" | KnowledgeCategory'.
+src/pages/Knowledge/index.tsx(13,5): error TS2322: Type '"traffic"' is not assignable to type '"" | KnowledgeCategory'.
+src/pages/Knowledge/index.tsx(14,5): error TS2322: Type '"inheritance"' is not assignable to type '"" | KnowledgeCategory'.
+src/pages/Knowledge/index.tsx(15,5): error TS2322: Type '"other"' is not assignable to type '"" | KnowledgeCategory'.
+src/pages/Knowledge/index.tsx(53,17): error TS2322: Type '"" | KnowledgeCategory' is not assignable to type 'Key | null | undefined'.
+  Type 'KnowledgeCategory' is not assignable to type 'Key | null | undefined'.
+src/pages/News/index.tsx(8,5): error TS2322: Type '"legal"' is not assignable to type '"" | NewsCategory'.
+src/pages/News/index.tsx(9,5): error TS2322: Type '"case"' is not assignable to type '"" | NewsCategory'.
+src/pages/News/index.tsx(10,5): error TS2322: Type '"policy"' is not assignable to type '"" | NewsCategory'.
+src/pages/News/index.tsx(11,5): error TS2322: Type '"industry"' is not assignable to type '"" | NewsCategory'.
+src/pages/News/index.tsx(53,17): error TS2322: Type '"" | NewsCategory' is not assignable to type 'Key | null | undefined'.
+  Type 'NewsCategory' is not assignable to type 'Key | null | undefined'.
+src/pages/Settlement/index.tsx(72,72): error TS2339: Property 'description' does not exist on type 'IncomeRecord'.
+src/pages/Settlement/index.tsx(75,54): error TS2339: Property 'sourceType' does not exist on type 'IncomeRecord'.
+src/pages/Settlement/index.tsx(83,77): error TS2339: Property 'amount' does not exist on type 'IncomeRecord'.
+src/pages/Settlement/index.tsx(84,55): error TS2339: Property 'settled' does not exist on type 'IncomeRecord'.
+src/pages/Settlement/index.tsx(85,33): error TS2339: Property 'settled' does not exist on type 'IncomeRecord'.
+src/pages/Settlement/index.tsx(108,43): error TS2339: Property 'bankName' does not exist on type 'WithdrawalRequest'.
+src/pages/Settlement/index.tsx(110,74): error TS2339: Property 'bankAccount' does not exist on type 'WithdrawalRequest'.
+src/pages/Settlement/index.tsx(124,37): error TS2339: Property 'processedAt' does not exist on type 'WithdrawalRequest'.
+src/pages/Settlement/index.tsx(126,56): error TS2339: Property 'processedAt' does not exist on type 'WithdrawalRequest'.
+src/test/test-utils.tsx(29,5): error TS2353: Object literal may only specify known properties, and 'logger' does not exist in type 'QueryClientConfig'.

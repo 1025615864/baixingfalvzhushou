@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from collections.abc import Awaitable, Callable
 from typing import cast
@@ -8,6 +9,8 @@ from typing import cast
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+
+logger = logging.getLogger(__name__)
 
 
 class EnvelopeMiddleware(BaseHTTPMiddleware):
@@ -63,8 +66,10 @@ class EnvelopeMiddleware(BaseHTTPMiddleware):
                             buf.extend(chunk.tobytes())
                         else:
                             try:
-                                buf.extend(bytes(chunk))  # type: ignore[arg-type]
+                                # type: ignore[arg-type]
+                                buf.extend(bytes(chunk))
                             except Exception:
+                                logger.exception("Failed to process chunk in envelope middleware")
                                 continue
                     body_bytes = bytes(buf)
 
@@ -90,9 +95,11 @@ class EnvelopeMiddleware(BaseHTTPMiddleware):
         try:
             payload: object = cast(object, json.loads(body_bytes))
         except Exception:
+            logger.exception("Failed to parse JSON body in envelope middleware")
             return _return_unmodified()
 
-        if isinstance(payload, dict) and ("ok" in payload) and ("data" in payload):
+        if isinstance(payload, dict) and (
+                "ok" in payload) and ("data" in payload):
             return _return_unmodified()
 
         wrapped: dict[str, object] = {

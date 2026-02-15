@@ -1,0 +1,346 @@
+import { useState } from 'react';
+import { Search, MapPin, Star, Briefcase, GraduationCap, MessageSquare, ChevronRight } from 'lucide-react';
+
+import { Button } from '@/components/ui/Button';
+import { Card, CardContent } from '@/components/ui/Card';
+
+type LawyerSpecialty = 'all' | 'labor' | 'contract' | 'marriage' | 'property' | 'criminal' | 'traffic' | 'intellectual' | 'inheritance' | 'corporate';
+
+interface SpecialtyOption {
+  value: LawyerSpecialty;
+  label: string;
+  count?: number;
+}
+
+const specialties: SpecialtyOption[] = [
+  { value: 'all', label: '全部专业', count: 1280 },
+  { value: 'labor', label: '劳动法', count: 156 },
+  { value: 'contract', label: '合同法', count: 234 },
+  { value: 'marriage', label: '婚姻法', count: 189 },
+  { value: 'property', label: '房产法', count: 145 },
+  { value: 'criminal', label: '刑事辩护', count: 198 },
+  { value: 'traffic', label: '交通事故', count: 123 },
+  { value: 'intellectual', label: '知识产权', count: 87 },
+  { value: 'inheritance', label: '继承法', count: 76 },
+  { value: 'corporate', label: '公司法', count: 112 },
+];
+
+// 模拟律师数据
+const mockLawyers = [
+  {
+    id: 1,
+    name: '张律师',
+    avatar: '',
+    title: '高级合伙人',
+    firm: '北京市大成律师事务所',
+    specialty: ['劳动法', '合同法'],
+    experience: 15,
+    cases: 1200,
+    rating: 4.9,
+    reviews: 328,
+    location: '北京',
+    price: '¥500/小时',
+    tags: ['资深专家', '响应快速'],
+  },
+  {
+    id: 2,
+    name: '李律师',
+    avatar: '',
+    title: '合伙人律师',
+    firm: '上海市锦天城律师事务所',
+    specialty: ['婚姻法', '继承法'],
+    experience: 12,
+    cases: 890,
+    rating: 4.8,
+    reviews: 256,
+    location: '上海',
+    price: '¥400/小时',
+    tags: ['耐心细致', '经验丰富'],
+  },
+  {
+    id: 3,
+    name: '王律师',
+    avatar: '',
+    title: '资深律师',
+    firm: '广州市金杜律师事务所',
+    specialty: ['刑事辩护', '公司法'],
+    experience: 10,
+    cases: 650,
+    rating: 4.9,
+    reviews: 189,
+    location: '广州',
+    price: '¥600/小时',
+    tags: ['专业权威', '胜率高'],
+  },
+  {
+    id: 4,
+    name: '陈律师',
+    avatar: '',
+    title: '执业律师',
+    firm: '深圳市中伦律师事务所',
+    specialty: ['房产法', '合同法'],
+    experience: 8,
+    cases: 420,
+    rating: 4.7,
+    reviews: 134,
+    location: '深圳',
+    price: '¥350/小时',
+    tags: ['服务热情', '价格透明'],
+  },
+  {
+    id: 5,
+    name: '刘律师',
+    avatar: '',
+    title: '高级合伙人',
+    firm: '北京市金诚同达律师事务所',
+    specialty: ['知识产权', '公司法'],
+    experience: 18,
+    cases: 1500,
+    rating: 5.0,
+    reviews: 412,
+    location: '北京',
+    price: '¥800/小时',
+    tags: ['行业专家', '知名律师'],
+  },
+  {
+    id: 6,
+    name: '赵律师',
+    avatar: '',
+    title: '合伙人律师',
+    firm: '杭州市天册律师事务所',
+    specialty: ['交通事故', '劳动法'],
+    experience: 11,
+    cases: 720,
+    rating: 4.8,
+    reviews: 198,
+    location: '杭州',
+    price: '¥380/小时',
+    tags: ['认真负责', '沟通顺畅'],
+  },
+];
+
+export function LawyerPage(): JSX.Element {
+  const [selectedSpecialty, setSelectedSpecialty] = useState<LawyerSpecialty>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('recommended');
+  const [showFilters, setShowFilters] = useState(false);
+
+  const filteredLawyers = mockLawyers.filter(lawyer => {
+    const matchesSpecialty = selectedSpecialty === 'all' || 
+      lawyer.specialty.some(s => {
+        const specialtyMap: Record<string, string> = {
+          '劳动法': 'labor',
+          '合同法': 'contract',
+          '婚姻法': 'marriage',
+          '房产法': 'property',
+          '刑事辩护': 'criminal',
+          '交通事故': 'traffic',
+          '知识产权': 'intellectual',
+          '继承法': 'inheritance',
+          '公司法': 'corporate',
+        };
+        return specialtyMap[s] === selectedSpecialty;
+      });
+    const matchesSearch = searchQuery === '' || 
+      lawyer.name.includes(searchQuery) || 
+      lawyer.firm.includes(searchQuery);
+    return matchesSpecialty && matchesSearch;
+  });
+
+  return (
+    <div className="min-h-screen bg-slate-50 pt-16">
+      {/* Header Banner */}
+      <div className="bg-gradient-primary py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">
+              找律师
+            </h1>
+            <p className="text-lg text-white/70 max-w-2xl mx-auto">
+              专业律师在线解答，为您提供权威法律意见，一对一贴心服务
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Search and Filter Section */}
+        <div className="bg-white rounded-2xl shadow-soft p-6 mb-6">
+          {/* Search Input */}
+          <div className="relative mb-6">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="搜索律师姓名、律所、专业领域..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
+            />
+          </div>
+
+          {/* Specialty Filter */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {specialties.map((spec) => (
+              <button
+                key={spec.value}
+                onClick={() => setSelectedSpecialty(spec.value)}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                  selectedSpecialty === spec.value
+                    ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/25'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {spec.label}
+                {spec.count && (
+                  <span className={`ml-1.5 text-xs ${
+                    selectedSpecialty === spec.value ? 'text-white/70' : 'text-slate-400'
+                  }`}>
+                    {spec.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Advanced Filters Toggle */}
+          <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center gap-2 text-sm text-slate-600 hover:text-primary-600 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+              高级筛选
+              <ChevronRight className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-90' : ''}`} />
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-500">排序：</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="text-sm border-0 bg-transparent text-slate-700 font-medium focus:ring-0 cursor-pointer"
+              >
+                <option value="recommended">综合推荐</option>
+                <option value="rating">评分最高</option>
+                <option value="experience">经验最丰富</option>
+                <option value="price">价格最低</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats Bar */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4 text-sm text-slate-600">
+            <span>共找到 <span className="font-semibold text-slate-900">{filteredLawyers.length}</span> 位律师</span>
+            {selectedSpecialty !== 'all' && (
+              <span className="px-2 py-1 bg-primary-50 text-primary-700 rounded-lg text-xs">
+                {specialties.find(s => s.value === selectedSpecialty)?.label}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Lawyer Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredLawyers.map((lawyer) => (
+            <Card key={lawyer.id} variant="hover" className="group">
+              <CardContent className="p-6">
+                {/* Header */}
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-lg">
+                    {lawyer.name.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-lg font-semibold text-slate-900">{lawyer.name}</h3>
+                      {lawyer.rating >= 4.9 && (
+                        <span className="px-2 py-0.5 bg-accent-100 text-accent-700 text-xs font-medium rounded-full">
+                          优选
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-slate-500">{lawyer.title}</p>
+                    <p className="text-sm text-slate-400 truncate">{lawyer.firm}</p>
+                  </div>
+                </div>
+
+                {/* Stats */}
+                <div className="flex items-center gap-4 mb-4 text-sm">
+                  <div className="flex items-center gap-1">
+                    <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                    <span className="font-semibold text-slate-900">{lawyer.rating}</span>
+                    <span className="text-slate-400">({lawyer.reviews})</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-slate-600">
+                    <Briefcase className="w-4 h-4" />
+                    <span>{lawyer.experience}年经验</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-slate-600">
+                    <GraduationCap className="w-4 h-4" />
+                    <span>{lawyer.cases}案例</span>
+                  </div>
+                </div>
+
+                {/* Specialty Tags */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {lawyer.specialty.map((spec, index) => (
+                    <span
+                      key={index}
+                      className="px-2.5 py-1 bg-slate-100 text-slate-600 text-xs rounded-lg"
+                    >
+                      {spec}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Tags */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {lawyer.tags.map((tag, index) => (
+                    <span
+                      key={index}
+                      className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Location & Price */}
+                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                  <div className="flex items-center gap-1 text-sm text-slate-500">
+                    <MapPin className="w-4 h-4" />
+                    {lawyer.location}
+                  </div>
+                  <div className="text-lg font-bold text-primary-600">
+                    {lawyer.price}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-3 mt-4">
+                  <Button variant="outline" size="sm" fullWidth>
+                    查看详情
+                  </Button>
+                  <Button variant="primary" size="sm" fullWidth leftIcon={<MessageSquare className="w-4 h-4" />}>
+                    立即咨询
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Empty State */}
+        {filteredLawyers.length === 0 && (
+          <div className="text-center py-16">
+            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Search className="w-10 h-10 text-slate-400" />
+            </div>
+            <h3 className="text-lg font-medium text-slate-900 mb-2">未找到符合条件的律师</h3>
+            <p className="text-slate-500">请尝试调整筛选条件或搜索关键词</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

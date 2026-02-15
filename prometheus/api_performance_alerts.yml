@@ -1,0 +1,184 @@
+# API性能告警规则
+
+groups:
+  - name: api_performance
+    interval: 30s
+    rules:
+      # API响应时间告警
+      - alert: APIHighLatency
+        expr: |
+          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "API响应时间过高"
+          description: "API P95响应时间超过1秒：{{ $value }}秒"
+
+      - alert: APICriticalLatency
+        expr: |
+          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 3
+        for: 2m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "API响应时间严重过高"
+          description: "API P95响应时间超过3秒：{{ $value }}秒"
+
+      # API错误率告警
+      - alert: APIHighErrorRate
+        expr: |
+          rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "API错误率过高"
+          description: "API 5xx错误率超过5%：{{ $value | humanizePercentage }}"
+
+      - alert: APICriticalErrorRate
+        expr: |
+          rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "API错误率严重过高"
+          description: "API 5xx错误率超过10%：{{ $value | humanizePercentage }}"
+
+      # API请求量告警
+      - alert: APILowRequestRate
+        expr: |
+          rate(http_requests_total[5m]) < 10
+        for: 10m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "API请求量过低"
+          description: "API请求量低于10 req/s：{{ $value }} req/s"
+
+      # 支付接口告警
+      - alert: PaymentCallbackLatency
+        expr: |
+          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{path=~"/api/v1/payment/callback.*"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: payment
+        annotations:
+          summary: "支付回调响应时间过高"
+          description: "支付回调P95响应时间超过2秒：{{ $value }}秒"
+
+      - alert: PaymentCallbackErrorRate
+        expr: |
+          rate(http_requests_total{path=~"/api/v1/payment/callback.*",status=~"5.."}[5m]) / rate(http_requests_total{path=~"/api/v1/payment/callback.*"}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          component: payment
+        annotations:
+          summary: "支付回调错误率过高"
+          description: "支付回调错误率超过10%：{{ $value | humanizePercentage }}"
+
+  - name: database_performance
+    interval: 30s
+    rules:
+      # 数据库连接池告警
+      - alert: DatabaseConnectionPoolHighUsage
+        expr: |
+          pg_stat_activity_count / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "数据库连接池使用率过高"
+          description: "数据库连接池使用率超过80%：{{ $value | humanizePercentage }}"
+
+      - alert: DatabaseSlowQuery
+        expr: |
+          rate(pg_stat_statements_calls_total[5m]) > 1000 and histogram_quantile(0.95, rate(pg_stat_statements_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "数据库慢查询"
+          description: "检测到慢查询，P95执行时间超过1秒"
+
+  - name: system_performance
+    interval: 30s
+    rules:
+      # CPU使用率告警
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "CPU使用率过高"
+          description: "CPU使用率超过80%：{{ $value }}%"
+
+      - alert: CriticalCPUUsage
+        expr: |
+          100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "CPU使用率严重过高"
+          description: "CPU使用率超过90%：{{ $value }}%"
+
+      # 内存使用率告警
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "内存使用率过高"
+          description: "内存使用率超过80%：{{ $value }}%"
+
+      - alert: CriticalMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "内存使用率严重过高"
+          description: "内存使用率超过90%：{{ $value }}%"
+
+      # 磁盘使用率告警
+      - alert: HighDiskUsage
+        expr: |
+          (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "磁盘使用率过高"
+          description: "磁盘使用率超过80%：{{ $value }}%"
+
+      - alert: CriticalDiskUsage
+        expr: |
+          (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 90
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "磁盘使用率严重过高"
+          description: "磁盘使用率超过90%：{{ $value }}%"

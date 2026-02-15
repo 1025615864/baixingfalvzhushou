@@ -22,7 +22,10 @@ async def test_admin_reconcile_order_not_found_returns_404(client, test_session)
     try:
         resp = await client.get("/api/payment/admin/reconcile/not-exist")
         assert resp.status_code == 404
-        assert resp.json()["detail"] == "订单不存在"
+        data = resp.json()
+        assert data["ok"] is False
+        assert "error" in data
+        assert "订单不存在" in str(data["error"])
     finally:
         app.dependency_overrides.pop(require_admin, None)
 

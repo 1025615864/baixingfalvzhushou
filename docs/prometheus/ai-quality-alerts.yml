@@ -1,0 +1,246 @@
+# AI 质量监控告警规则
+#
+# 这份告警规则用于 Prometheus Alertmanager，可以根据实际需求调整阈值
+# 使用方式：
+#   1. 将此文件放入 Prometheus 配置目录
+#   2. 在 prometheus.yml 中引用此文件
+#   3. 或通过 Alertmanager API 导入
+
+groups:
+  - name: ai-quality-alerts
+    interval: 30s  # 评估间隔
+    rules:
+
+      # ----------------------------------------------------------------
+      # 满意度告警
+      # ----------------------------------------------------------------
+      - alert: AISatisfactionLow
+        expr: |
+          baixing_ai_quality_score_satisfaction_rate < 75
+        for: 1d  # 持续1天触发
+        labels:
+          severity: warning
+          team: ai
+        annotations:
+          summary: "AI满意度低于75%"
+          description: |
+            当前满意度: {{ $value | humanizePercentage }}
+            目标: ≥75%
+            建议: 检查AI模型响应质量，优化提示词
+          runbook_url: "https://docs.baixing-law.com/runbooks/ai-satisfaction"
+          dashboard_url: "https://grafana.baixing-law.com/d/ai-quality-monitor"
+
+      - alert: AISatisfactionCritical
+        expr: |
+          baixing_ai_quality_score_satisfaction_rate < 50
+        for: 6h
+        labels:
+          severity: critical
+          team: ai
+        annotations:
+          summary: "AI满意度严重偏低！"
+          description: |
+            当前满意度: {{ $value | humanizePercentage }}
+            已严重低于预期: 50%
+            建议: 立即检查AI服务，可能需要回滚最近的模型变更
+
+      # ----------------------------------------------------------------
+      # 响应时间告警
+      # ----------------------------------------------------------------
+      - alert: AISlowResponse
+        expr: |
+          histogram_quantile(0.95, rate(baixing_ai_quality_response_time_seconds_bucket[5m])) > 3
+        for: 30m  # 持续30分钟触发
+        labels:
+          severity: warning
+          team: ai
+        annotations:
+          summary: "AI响应时间P95超过3秒"
+          description: |
+            当前P95响应时间: {{ $value | humanizeDuration }}
+            目标: P95 < 3s
+            建议: 检查模型响应速度，优化提示词复杂度
+
+      - alert: AIResponseTimeout
+        expr: |
+          histogram_quantile(0.99, rate(baixing_ai_quality_response_time_seconds_bucket[5m])) > 5
+        for: 15m
+        labels:
+          severity: critical
+          team: ai
+        annotations:
+          summary: "AI响应时间P99超过5秒！"
+          description: |
+            当前P99响应时间: {{ $value | humanizeDuration }}
+            已严重影响用户体验
+            建议: 立即检查服务性能，考虑增加超时配置
+
+      # ----------------------------------------------------------------
+      # 错误率告警
+      # ----------------------------------------------------------------
+      - alert: AIHighErrorRate
+        expr: |
+          (
+            baixing_ai_quality_errors_total
+            / clamp_min(baixing_ai_quality_conversations_total, 1)
+          ) > 0.1
+        for: 1h
+        labels:
+          severity: warning
+          team: ai
+        annotations:
+          summary: "AI错误率超过10%"
+          description: |
+            当前错误率: {{ $value | humanizePercentage }}
+            目标: < 10%
+            建议: 检查错误日志，定位问题原因
+
+      - alert: AIErrorRateCritical
+        expr: |
+          (
+            baixing_ai_quality_errors_total
+            / clamp_min(baixing_ai_quality_conversations_total, 1)
+          ) > 0.2
+        for: 30m
+        labels:
+          severity: critical
+          team: ai
+          pager: "true"
+        annotations:
+          summary: "AI错误率严重偏高！"
+          description: |
+            当前错误率: {{ $value | humanizePercentage }}
+            已严重影响服务可用性
+            建议: 立即排查，可能是上游服务或模型异常
+
+      # ----------------------------------------------------------------
+      # 无数据告警
+      # ----------------------------------------------------------------
+      - alert: AINoData
+        expr: |
+          increase(baixing_ai_quality_conversations_total[5m]) == 0
+        for: 15m
+        labels:
+          severity: info
+          team: ai
+        annotations:
+          summary: "AI服务5分钟无请求"
+          description: |
+            AI服务在最近5分钟内没有收到任何请求
+            建议: 检查服务是否正常运行
+
+      - alert: AIServiceDown
+        expr: |
+          absent(baixing_ai_quality_conversations_total[2m])
+        for: 2m
+        labels:
+          severity: critical
+          team: ai
+        annotations:
+          summary: "AI服务可能宕机"
+          description: |
+            2分钟内没有AI质量监控数据
+            建议: 检查AI服务状态和监控组件
+
+      # ----------------------------------------------------------------
+      # 特定错误类型告警
+      # ----------------------------------------------------------------
+      - alert: AITimeoutErrorsHigh
+        expr: |
+         baixing_ai_quality_error_type_total{type="TimeoutError"} > 10
+        for: 1h
+        labels:
+          severity: warning
+          team: ai
+        annotations:
+          summary: "AI超时错误过多"
+          description: |
+            最近1小时内发生 {{ $value }} 次超时错误
+            建议: 检查模型响应速度，考虑增加超时时间
+
+      - alert: AIRateLimitErrorsHigh
+        expr: |
+          baixing_ai_quality_error_type_total{type="RateLimitError"} > 5
+        for: 30m
+        labels:
+          severity: warning
+          team: ai
+        annotations:
+          summary: "AI触发限流"
+          description: |
+            最近30分钟内发生 {{ $value }} 次限流错误
+            建议: 检查API配额，考虑增加限流阈值
+
+      # ----------------------------------------------------------------
+      # 工具使用异常告警
+      # ----------------------------------------------------------------
+      - alert: AIToolFailureHigh
+        expr: |
+          baixing_ai_quality_tool_total > 0
+        for: 0m
+        labels:
+          severity: info
+          team: ai
+        annotations:
+          summary: "AI工具使用统计"
+          description: |
+            当前工具使用情况:
+            {{ $labels.tool }}: {{ $value }} 次
+          runbook_url: "https://docs.baixing-law.com/runbooks/ai-tools"
+
+      # ----------------------------------------------------------------
+      # 趋势告警
+      # ----------------------------------------------------------------
+      - alert: AIQualityScoreDrop
+        expr: |
+          (
+            avg_over_time(baixing_ai_quality_score_avg[1h])
+            - avg_over_time(baixing_ai_quality_score_avg[24h] offset 1d)
+          ) < -0.5
+        for: 1h
+        labels:
+          severity: warning
+          team: ai
+        annotations:
+          summary: "AI质量评分显著下降"
+          description: |
+            相比昨天同时段，平均评分下降了 {{ $value | humanizeDuration }} 分
+            建议: 对比分析最近24小时的对话内容，找出问题所在
+
+      # ----------------------------------------------------------------
+      # 综合健康告警
+      # ----------------------------------------------------------------
+      - alert: AIHealthCheckFailed
+        expr: |
+          up{job="ai-quality"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: ai
+          pager: "true"
+        annotations:
+          summary: "AI质量监控健康检查失败"
+          description: |
+            AI质量监控系统健康检查失败
+            建议: 检查监控组件运行状态
+
+# ----------------------------------------------------------------
+# 告警抑制规则
+# ----------------------------------------------------------------
+inhibit_rules:
+  # 抑制更严重的告警时，抑制相关的警告告警
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal:
+      - team
+      - service
+
+  # 无数据告警抑制其他告警
+  - source_match:
+      alertname: AINoData
+    target_match:
+      severity: warning
+    equal:
+      - team

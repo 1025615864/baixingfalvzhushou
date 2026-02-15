@@ -13,7 +13,8 @@ class PostCreate(BaseModel):
     category: str = Field(default="general", description="分类")
     cover_image: str | None = Field(None, description="封面图URL")
     images: list[str] | None = Field(None, description="图片URL列表")
-    attachments: list[dict[str, str]] | None = Field(None, description="附件列表[{name, url}]")
+    attachments: list[dict[str, str]] | None = Field(
+        None, description="附件列表[{name, url}]")
 
 
 class PostUpdate(BaseModel):
@@ -35,7 +36,7 @@ class AuthorInfo(BaseModel):
     username: str
     nickname: str | None = None
     avatar: str | None = None
-    
+
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
 
@@ -74,7 +75,7 @@ class PostResponse(BaseModel):
     is_liked: bool = False
     is_favorited: bool = False
     reactions: list[ReactionCount] = []  # 表情反应统计
-    
+
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
 
@@ -88,7 +89,8 @@ class PostListResponse(BaseModel):
 
 class PostIdListRequest(BaseModel):
     """批量操作帖子请求"""
-    ids: Annotated[list[int], Field(default_factory=list, description="帖子ID列表")]
+    ids: Annotated[list[int], Field(
+        default_factory=list, description="帖子ID列表")]
 
 
 # ============ 评论相关 ============
@@ -116,7 +118,7 @@ class CommentResponse(BaseModel):
     author: AuthorInfo | None = None
     is_liked: bool = False
     replies: list["CommentResponse"] = []
-    
+
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
 
@@ -179,3 +181,56 @@ class PostStatsResponse(BaseModel):
     hot_posts_count: int
     essence_posts_count: int
     category_stats: list[dict[str, int]]
+
+
+# ============ 律师邀请相关 ============
+
+class LawyerInvitationCreate(BaseModel):
+    """创建律师邀请"""
+    lawyer_id: int = Field(..., description="律师ID")
+    message: str | None = Field(None, max_length=500, description="邀请留言")
+
+
+class LawyerInvitationResponse(BaseModel):
+    """律师邀请响应"""
+    id: int
+    post_id: int
+    lawyer_id: int
+    invited_by: int
+    status: str  # pending/accepted/declined/expired
+    message: str | None = None
+    responded_at: datetime | None = None
+    expires_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
+
+
+class LawyerInvitationListResponse(BaseModel):
+    """律师邀请列表响应"""
+    items: list[LawyerInvitationResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+# ============ News 转 Forum 相关 ============
+
+class NewsToForumPostRequest(BaseModel):
+    """新闻转论坛帖子请求"""
+    news_id: int = Field(..., description="新闻ID")
+    title: str | None = Field(
+        None,
+        max_length=200,
+        description="自定义标题，默认使用新闻标题")
+    content: str | None = Field(None, description="自定义内容，默认使用新闻摘要+链接")
+    category: str = Field(default="general", description="帖子分类")
+
+
+class NewsToForumPostResponse(BaseModel):
+    """新闻转论坛帖子响应"""
+    post_id: int
+    post_title: str
+    post_url: str
+    message: str

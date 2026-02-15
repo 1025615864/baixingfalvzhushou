@@ -16,6 +16,7 @@ class SearchQuality:
 
 
 class ResponseStrategy(str, Enum):
+    DIRECT_ANSWER = "direct_answer"
     FULL_RAG = "full_rag"
     PARTIAL_RAG = "partial_rag"
     GENERAL_LEGAL = "general_legal"
@@ -47,7 +48,8 @@ class ResponseStrategyDecider:
         r"跨.*境",
     ]
 
-    def decide(self, query: str, search_quality: SearchQuality, *, risk_level: RiskLevel) -> StrategyDecision:
+    def decide(self, query: str, search_quality: SearchQuality, *,
+               risk_level: RiskLevel) -> StrategyDecision:
         q = str(query or "")
 
         if risk_level == RiskLevel.BLOCKED:

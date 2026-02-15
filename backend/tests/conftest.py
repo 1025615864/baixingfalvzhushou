@@ -465,8 +465,17 @@ def _cleanup_services():
 
 @pytest.fixture(autouse=True)
 def _reset_logging_handlers():
-    """自动重置日志处理器"""
+    """自动重置日志处理器并确保日志目录存在"""
     import logging
+    
+    # 确保日志目录存在 - 修复 FileNotFoundError
+    for logger_name in ["app", "app.services", "app.services.wechat", "app.services.wechat_service"]:
+        logger = logging.getLogger(logger_name)
+        for handler in logger.handlers[:]:
+            # 确保文件处理器的目录存在
+            if isinstance(handler, logging.FileHandler):
+                log_path = Path(handler.baseFilename).parent
+                log_path.mkdir(parents=True, exist_ok=True)
     
     yield
     
@@ -501,6 +510,14 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "unit: marks tests as unit tests")
     config.addinivalue_line("markers", "integration: marks tests as integration tests")
     config.addinivalue_line("markers", "database: marks tests that need database")
+
+    # 忽略 WebSocket 测试中的 RuntimeWarning（协程未等待）
+    # 这是因为 enhance_websocket 在测试中使用 asyncio.create_task 发送后台消息
+    # 但测试中不等待这些后台任务完成
+    config.addinivalue_line(
+        "filterwarnings",
+        "ignore::RuntimeWarning:.*_broadcast_to_room"
+    )
 
 
 def pytest_collection_modifyitems(config, items):

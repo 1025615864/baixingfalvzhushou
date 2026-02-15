@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Integer, String, Text, DateTime, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import Index, Integer, String, Text, DateTime, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from ..database import Base
@@ -16,29 +16,50 @@ if TYPE_CHECKING:
 class Notification(Base):
     """用户通知表"""
     __tablename__: str = "notifications"
-    __table_args__: tuple[UniqueConstraint, ...] = (
-        UniqueConstraint("user_id", "type", "dedupe_key", name="uq_notifications_user_type_dedupe_key"),
+    __table_args__: tuple = (
+        # 去重唯一约束
+        UniqueConstraint(
+            "user_id",
+            "type",
+            "dedupe_key",
+            name="uq_notifications_user_type_dedupe_key"),
+        # 用户未读通知查询优化
+        Index('ix_notifications_user_unread', 'user_id', 'is_read', 'created_at'),
+        # 通知类型筛选优化
+        Index('ix_notifications_user_type', 'user_id', 'type', 'created_at'),
     )
-    
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    type: Mapped[str] = mapped_column(String(50), nullable=False)  # comment_reply, post_like, system, etc.
+
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True)
+    # comment_reply, post_like, system, etc.
+    type: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
-    link: Mapped[str | None] = mapped_column(String(500), nullable=True)  # 跳转链接
+    link: Mapped[str | None] = mapped_column(
+        String(500), nullable=True)  # 跳转链接
     dedupe_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
-    
+
     # 关联信息
-    related_user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)  # 触发通知的用户
-    related_post_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 关联帖子
-    related_comment_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 关联评论
-    
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    
+    related_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True)  # 触发通知的用户
+    related_post_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True)  # 关联帖子
+    related_comment_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True)  # 关联评论
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now())
+
     # 关系
-    user: Mapped[User] = relationship("User", foreign_keys=[user_id], backref="notifications")
-    related_user: Mapped[User | None] = relationship("User", foreign_keys=[related_user_id])
+    user: Mapped[User] = relationship(
+        "User",
+        foreign_keys=[user_id],
+        backref="notifications")
+    related_user: Mapped[User | None] = relationship(
+        "User", foreign_keys=[related_user_id])
 
 
 # 通知类型常量

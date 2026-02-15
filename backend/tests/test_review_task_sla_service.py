@@ -72,7 +72,7 @@ def test_compute_review_due_at_returns_none_when_base_missing() -> None:
 
 
 def test_compute_review_due_at_normalizes_naive_base_and_min_minutes() -> None:
-    base = datetime.utcnow()
+    base = datetime.now(timezone.utc)
     t = ConsultationReviewTask(
         consultation_id=1,
         user_id=1,
@@ -137,12 +137,12 @@ async def test_scan_skipped_when_notifications_disabled(test_session) -> None:
 
 @pytest.mark.asyncio
 async def test_scan_inserts_notifications_sqlite(test_session, monkeypatch) -> None:
-    import app.services.websocket_service as websocket_service
+    from app.services.unified_notification_service import unified_notification_service
 
-    async def fake_notify_user(*args, **kwargs):
+    async def fake_notify_ws(*args, **kwargs):
         return True
 
-    monkeypatch.setattr(websocket_service, "notify_user", fake_notify_user, raising=True)
+    monkeypatch.setattr(unified_notification_service, "notify_ws", fake_notify_ws, raising=True)
 
     cfg = {
         "pending_sla_minutes": 1,
@@ -289,7 +289,7 @@ async def test_scan_swallow_enable_notifications_query_error_and_no_values(monke
     def fake_due_at(task, cfg):
         if str(getattr(task, "status", "")) == "submitted":
             return None
-        return datetime.utcnow() + timedelta(minutes=120)
+        return datetime.now(timezone.utc) + timedelta(minutes=120)
 
     monkeypatch.setattr(svc, "compute_review_due_at", fake_due_at, raising=True)
     out = await svc.scan_and_notify_review_task_sla(DummyDb())  # type: ignore[arg-type]
@@ -334,13 +334,13 @@ async def test_scan_postgresql_returning_branch_and_notify(monkeypatch) -> None:
 
     calls = {"notify": 0}
 
-    async def fake_notify_user(*args, **kwargs):
+    async def fake_notify_ws(*args, **kwargs):
         calls["notify"] += 1
         return True
 
-    import app.services.websocket_service as websocket_service
+    from app.services.unified_notification_service import unified_notification_service
 
-    monkeypatch.setattr(websocket_service, "notify_user", fake_notify_user, raising=True)
+    monkeypatch.setattr(unified_notification_service, "notify_ws", fake_notify_ws, raising=True)
 
     class DummyDb:
         def __init__(self):
@@ -354,7 +354,12 @@ async def test_scan_postgresql_returning_branch_and_notify(monkeypatch) -> None:
                 return DummyRes(scalar=DummyCfg())
             if self.calls == 3:
                 return DummyRes(rows=[(t, 2)])
-            return DummyRes(inserted_rows=[(0, "t", "c", "/l", "k"), (2, "t", "c", "/l", "k")])
+            return DummyRes(
+                inserted_rows=[
+                    (0, 0, "t", "c", "/l", "k"),
+                    (2, 2, "t", "c", "/l", "k"),
+                ]
+            )
 
         async def commit(self):
             return None
@@ -399,12 +404,12 @@ async def test_scan_values_notify_skips_invalid_uid(monkeypatch) -> None:
         class dialect:
             name = "sqlite"
 
-    async def fake_notify_user(*args, **kwargs):
+    async def fake_notify_ws(*args, **kwargs):
         return True
 
-    import app.services.websocket_service as websocket_service
+    from app.services.unified_notification_service import unified_notification_service
 
-    monkeypatch.setattr(websocket_service, "notify_user", fake_notify_user, raising=True)
+    monkeypatch.setattr(unified_notification_service, "notify_ws", fake_notify_ws, raising=True)
 
     class DummyDb:
         def __init__(self):
@@ -462,12 +467,12 @@ async def test_scan_notify_exception_is_swallowed(monkeypatch) -> None:
         class dialect:
             name = "postgresql"
 
-    async def boom_notify(*args, **kwargs):
+    async def boom_notify_ws(*args, **kwargs):
         raise RuntimeError("notify")
 
-    import app.services.websocket_service as websocket_service
+    from app.services.unified_notification_service import unified_notification_service
 
-    monkeypatch.setattr(websocket_service, "notify_user", boom_notify, raising=True)
+    monkeypatch.setattr(unified_notification_service, "notify_ws", boom_notify_ws, raising=True)
 
     class DummyDb:
         def __init__(self):
@@ -481,7 +486,7 @@ async def test_scan_notify_exception_is_swallowed(monkeypatch) -> None:
                 return DummyRes(scalar=DummyCfg())
             if self.calls == 3:
                 return DummyRes(rows=[(t, 2)])
-            return DummyRes(inserted_rows=[(2, "t", "c", "/l", "k")])
+            return DummyRes(inserted_rows=[(2, 2, "t", "c", "/l", "k")])
 
         async def commit(self):
             return None

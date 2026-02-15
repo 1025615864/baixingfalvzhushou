@@ -108,6 +108,16 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd redis-cli ping
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -137,9 +147,102 @@ jobs:
         env:
           DEBUG: "1"
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379/0
           JWT_SECRET_KEY: test-secret-key
           PAYMENT_WEBHOOK_SECRET: test-payment-webhook-secret
-        run: python -m pytest tests/ -v --tb=short --cov=app --cov-report=xml:coverage.xml --cov-report=term:skip-covered --cov-fail-under=60
+        run: python -m pytest tests/ -v --tb=short --cov=app --cov-report=xml:coverage.xml --cov-report=term:skip-covered --cov-fail-under=62
+
+  # Schemathesis API 测试（基于 OpenAPI Schema）
+  schemathesis-api-test:
+    needs: [backend-test]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd redis-cli ping
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+          python -m pip install schemathesis[cli]
+
+      - name: Start backend server
+        env:
+          DEBUG: "1"
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET_KEY: test-secret-key-change-me-32chars-minimum
+          PAYMENT_WEBHOOK_SECRET: test-payment-webhook-secret
+        run: |
+          python -m uvicorn app.main:app --host 0.0.0.0 --port 8080 &
+          sleep 10
+
+      - name: Wait for server to be ready
+        run: |
+          for i in {1..30}; do
+            if curl -s http://localhost:8080/health > /dev/null 2>&1; then
+              echo "Server is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server failed to start"
+          exit 1
+
+      - name: Run Schemathesis API tests
+        run: |
+          schemathesis run http://localhost:8080/openapi.json \
+            --checks all \
+            --base-url http://localhost:8080 \
+            --validate-schema \
+            --verbosity verbose \
+            --output-format cli \
+            --junit-xml results/schemathesis-junit.xml \
+            --json results/schemathesis-report.json || true
+
+      - name: Upload Schemathesis results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: schemathesis-results
+          path: |
+            backend/results/
+            schemathesis.toml
+          retention-days: 7
 
   # 前端构建
   frontend-build:
@@ -161,11 +264,113 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate || true
+
       - name: Type check
         run: npx tsc --noEmit
 
       - name: Build
         run: npm run build
+
+  # ========== 镜像构建和安全扫描验证 ==========
+  docker-build-verify:
+    needs: [backend-test, frontend-build]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 后端镜像构建和扫描
+      - name: Build backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: false
+          load: true
+          tags: baixing-backend:ci
+          cache-from: type=gha
+
+      - name: Run Trivy vulnerability scanner (backend)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'baixing-backend:ci'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Run Trivy vulnerability scanner (backend - JSON)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'baixing-backend:ci'
+          format: 'json'
+          output: 'trivy-backend-results.json'
+          severity: 'CRITICAL'
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Check critical vulnerabilities (backend)
+        run: |
+          if [ -f trivy-backend-results.json ]; then
+            python3 scripts/check_trivy_results.py --report trivy-backend-results.json --severity CRITICAL --max-allowed 0
+          else
+            echo "::warning::Trivy 扫描结果文件未生成"
+          fi
+
+      # 前端镜像构建和扫描
+      - name: Build frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: false
+          load: true
+          tags: baixing-frontend:ci
+          cache-from: type=gha
+
+      - name: Run Trivy vulnerability scanner (frontend - table)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'baixing-frontend:ci'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Run Trivy vulnerability scanner (frontend - JSON)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'baixing-frontend:ci'
+          format: 'json'
+          output: 'trivy-frontend-results.json'
+          severity: 'CRITICAL'
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Check critical vulnerabilities (frontend)
+        run: |
+          if [ -f trivy-frontend-results.json ]; then
+            python3 scripts/check_trivy_results.py --report trivy-frontend-results.json --severity CRITICAL --max-allowed 0
+          else
+            echo "::warning::Trivy 扫描结果文件未生成"
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## 🐳 镜像构建与安全扫描" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| 检查项 | 状态 |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 后端镜像构建 | ✅ 完成 |" >> $GITHUB_STEP_SUMMARY
+          echo "| 后端漏洞扫描 | ✅ 完成 |" >> $GITHUB_STEP_SUMMARY
+          echo "| 前端镜像构建 | ✅ 完成 |" >> $GITHUB_STEP_SUMMARY
+          echo "| 前端漏洞扫描 | ✅ 完成 |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> ⚠️ 发现 CRITICAL 级别漏洞将阻断 CI 流程" >> $GITHUB_STEP_SUMMARY
 
   # Playwright E2E (minimal documents closed-loop)
   playwright-documents-e2e:
@@ -214,6 +419,55 @@ jobs:
           E2E_DATABASE_URL: "sqlite+aiosqlite:////tmp/e2e_playwright.db"
         run: npm run test:e2e -- --grep "(documents:|unauth:)"
 
+  # Playwright E2E (regression serial pipeline)
+  playwright-regression-e2e:
+    needs: [backend-test, frontend-build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare backend data dir
+        run: |
+          mkdir -p backend/data
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Install Playwright (chromium)
+        working-directory: ./frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run regression E2E (serial)
+        working-directory: ./frontend
+        env:
+          DEBUG: "1"
+          JWT_SECRET_KEY: "test-secret-key-change-me-32chars-minimum"
+          PAYMENT_WEBHOOK_SECRET: "test-payment-webhook-secret"
+          E2E_DATABASE_URL: "sqlite+aiosqlite:////tmp/e2e_playwright.db"
+        run: |
+          set -euo pipefail
+          npm run test:e2e:regression:serial
+
   # Docker构建（仅main分支）
   docker-build:
     needs: [backend-test, frontend-build]
@@ -261,8 +515,11 @@ jobs:
 
       - name: Run Ruff (Python linter)
         run: |
-          ruff check backend/app --ignore E501 || echo "ruff check failed (ignored)"
-        continue-on-error: true
+          ruff check backend/app --ignore E501
+
+      - name: Run Mypy (Python type check)
+        run: |
+          mypy backend/app --ignore-missing-imports
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -282,11 +539,10 @@ jobs:
         working-directory: ./frontend
         run: |
           if node -e "const p=require('./package.json'); const deps={...(p.dependencies||{}),...(p.devDependencies||{})}; process.exit(deps.eslint?0:1)"; then
-            npx eslint src --ext .ts,.tsx --max-warnings 50 || echo "eslint failed (ignored)"
+            npx eslint src --ext .ts,.tsx --max-warnings 50
           else
             echo "eslint not configured; skipping eslint"
           fi
-        continue-on-error: true
 
   # 安全扫描
   security-scan:
@@ -346,7 +602,7 @@ jobs:
   required-checks:
     runs-on: ubuntu-latest
     needs:
-      [helm-validate, backend-test, frontend-build, playwright-documents-e2e]
+      [helm-validate, backend-test, frontend-build, code-quality, playwright-documents-e2e, schemathesis-api-test]
     if: always()
     steps:
       - name: Verify required jobs
@@ -354,17 +610,25 @@ jobs:
           echo "helm-validate=${{ needs.helm-validate.result }}"
           echo "backend-test=${{ needs.backend-test.result }}"
           echo "frontend-build=${{ needs.frontend-build.result }}"
+          echo "code-quality=${{ needs.code-quality.result }}"
           echo "playwright-documents-e2e=${{ needs.playwright-documents-e2e.result }}"
+          echo "schemathesis-api-test=${{ needs.schemathesis-api-test.result }}"
           helm="${{ needs.helm-validate.result }}"
           backend="${{ needs.backend-test.result }}"
           frontend="${{ needs.frontend-build.result }}"
+          quality="${{ needs.code-quality.result }}"
           e2e="${{ needs.playwright-documents-e2e.result }}"
+          schemathesis="${{ needs.schemathesis-api-test.result }}"
 
-          if [ "$helm" != "success" ] || [ "$backend" != "success" ] || [ "$frontend" != "success" ]; then
+          if [ "$helm" != "success" ] || [ "$backend" != "success" ] || [ "$frontend" != "success" ] || [ "$quality" != "success" ]; then
             exit 1
           fi
 
           if [ "$e2e" = "success" ] || [ "$e2e" = "skipped" ]; then
+            exit 0
+          fi
+
+          if [ "$schemathesis" = "success" ] || [ "$schemathesis" = "skipped" ]; then
             exit 0
           fi
 

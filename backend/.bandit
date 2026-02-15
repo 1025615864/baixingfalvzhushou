@@ -1,0 +1,42 @@
+# 安全扫描配置
+# .bandit配置文件
+
+[exclude_dirs]
+# 排除测试目录
+tests/
+# 排除迁移目录
+alembic/versions/
+
+[tests]
+# 测试插件
+B201: flask_debug_true
+B301: pickle
+B501: request_with_no_cert_validation
+B502: ssl_with_no_version
+B503: ssl_with_bad_version
+B504: ssl_with_no_ssl_version
+B601: paramiko_calls
+B602: subprocess_popen_with_shell_equals_true
+B603: subprocess_without_shell_equals_true
+B604: any_other_function_with_shell_equals_true
+B605: start_process_with_a_shell
+B606: start_process_with_no_shell
+B607: start_process_with_partial_path
+B608: hardcoded_sql_expressions
+B609: linux_commands_wildcard_injection
+B610: django_extra_used
+B611: django_rawsql_used
+B701: jinja2_autoescape_false
+B702: use_of_mako_templates
+
+[severity]
+# 设置最低严重级别
+low
+medium
+high
+
+[confidence]
+# 设置最低置信度
+low
+medium
+high

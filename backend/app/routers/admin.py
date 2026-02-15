@@ -3,6 +3,7 @@ from collections.abc import AsyncIterator, Mapping
 from typing import Annotated, cast
 import csv
 import io
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
@@ -18,8 +19,18 @@ from ..models.lawfirm import LawFirm
 from ..models.consultation import Consultation, ChatMessage
 from ..models.knowledge import LegalKnowledge
 from ..utils.deps import require_admin
+from ..utils.pii import sanitize_pii
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["管理后台"])
+
+
+def _log_export_action(user_id: int, export_type: str, record_count: int) -> None:
+    """记录导出操作审计日志"""
+    logger.info(
+        f"Admin export: user_id={user_id}, type={export_type}, records={record_count}"
+    )
 
 
 @router.get("/stats", summary="获取统计数据")
@@ -32,11 +43,11 @@ async def get_stats(
     # 用户统计
     user_count = await db.execute(select(func.count()).select_from(User))
     total_users = user_count.scalar() or 0
-    
+
     # 新闻统计
     news_count = await db.execute(select(func.count()).select_from(News))
     total_news = news_count.scalar() or 0
-    
+
     # 帖子统计
     post_count = await db.execute(select(func.count()).select_from(Post))
     total_posts = post_count.scalar() or 0
@@ -48,11 +59,11 @@ async def get_stats(
     # AI咨询统计
     consultation_count = await db.execute(select(func.count()).select_from(Consultation))
     total_consultations = consultation_count.scalar() or 0
-    
+
     # 律所统计
     firm_count = await db.execute(select(func.count()).select_from(LawFirm))
     total_firms = firm_count.scalar() or 0
-    
+
     return {
         "users": total_users,
         "news": total_news,
@@ -65,10 +76,14 @@ async def get_stats(
 
 # ============ 数据导出 API ============
 
-def generate_csv(data: list[dict[str, object]], fieldnames: list[str]) -> io.StringIO:
+def generate_csv(data: list[dict[str, object]],
+                 fieldnames: list[str]) -> io.StringIO:
     """生成CSV内容"""
     output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction='ignore')
+    writer = csv.DictWriter(
+        output,
+        fieldnames=fieldnames,
+        extrasaction='ignore')
     writer.writeheader()
     for row in data:
         # 处理日期时间格式
@@ -83,10 +98,15 @@ def generate_csv(data: list[dict[str, object]], fieldnames: list[str]) -> io.Str
     return output
 
 
-async def generate_csv_stream(fieldnames: list[str], rows_iter: AsyncIterator[Mapping[str, object]]):
+async def generate_csv_stream(
+        fieldnames: list[str], rows_iter: AsyncIterator[Mapping[str, object]]):
     header_out = io.StringIO()
     _ = header_out.write("\ufeff")
-    header_writer = csv.DictWriter(header_out, fieldnames=fieldnames, extrasaction='ignore', lineterminator="\n")
+    header_writer = csv.DictWriter(
+        header_out,
+        fieldnames=fieldnames,
+        extrasaction='ignore',
+        lineterminator="\n")
     header_writer.writeheader()
     yield header_out.getvalue()
 
@@ -99,7 +119,11 @@ async def generate_csv_stream(fieldnames: list[str], rows_iter: AsyncIterator[Ma
                 processed[k] = v
 
         out = io.StringIO()
-        writer = csv.DictWriter(out, fieldnames=fieldnames, extrasaction='ignore', lineterminator="\n")
+        writer = csv.DictWriter(
+            out,
+            fieldnames=fieldnames,
+            extrasaction='ignore',
+            lineterminator="\n")
         writer.writerow(processed)
         yield out.getvalue()
 
@@ -110,14 +134,22 @@ async def export_users(
     db: Annotated[AsyncSession, Depends(get_db)],
     format: Annotated[str, Query(description="导出格式: csv")] = "csv",
 ):
-    """导出所有用户数据为CSV"""
-    _ = current_user
-    _ = format
-    fieldnames = ["id", "username", "email", "nickname", "phone", "role", "is_active", "created_at"]
+    """导出所有用户数据为CSV（敏感字段已脱敏）"""
+    user_id = current_user.id
+    fieldnames = [
+        "id",
+        "username",
+        "email",
+        "nickname",
+        "phone",
+        "role",
+        "is_active",
+        "created_at"]
 
     async def row_generator():
         batch_size = 1000
         offset = 0
+        record_count = 0
         while True:
             result = await db.execute(
                 select(User).order_by(User.id).offset(offset).limit(batch_size)
@@ -126,17 +158,21 @@ async def export_users(
             if not users:
                 break
             for u in users:
+                record_count += 1
                 yield {
                     "id": u.id,
-                    "username": u.username,
-                    "email": u.email,
-                    "nickname": u.nickname or "",
-                    "phone": u.phone or "",
+                    "username": sanitize_pii(u.username),
+                    "email": sanitize_pii(u.email),
+                    "nickname": sanitize_pii(u.nickname or ""),
+                    "phone": sanitize_pii(u.phone or ""),
                     "role": u.role,
                     "is_active": "是" if u.is_active else "否",
                     "created_at": u.created_at,
                 }
             offset += batch_size
+
+        # 记录审计日志
+        _log_export_action(user_id, "users", record_count)
 
     filename = f"users_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
     return StreamingResponse(
@@ -153,7 +189,17 @@ async def export_posts(
 ):
     """导出所有帖子数据为CSV"""
     _ = current_user
-    fieldnames = ["id", "title", "author", "category", "view_count", "like_count", "comment_count", "is_pinned", "is_hot", "created_at"]
+    fieldnames = [
+        "id",
+        "title",
+        "author",
+        "category",
+        "view_count",
+        "like_count",
+        "comment_count",
+        "is_pinned",
+        "is_hot",
+        "created_at"]
 
     async def row_generator():
         batch_size = 500
@@ -199,14 +245,21 @@ async def export_news(
 ):
     """导出所有新闻数据为CSV"""
     _ = current_user
-    fieldnames = ["id", "title", "category", "view_count", "is_published", "created_at"]
+    fieldnames = [
+        "id",
+        "title",
+        "category",
+        "view_count",
+        "is_published",
+        "created_at"]
 
     async def row_generator():
         batch_size = 1000
         offset = 0
         while True:
             result = await db.execute(
-                select(News).order_by(News.id.desc()).offset(offset).limit(batch_size)
+                select(News).order_by(
+                    News.id.desc()).offset(offset).limit(batch_size)
             )
             news_list = result.scalars().all()
             if not news_list:
@@ -237,14 +290,27 @@ async def export_lawfirms(
 ):
     """导出所有律所数据为CSV"""
     _ = current_user
-    fieldnames = ["id", "name", "city", "province", "address", "phone", "email", "rating", "review_count", "is_verified", "is_active", "created_at"]
+    fieldnames = [
+        "id",
+        "name",
+        "city",
+        "province",
+        "address",
+        "phone",
+        "email",
+        "rating",
+        "review_count",
+        "is_verified",
+        "is_active",
+        "created_at"]
 
     async def row_generator():
         batch_size = 1000
         offset = 0
         while True:
             result = await db.execute(
-                select(LawFirm).order_by(LawFirm.id).offset(offset).limit(batch_size)
+                select(LawFirm).order_by(
+                    LawFirm.id).offset(offset).limit(batch_size)
             )
             firms = result.scalars().all()
             if not firms:
@@ -281,20 +347,33 @@ async def export_knowledge(
 ):
     """导出所有法律知识数据为CSV"""
     _ = current_user
-    fieldnames = ["id", "knowledge_type", "title", "article_number", "category", "content", "keywords", "source", "is_active", "is_vectorized", "created_at"]
+    fieldnames = [
+        "id",
+        "knowledge_type",
+        "title",
+        "article_number",
+        "category",
+        "content",
+        "keywords",
+        "source",
+        "is_active",
+        "is_vectorized",
+        "created_at"]
 
     async def row_generator():
         batch_size = 500
         offset = 0
         while True:
             result = await db.execute(
-                select(LegalKnowledge).order_by(LegalKnowledge.id).offset(offset).limit(batch_size)
+                select(LegalKnowledge).order_by(
+                    LegalKnowledge.id).offset(offset).limit(batch_size)
             )
             knowledge_list = result.scalars().all()
             if not knowledge_list:
                 break
             for k in knowledge_list:
-                content_preview = k.content[:200] + "..." if len(k.content) > 200 else k.content
+                content_preview = k.content[:200] + \
+                    "..." if len(k.content) > 200 else k.content
                 yield {
                     "id": k.id,
                     "knowledge_type": k.knowledge_type,
@@ -323,13 +402,22 @@ async def export_consultations(
     current_user: Annotated[User, Depends(require_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """导出所有咨询记录为CSV"""
-    _ = current_user
-    fieldnames = ["id", "session_id", "user", "title", "status", "message_count", "created_at", "updated_at"]
+    """导出所有咨询记录为CSV（敏感字段已脱敏）"""
+    user_id = current_user.id
+    fieldnames = [
+        "id",
+        "session_id",
+        "user",
+        "title",
+        "status",
+        "message_count",
+        "created_at",
+        "updated_at"]
 
     async def row_generator() -> AsyncIterator[Mapping[str, object]]:
         batch_size = 500
         offset = 0
+        record_count = 0
         while True:
             result = await db.execute(
                 select(
@@ -356,21 +444,26 @@ async def export_consultations(
                 .offset(offset)
                 .limit(batch_size)
             )
-            rows = cast(list[tuple[int, str, str | None, datetime, datetime, str | None, int]], result.all())
+            rows = cast(list[tuple[int, str, str | None, datetime,
+                        datetime, str | None, int]], result.all())
             if not rows:
                 break
             for consultation_id, session_id, title, created_at, updated_at, username, message_count in rows:
+                record_count += 1
                 yield {
                     "id": consultation_id,
                     "session_id": session_id,
-                    "user": username or "",
-                    "title": title or "",
+                    "user": sanitize_pii(username or ""),
+                    "title": sanitize_pii(title or ""),
                     "status": "",
                     "message_count": int(message_count),
                     "created_at": created_at,
                     "updated_at": updated_at,
                 }
             offset += batch_size
+
+        # 记录审计日志
+        _log_export_action(user_id, "consultations", record_count)
 
     filename = f"consultations_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
     return StreamingResponse(

@@ -1,5 +1,6 @@
 import asyncio
 import io
+import logging
 import os
 import subprocess
 import tempfile
@@ -16,6 +17,8 @@ try:
     import sherpa_onnx  # type: ignore
 except Exception:
     sherpa_onnx = None
+
+logger = logging.getLogger(__name__)
 
 
 SherpaMode = Literal["off", "local", "remote"]
@@ -45,7 +48,11 @@ def sherpa_is_ready(settings: Any) -> bool:
         return False
 
     if mode == "remote":
-        url = str(_get_setting(settings, "sherpa_asr_remote_url", "") or "").strip()
+        url = str(
+            _get_setting(
+                settings,
+                "sherpa_asr_remote_url",
+                "") or "").strip()
         return bool(url)
 
     if np is None:
@@ -54,16 +61,33 @@ def sherpa_is_ready(settings: Any) -> bool:
     if sherpa_onnx is None:
         return False
 
-    tokens = str(_get_setting(settings, "sherpa_onnx_tokens", "") or "").strip()
-    wenet_ctc = str(_get_setting(settings, "sherpa_onnx_wenet_ctc_model", "") or "").strip()
-    whisper_encoder = str(_get_setting(settings, "sherpa_onnx_whisper_encoder", "") or "").strip()
-    whisper_decoder = str(_get_setting(settings, "sherpa_onnx_whisper_decoder", "") or "").strip()
+    tokens = str(
+        _get_setting(
+            settings,
+            "sherpa_onnx_tokens",
+            "") or "").strip()
+    wenet_ctc = str(
+        _get_setting(
+            settings,
+            "sherpa_onnx_wenet_ctc_model",
+            "") or "").strip()
+    whisper_encoder = str(
+        _get_setting(
+            settings,
+            "sherpa_onnx_whisper_encoder",
+            "") or "").strip()
+    whisper_decoder = str(
+        _get_setting(
+            settings,
+            "sherpa_onnx_whisper_decoder",
+            "") or "").strip()
 
     if tokens and wenet_ctc:
         return os.path.exists(tokens) and os.path.exists(wenet_ctc)
 
     if tokens and whisper_encoder and whisper_decoder:
-        return os.path.exists(tokens) and os.path.exists(whisper_encoder) and os.path.exists(whisper_decoder)
+        return os.path.exists(tokens) and os.path.exists(
+            whisper_encoder) and os.path.exists(whisper_decoder)
 
     return False
 
@@ -110,14 +134,45 @@ def wave_open(file_obj: io.BytesIO):
     return wave.open(file_obj, "rb")
 
 
+# 允许的音频文件扩展名白名单
+ALLOWED_AUDIO_SUFFIXES = {".wav", "mp3", ".mp3", ".ogg", ".flac", ".m4a", ".aac", ".wma", ".webm"}
+
+
+def _validate_audio_suffix(suffix: str) -> str:
+    """
+    验证音频文件扩展名是否合法
+    
+    Args:
+        suffix: 文件扩展名
+        
+    Returns:
+        合法的扩展名，如果不合法返回 .bin
+    """
+    if not suffix:
+        return ".bin"
+    
+    # 统一转换为小写并确保以点开头
+    normalized = suffix.lower() if suffix.startswith(".") else f".{suffix.lower()}"
+    
+    if normalized in ALLOWED_AUDIO_SUFFIXES:
+        return normalized
+    
+    # 不合法的扩展名，使用通用二进制扩展名
+    logger.warning(f"Unsupported audio suffix: {suffix}, using .bin")
+    return ".bin"
+
+
 def _convert_with_ffmpeg_to_wav_16k_mono(content: bytes, suffix: str) -> bytes:
     if not _ffmpeg_available():
         raise RuntimeError("ffmpeg_not_available")
 
+    # 验证文件扩展名
+    safe_suffix = _validate_audio_suffix(suffix)
+
     in_path = None
     out_path = None
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=safe_suffix) as f:
             in_path = f.name
             f.write(content)
 
@@ -140,7 +195,12 @@ def _convert_with_ffmpeg_to_wav_16k_mono(content: bytes, suffix: str) -> bytes:
             "wav",
             out_path,
         ]
-        cp = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=30)
+        cp = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=30)
         if cp.returncode != 0:
             raise RuntimeError("ffmpeg_convert_failed")
 
@@ -161,15 +221,18 @@ def _audio_to_float32_16k(content: bytes, filename: str) -> tuple[Any, int]:
     try:
         samples, sr = _read_wav_bytes(content)
         if sr != 16000:
-            wav = _convert_with_ffmpeg_to_wav_16k_mono(content, suffix=suffix or ".wav")
+            wav = _convert_with_ffmpeg_to_wav_16k_mono(
+                content, suffix=suffix or ".wav")
             return _read_wav_bytes(wav)
         return samples, sr
     except Exception:
-        wav = _convert_with_ffmpeg_to_wav_16k_mono(content, suffix=suffix or ".bin")
+        wav = _convert_with_ffmpeg_to_wav_16k_mono(
+            content, suffix=suffix or ".bin")
         return _read_wav_bytes(wav)
 
 
 class _SherpaLocalSingleton:
+    # 注意：使用 threading.Lock 是因为 get_recognizer 在 asyncio.to_thread 中运行（独立线程环境）
     _lock = threading.Lock()
     _recognizer: Any = None
     _fingerprint: tuple[str, ...] | None = None
@@ -182,20 +245,59 @@ class _SherpaLocalSingleton:
             raise RuntimeError("sherpa_onnx_not_installed")
         assert sherpa_onnx is not None
 
-        tokens = str(_get_setting(settings, "sherpa_onnx_tokens", "") or "").strip()
-        wenet_ctc = str(_get_setting(settings, "sherpa_onnx_wenet_ctc_model", "") or "").strip()
-        whisper_encoder = str(_get_setting(settings, "sherpa_onnx_whisper_encoder", "") or "").strip()
-        whisper_decoder = str(_get_setting(settings, "sherpa_onnx_whisper_decoder", "") or "").strip()
+        tokens = str(
+            _get_setting(
+                settings,
+                "sherpa_onnx_tokens",
+                "") or "").strip()
+        wenet_ctc = str(
+            _get_setting(
+                settings,
+                "sherpa_onnx_wenet_ctc_model",
+                "") or "").strip()
+        whisper_encoder = str(
+            _get_setting(
+                settings,
+                "sherpa_onnx_whisper_encoder",
+                "") or "").strip()
+        whisper_decoder = str(
+            _get_setting(
+                settings,
+                "sherpa_onnx_whisper_decoder",
+                "") or "").strip()
 
-        num_threads = int(_get_setting(settings, "sherpa_onnx_num_threads", 2) or 2)
-        decoding_method = str(_get_setting(settings, "sherpa_onnx_decoding_method", "greedy_search") or "greedy_search")
+        num_threads = int(
+            _get_setting(
+                settings,
+                "sherpa_onnx_num_threads",
+                2) or 2)
+        decoding_method = str(
+            _get_setting(
+                settings,
+                "sherpa_onnx_decoding_method",
+                "greedy_search") or "greedy_search")
         debug = bool(_get_setting(settings, "sherpa_onnx_debug", False))
 
-        sample_rate = int(_get_setting(settings, "sherpa_onnx_sample_rate", 16000) or 16000)
-        feature_dim = int(_get_setting(settings, "sherpa_onnx_feature_dim", 80) or 80)
+        sample_rate = int(
+            _get_setting(
+                settings,
+                "sherpa_onnx_sample_rate",
+                16000) or 16000)
+        feature_dim = int(
+            _get_setting(
+                settings,
+                "sherpa_onnx_feature_dim",
+                80) or 80)
 
         if tokens and wenet_ctc:
-            cls._fingerprint = ("wenet_ctc", tokens, wenet_ctc, str(num_threads), decoding_method, str(sample_rate), str(feature_dim))
+            cls._fingerprint = (
+                "wenet_ctc",
+                tokens,
+                wenet_ctc,
+                str(num_threads),
+                decoding_method,
+                str(sample_rate),
+                str(feature_dim))
             return sherpa_onnx.OfflineRecognizer.from_wenet_ctc(
                 model=wenet_ctc,
                 tokens=tokens,
@@ -207,9 +309,19 @@ class _SherpaLocalSingleton:
             )
 
         if tokens and whisper_encoder and whisper_decoder:
-            language = str(_get_setting(settings, "sherpa_onnx_whisper_language", "") or "")
-            task = str(_get_setting(settings, "sherpa_onnx_whisper_task", "transcribe") or "transcribe")
-            tail_paddings = int(_get_setting(settings, "sherpa_onnx_whisper_tail_paddings", -1) or -1)
+            language = str(
+                _get_setting(
+                    settings,
+                    "sherpa_onnx_whisper_language",
+                    "") or "")
+            task = str(
+                _get_setting(
+                    settings,
+                    "sherpa_onnx_whisper_task",
+                    "transcribe") or "transcribe")
+            tail_paddings = int(
+                _get_setting(
+                    settings, "sherpa_onnx_whisper_tail_paddings", -1) or -1)
             cls._fingerprint = (
                 "whisper",
                 tokens,
@@ -238,26 +350,48 @@ class _SherpaLocalSingleton:
     @classmethod
     def get_recognizer(cls, settings: Any):
         with cls._lock:
-            desired_tokens = str(_get_setting(settings, "sherpa_onnx_tokens", "") or "").strip()
-            desired_wenet = str(_get_setting(settings, "sherpa_onnx_wenet_ctc_model", "") or "").strip()
-            desired_we = str(_get_setting(settings, "sherpa_onnx_whisper_encoder", "") or "").strip()
-            desired_wd = str(_get_setting(settings, "sherpa_onnx_whisper_decoder", "") or "").strip()
+            desired_tokens = str(
+                _get_setting(
+                    settings,
+                    "sherpa_onnx_tokens",
+                    "") or "").strip()
+            desired_wenet = str(
+                _get_setting(
+                    settings,
+                    "sherpa_onnx_wenet_ctc_model",
+                    "") or "").strip()
+            desired_we = str(
+                _get_setting(
+                    settings,
+                    "sherpa_onnx_whisper_encoder",
+                    "") or "").strip()
+            desired_wd = str(
+                _get_setting(
+                    settings,
+                    "sherpa_onnx_whisper_decoder",
+                    "") or "").strip()
 
             desired_fp = None
             if desired_tokens and desired_wenet:
                 desired_fp = ("wenet_ctc", desired_tokens, desired_wenet)
             elif desired_tokens and desired_we and desired_wd:
-                desired_fp = ("whisper", desired_tokens, desired_we, desired_wd)
+                desired_fp = (
+                    "whisper",
+                    desired_tokens,
+                    desired_we,
+                    desired_wd)
 
             if cls._recognizer is not None and cls._fingerprint is not None and desired_fp is not None:
-                if tuple(cls._fingerprint[: len(desired_fp)]) == tuple(desired_fp):
+                if tuple(cls._fingerprint[: len(desired_fp)]) == tuple(
+                        desired_fp):
                     return cls._recognizer
 
             cls._recognizer = cls._build_recognizer(settings)
             return cls._recognizer
 
 
-def _transcribe_local_sync(content: bytes, filename: str, settings: Any) -> str:
+def _transcribe_local_sync(
+        content: bytes, filename: str, settings: Any) -> str:
     if np is None:
         raise RuntimeError("numpy_not_installed")
     samples, sr = _audio_to_float32_16k(content, filename)
@@ -283,9 +417,18 @@ async def sherpa_transcribe(
         raise RuntimeError("sherpa_disabled")
 
     if mode == "remote":
-        url = str(_get_setting(settings, "sherpa_asr_remote_url", "") or "").strip()
+        url = str(
+            _get_setting(
+                settings,
+                "sherpa_asr_remote_url",
+                "") or "").strip()
         if not url:
             raise RuntimeError("sherpa_remote_url_missing")
+
+        # 验证 URL 安全性，防止 SSRF 攻击
+        from ..utils.security import validate_sherpa_remote_url
+        if not validate_sherpa_remote_url(url):
+            raise RuntimeError("sherpa_remote_url_invalid_or_unsafe")
 
         data: dict[str, str] = {}
         if segment_index is not None:
@@ -298,7 +441,12 @@ async def sherpa_transcribe(
             resp = await client.post(url, data=data, files=files)
             resp.raise_for_status()
             payload = resp.json()
-            text = str(payload.get("text", "") if isinstance(payload, dict) else "")
+            text = str(
+                payload.get(
+                    "text",
+                    "") if isinstance(
+                    payload,
+                    dict) else "")
         return text, "sherpa_remote", url
 
     text = await asyncio.to_thread(_transcribe_local_sync, content, filename, settings)

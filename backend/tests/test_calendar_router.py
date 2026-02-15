@@ -69,9 +69,9 @@ async def test_calendar_create_list_update_delete_flow(client, test_session, mon
                 _ = tz
                 return fixed_now
 
-        import app.routers.calendar as cal_router
+        import app.services.calendar.core as cal_core
 
-        monkeypatch.setattr(cal_router, "datetime", _DT, raising=True)
+        monkeypatch.setattr(cal_core, "datetime", _DT, raising=True)
 
         upd = await client.put(
             f"/api/calendar/reminders/{r1['id']}",

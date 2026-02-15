@@ -7,15 +7,24 @@ from typing import Protocol
 
 
 class LockClient(Protocol):
-    async def acquire_lock(self, key: str, value: str, expire: int) -> bool: ...
+    async def acquire_lock(
+        self,
+        key: str,
+        value: str,
+        expire: int) -> bool: ...
 
-    async def refresh_lock(self, key: str, value: str, expire: int) -> bool: ...
+    async def refresh_lock(
+        self,
+        key: str,
+        value: str,
+        expire: int) -> bool: ...
 
     async def release_lock(self, key: str, value: str) -> bool: ...
 
 
 class PeriodicLockedRunner:
-    def __init__(self, *, stop_event: asyncio.Event, lock_client: LockClient, logger: logging.Logger):
+    def __init__(self, *, stop_event: asyncio.Event,
+                 lock_client: LockClient, logger: logging.Logger):
         self._stop_event = stop_event
         self._lock_client = lock_client
         self._logger = logger
@@ -57,7 +66,10 @@ class PeriodicLockedRunner:
                         job_task = asyncio.create_task(_job_wrapper())
 
                         async def _refresh_loop() -> None:
-                            while (not self._stop_event.is_set()) and (job_task is not None) and (not job_task.done()):
+                            while (
+                                    not self._stop_event.is_set()) and (
+                                    job_task is not None) and (
+                                    not job_task.done()):
                                 try:
                                     await asyncio.wait_for(self._stop_event.wait(), timeout=refresh_interval)
                                     return
@@ -72,6 +84,12 @@ class PeriodicLockedRunner:
                                             if cancel_job_on_lock_lost and job_task is not None and not job_task.done():
                                                 job_task.cancel()
                                             return
+                                    except (ConnectionError, TimeoutError) as lock_err:
+                                        # 网络连接或超时错误
+                                        self._logger.error(f"定时任务锁续租网络错误: {lock_err}")
+                                        if cancel_job_on_lock_lost and job_task is not None and not job_task.done():
+                                            job_task.cancel()
+                                        return
                                     except Exception:
                                         self._logger.exception("定时任务锁续租失败")
                                         if cancel_job_on_lock_lost and job_task is not None and not job_task.done():
@@ -92,8 +110,8 @@ class PeriodicLockedRunner:
                             except asyncio.CancelledError:
                                 if self._stop_event.is_set():
                                     raise
-                            except Exception:
-                                pass
+                            except Exception as cleanup_err:
+                                self._logger.debug(f"Refresh task cleanup error: {cleanup_err}")
 
                         if job_task is not None and (not job_task.done()):
                             job_task.cancel()
@@ -102,14 +120,19 @@ class PeriodicLockedRunner:
                             except asyncio.CancelledError:
                                 if self._stop_event.is_set():
                                     raise
-                            except Exception:
-                                pass
+                            except asyncio.TimeoutError as cancel_err:
+                                self._logger.warning(f"Job task cancellation timeout: {cancel_err}")
+                            except Exception as cancel_err:
+                                self._logger.debug(f"Job task cancellation error: {cancel_err}")
 
                         _ = await self._lock_client.release_lock(lock_key, value=lv)
             except asyncio.CancelledError:
                 raise
-            except Exception:
-                self._logger.exception("处理定时任务失败")
+            except (ConnectionError, TimeoutError) as net_err:
+                # 网络相关错误
+                self._logger.error(f"Periodic task network error: {net_err}")
+            except Exception as loop_err:
+                self._logger.exception(f"Periodic task loop error: {loop_err}")
 
             try:
                 await asyncio.wait_for(self._stop_event.wait(), timeout=float(interval_seconds))

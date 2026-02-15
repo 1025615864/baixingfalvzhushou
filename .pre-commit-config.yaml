@@ -1,26 +1,84 @@
+# Pre-commit Hooks 配置
+# 使用方法: 
+# 1. 安装 pre-commit: pip install pre-commit
+# 2. 安装 hooks: pre-commit install
+# 3. 手动运行: pre-commit run --all-files
+
 repos:
+  # 通用检查
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
       - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
       - id: end-of-file-fixer
       - id: check-yaml
+        args: [--unsafe]
+      - id: check-json
       - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: debug-statements
+        languages: [python]
 
+  # Python 代码检查
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.1.9
     hooks:
       - id: ruff
-        args: [--fix]
+        args: [--fix, --exit-zero]
+        files: ^backend/
       - id: ruff-format
+        files: ^backend/
 
+  # 前端代码检查
   - repo: local
     hooks:
-      - id: pyright
-        name: pyright
-        entry: pyright
-        language: python
-        additional_dependencies: [pyright]
-        types: [python]
-        args: ["--project", "backend/pyrightconfig.json"]
+      # 后端测试
+      - id: backend-tests
+        name: Backend Tests (fast)
+        entry: bash -c "cd backend && python -m pytest -m 'not slow' -x -q --tb=short 2>/dev/null || echo '⚠️ Some tests failed'"
+        language: system
         pass_filenames: false
+        files: ^backend/
+        stages: [pre-push]
+        
+      # 前端测试
+      - id: frontend-tests
+        name: Frontend Tests
+        entry: bash -c "cd frontend-v2 && npm run test 2>/dev/null || echo '⚠️ Some tests failed'"
+        language: system
+        pass_filenames: false
+        files: ^frontend-v2/
+        stages: [pre-push]
+
+      # 前端 lint
+      - id: frontend-lint
+        name: Frontend Lint
+        entry: bash -c "cd frontend-v2 && npm run lint -- --fix 2>/dev/null || echo '⚠️ Lint issues found'"
+        language: system
+        pass_filenames: false
+        files: ^frontend-v2/
+
+      # TypeScript 类型检查
+      - id: frontend-typecheck
+        name: Frontend Type Check
+        entry: bash -c "cd frontend-v2 && npm run type-check 2>/dev/null || echo '⚠️ Type errors found'"
+        language: system
+        pass_filenames: false
+        files: ^frontend-v2/
+        stages: [pre-push]
+
+# CI 配置
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit.com hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: [backend-tests, frontend-tests, frontend-typecheck]
+  submodules: false

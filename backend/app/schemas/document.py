@@ -14,6 +14,7 @@ class DocumentGenerateRequest(BaseModel):
     facts: str = Field(..., min_length=1, max_length=8000)
     claims: str = Field(..., min_length=1, max_length=4000)
     evidence: str | None = Field(default=None, max_length=4000)
+    extra_info: dict[str, str] | None = None
 
 
 class DocumentResponse(BaseModel):
@@ -21,6 +22,13 @@ class DocumentResponse(BaseModel):
     title: str
     content: str
     created_at: datetime
+    template_key: str | None = None
+    template_version: int | None = None
+
+
+class DocumentExportPdfRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    content: str = Field(..., min_length=1)
 
 
 class DocumentSaveRequest(BaseModel):
@@ -28,6 +36,8 @@ class DocumentSaveRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     content: str = Field(..., min_length=1)
     payload: dict[str, object] | None = None
+    template_key: str | None = None
+    template_version: int | None = None
 
 
 class DocumentItem(BaseModel):
@@ -37,6 +47,11 @@ class DocumentItem(BaseModel):
     created_at: datetime
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
+
+
+class DocumentListResponse(BaseModel):
+    items: list[DocumentItem]
+    total: int
 
 
 class DocumentDetail(BaseModel):
@@ -50,8 +65,3 @@ class DocumentDetail(BaseModel):
     updated_at: datetime
 
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
-
-
-class DocumentListResponse(BaseModel):
-    items: list[DocumentItem]
-    total: int

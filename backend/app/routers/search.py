@@ -1,4 +1,5 @@
 """全局搜索路由"""
+import logging
 from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +10,8 @@ from ..models.user import User
 from ..utils.deps import get_current_user_optional
 from ..utils.rate_limiter import get_client_ip
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/search", tags=["全局搜索"])
 
 
@@ -18,11 +21,12 @@ async def global_search(
     q: Annotated[str, Query(min_length=2, description="搜索关键词")],
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: Annotated[int, Query(ge=1, le=50)] = 10,
-    current_user: Annotated[User | None, Depends(get_current_user_optional)] = None,
+    current_user: Annotated[User | None, Depends(
+        get_current_user_optional)] = None,
 ) -> SearchResults:
     """
     全局搜索
-    
+
     搜索新闻、帖子、律所、律师、法律知识
     """
     ip_address = get_client_ip(request)
@@ -36,7 +40,7 @@ async def global_search(
         )
     except Exception:
         # 记录搜索历史失败不影响搜索本身
-        pass
+        logger.exception("Failed to record search history")
 
     results = await search_service.global_search(db, q, limit)
     return results

@@ -49,7 +49,9 @@ async def list_my_tickets(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
 ):
-    base = select(FeedbackTicket).where(FeedbackTicket.user_id == int(current_user.id))
+    base = select(FeedbackTicket).where(
+        FeedbackTicket.user_id == int(
+            current_user.id))
     count_q = select(func.count(FeedbackTicket.id)).where(
         FeedbackTicket.user_id == int(current_user.id)
     )
@@ -91,7 +93,8 @@ async def admin_ticket_stats(
 
     total = sum(by_status.values())
     unassigned_res = await db.execute(
-        select(func.count(FeedbackTicket.id)).where(FeedbackTicket.admin_id.is_(None))
+        select(func.count(FeedbackTicket.id)).where(
+            FeedbackTicket.admin_id.is_(None))
     )
     unassigned = int(unassigned_res.scalar() or 0)
 
@@ -104,7 +107,8 @@ async def admin_ticket_stats(
     )
 
 
-@router.get("/admin/tickets", response_model=FeedbackTicketListResponse, summary="管理员-获取反馈工单列表")
+@router.get("/admin/tickets",
+            response_model=FeedbackTicketListResponse, summary="管理员-获取反馈工单列表")
 async def admin_list_tickets(
     current_user: Annotated[User, Depends(require_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -120,7 +124,8 @@ async def admin_list_tickets(
 
     if status_filter:
         q = q.where(FeedbackTicket.status == str(status_filter).strip())
-        count_q = count_q.where(FeedbackTicket.status == str(status_filter).strip())
+        count_q = count_q.where(
+            FeedbackTicket.status == str(status_filter).strip())
 
     if keyword:
         kw = f"%{keyword.strip()}%"
@@ -167,7 +172,9 @@ async def admin_update_ticket(
     res = await db.execute(select(FeedbackTicket).where(FeedbackTicket.id == int(ticket_id)))
     ticket = res.scalar_one_or_none()
     if ticket is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="工单不存在")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="工单不存在")
 
     fields_set = getattr(data, "model_fields_set", set())
 
@@ -181,7 +188,8 @@ async def admin_update_ticket(
         ticket.status = next_status
 
     if "admin_reply" in fields_set:
-        next_reply = str(data.admin_reply or "").strip() if data.admin_reply is not None else ""
+        next_reply = str(data.admin_reply or "").strip(
+        ) if data.admin_reply is not None else ""
         ticket.admin_reply = next_reply or None
         if next_reply:
             ticket.admin_id = int(current_user.id)

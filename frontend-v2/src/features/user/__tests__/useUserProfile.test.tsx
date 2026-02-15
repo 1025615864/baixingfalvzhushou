@@ -159,7 +159,7 @@ describe('useUserProfile Hooks', () => {
       });
 
       const updateData = {
-        name: '李四',
+        nickname: '李四',
         bio: '新的个人简介',
       };
 
@@ -172,7 +172,7 @@ describe('useUserProfile Hooks', () => {
       });
 
       expect(result.current.data).toBeDefined();
-      expect(result.current.data?.name).toBe(updateData.name);
+      expect(result.current.data?.name).toBe(updateData.nickname);
       expect(result.current.data?.bio).toBe(updateData.bio);
     });
 
@@ -205,7 +205,7 @@ describe('useUserProfile Hooks', () => {
       });
 
       const updateData = {
-        name: '王五',
+        nickname: '王五',
         bio: '更新后的简介',
         location: '上海市',
         company: '新公司',
@@ -221,7 +221,7 @@ describe('useUserProfile Hooks', () => {
       });
 
       const updated = result.current.data;
-      expect(updated?.name).toBe(updateData.name);
+      expect(updated?.name).toBe(updateData.nickname);
       expect(updated?.bio).toBe(updateData.bio);
       expect(updated?.location).toBe(updateData.location);
       expect(updated?.company).toBe(updateData.company);

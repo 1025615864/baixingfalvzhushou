@@ -1,0 +1,397 @@
+# Prometheus 告警规则配置
+# 用于百姓法律助手生产环境监控
+
+groups:
+  # 应用性能告警
+  - name: application_performance
+    interval: 30s
+    rules:
+      # API 响应时间告警
+      - alert: HighAPILatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "API 响应时间过长"
+          description: "95% 的 API 请求响应时间超过 1 秒（当前值: {{ $value }}s）"
+
+      - alert: CriticalAPILatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le) > 2
+        for: 5m
+        labels:
+          severity: critical
+          service: backend
+        annotations:
+          summary: "API 响应时间严重"
+          description: "95% 的 API 请求响应时间超过 2 秒（当前值: {{ $value }}s）"
+
+      # API 错误率告警
+      - alert: HighAPIErrorRate
+        expr: sum(rate(http_requests_total{status=~"5.."}[5m])) by (status) / sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "API 错误率过高"
+          description: "API 错误率超过 5%（当前值: {{ $value | humanizePercentage }}）"
+
+      - alert: CriticalAPIErrorRate
+        expr: sum(rate(http_requests_total{status=~"5.."}[5m])) by (status) / sum(rate(http_requests_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          service: backend
+        annotations:
+          summary: "API 错误率严重"
+          description: "API 错误率超过 10%（当前值: {{ $value | humanizePercentage }}）"
+
+  # 数据库性能告警
+  - name: database_performance
+    interval: 30s
+    rules:
+      # 数据库连接池使用率告警
+      - alert: HighDatabaseConnectionPoolUsage
+        expr: db_pool_active_connections / db_pool_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "数据库连接池使用率过高"
+          description: "数据库连接池使用率超过 80%（当前值: {{ $value | humanizePercentage }}）"
+
+      - alert: CriticalDatabaseConnectionPoolUsage
+        expr: db_pool_active_connections / db_pool_max_connections > 0.95
+        for: 5m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "数据库连接池即将耗尽"
+          description: "数据库连接池使用率超过 95%（当前值: {{ $value | humanizePercentage }}）"
+
+      # 数据库慢查询告警
+      - alert: SlowDatabaseQueries
+        expr: histogram_quantile(0.95, rate(db_query_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "数据库查询缓慢"
+          description: "95% 的数据库查询时间超过 1 秒（当前值: {{ $value }}s）"
+
+      - alert: CriticalSlowDatabaseQueries
+        expr: histogram_quantile(0.95, rate(db_query_duration_seconds_bucket[5m])) > 3
+        for: 5m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "数据库查询严重缓慢"
+          description: "95% 的数据库查询时间超过 3 秒（当前值: {{ $value }}s）"
+
+  # Redis 性能告警
+  - name: redis_performance
+    interval: 30s
+    rules:
+      # Redis 内存使用率告警
+      - alert: HighRedisMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis 内存使用率过高"
+          description: "Redis 内存使用率超过 80%（当前值: {{ $value | humanizePercentage }}）"
+
+      - alert: CriticalRedisMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.95
+        for: 5m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis 内存即将耗尽"
+          description: "Redis 内存使用率超过 95%（当前值: {{ $value | humanizePercentage }}）"
+
+      # Redis 连接数告警
+      - alert: HighRedisConnections
+        expr: redis_connected_clients > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis 连接数过多"
+          description: "Redis 连接数超过 1000（当前值: {{ $value }}）"
+
+  # 系统资源告警
+  - name: system_resources
+    interval: 30s
+    rules:
+      # CPU 使用率告警
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode!="idle"}[5m])) * 100) > 70
+        for: 5m
+        labels:
+          severity: warning
+          resource: cpu
+        annotations:
+          summary: "CPU 使用率过高"
+          description: "CPU 使用率超过 70%（当前值: {{ $value }}%）"
+
+      - alert: CriticalCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode!="idle"}[5m])) * 100) > 90
+        for: 5m
+        labels:
+          severity: critical
+          resource: cpu
+        annotations:
+          summary: "CPU 使用率严重"
+          description: "CPU 使用率超过 90%（当前值: {{ $value }}%）"
+
+      # 内存使用率告警
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 70
+        for: 5m
+        labels:
+          severity: warning
+          resource: memory
+        annotations:
+          summary: "内存使用率过高"
+          description: "内存使用率超过 70%（当前值: {{ $value }}%）"
+
+      - alert: CriticalMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: critical
+          resource: memory
+        annotations:
+          summary: "内存使用率严重"
+          description: "内存使用率超过 85%（当前值: {{ $value }}%）"
+
+      # 磁盘使用率告警
+      - alert: HighDiskUsage
+        expr: (1 - (node_filesystem_avail_bytes{fstype=~"ext4|ext3"} / node_filesystem_size_bytes)) * 100 > 75
+        for: 5m
+        labels:
+          severity: warning
+          resource: disk
+        annotations:
+          summary: "磁盘使用率过高"
+          description: "磁盘使用率超过 75%（当前值: {{ $value }}%）"
+
+      - alert: CriticalDiskUsage
+        expr: (1 - (node_filesystem_avail_bytes{fstype=~"ext4|ext3"} / node_filesystem_size_bytes)) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+          resource: disk
+        annotations:
+          summary: "磁盘空间不足"
+          description: "磁盘使用率超过 90%（当前值: {{ $value }}%）"
+
+  # AI 质量监控告警
+  - name: ai_quality_monitoring
+    interval: 30s
+    rules:
+      # AI 聊天成功率告警
+      - alert: LowAIResponseSuccessRate
+        expr: (sum(rate(ai_chat_requests_total[1h])) - sum(rate(ai_chat_errors_total[1h]))) / sum(rate(ai_chat_requests_total[1h])) < 0.9
+        for: 10m
+        labels:
+          severity: warning
+          service: ai
+        annotations:
+          summary: "AI 响应成功率过低"
+          description: "AI 响应成功率低于 90%（当前值: {{ $value | humanizePercentage }}）"
+
+      - alert: CriticalAIResponseSuccessRate
+        expr: (sum(rate(ai_chat_requests_total[1h])) - sum(rate(ai_chat_errors_total[1h]))) / sum(rate(ai_chat_requests_total[1h])) < 0.8
+        for: 10m
+        labels:
+          severity: critical
+          service: ai
+        annotations:
+          summary: "AI 响应成功率严重"
+          description: "AI 响应成功率低于 80%（当前值: {{ $value | humanizePercentage }}）"
+
+      # AI 响应时间告警
+      - alert: SlowAIResponseTime
+        expr: histogram_quantile(0.95, rate(ai_chat_response_duration_seconds_bucket[5m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: ai
+        annotations:
+          summary: "AI 响应时间过长"
+          description: "95% 的 AI 响应时间超过 10 秒（当前值: {{ $value }}s）"
+
+      - alert: CriticalAIResponseTime
+        expr: histogram_quantile(0.95, rate(ai_chat_response_duration_seconds_bucket[5m])) > 30
+        for: 5m
+        labels:
+          severity: critical
+          service: ai
+        annotations:
+          summary: "AI 响应时间严重"
+          description: "95% 的 AI 响应时间超过 30 秒（当前值: {{ $value }}s）"
+
+      # AI 错误率告警
+      - alert: HighAIErrorRate
+        expr: sum(rate(ai_chat_errors_total[5m])) / sum(rate(ai_chat_requests_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: ai
+        annotations:
+          summary: "AI 错误率过高"
+          description: "AI 错误率超过 10%（当前值: {{ $value | humanizePercentage }}）"
+
+      - alert: CriticalAIErrorRate
+        expr: sum(rate(ai_chat_errors_total[5m])) / sum(rate(ai_chat_requests_total[5m])) > 0.2
+        for: 5m
+        labels:
+          severity: critical
+          service: ai
+        annotations:
+          summary: "AI 错误率严重"
+          description: "AI 错误率超过 20%（当前值: {{ $value | humanizePercentage }}）"
+
+  # 服务可用性告警
+  - name: service_availability
+    interval: 30s
+    rules:
+      # 后端服务不可用
+      - alert: BackendServiceDown
+        expr: up{job="backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: backend
+        annotations:
+          summary: "后端服务不可用"
+          description: "后端服务已下线超过 1 分钟"
+
+      # 前端服务不可用
+      - alert: FrontendServiceDown
+        expr: up{job="frontend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: frontend
+        annotations:
+          summary: "前端服务不可用"
+          description: "前端服务已下线超过 1 分钟"
+
+      # 数据库服务不可用
+      - alert: DatabaseServiceDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "数据库服务不可用"
+          description: "数据库服务已下线超过 1 分钟"
+
+      # Redis 服务不可用
+      - alert: RedisServiceDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis 服务不可用"
+          description: "Redis 服务已下线超过 1 分钟"
+
+  # 业务指标告警
+  - name: business_metrics
+    interval: 60s
+    rules:
+      # 用户注册异常增长
+      - alert: UnusualUserRegistration
+        expr: rate(user_registrations_total[1h]) > 100
+        for: 10m
+        labels:
+          severity: warning
+          category: business
+        annotations:
+          summary: "用户注册异常增长"
+          description: "用户注册速率超过 100/小时（当前值: {{ $value }}/小时）"
+
+      # 支付失败率告警
+      - alert: HighPaymentFailureRate
+        expr: sum(rate(payment_requests_total{status="failed"}[5m])) / sum(rate(payment_requests_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          category: business
+        annotations:
+          summary: "支付失败率过高"
+          description: "支付失败率超过 10%（当前值: {{ $value | humanizePercentage }}）"
+
+      # 文件上传失败率告警
+      - alert: HighFileUploadFailureRate
+        expr: sum(rate(file_uploads_total{status="failed"}[5m])) / sum(rate(file_uploads_total[5m])) > 0.15
+        for: 5m
+        labels:
+          severity: warning
+          category: business
+        annotations:
+          summary: "文件上传失败率过高"
+          description: "文件上传失败率超过 15%（当前值: {{ $value | humanizePercentage }}）"
+
+  # 安全告警
+  - name: security_alerts
+    interval: 30s
+    rules:
+      # 异常登录尝试
+      - alert: UnusualLoginAttempts
+        expr: rate(login_attempts_total{status="failed"}[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "异常登录尝试"
+          description: "失败登录尝试超过 10/5 分钟（当前值: {{ $value }}/5 分钟）"
+
+      - alert: CriticalLoginAttempts
+        expr: rate(login_attempts_total{status="failed"}[5m]) > 50
+        for: 5m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "严重异常登录尝试"
+          description: "失败登录尝试超过 50/5 分钟（当前值: {{ $value }}/5 分钟）"
+
+      # API 速率限制触发
+      - alert: HighRateLimitTriggers
+        expr: rate(rate_limit_exceeded_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "API 速率限制频繁触发"
+          description: "API 速率限制触发超过 100/5 分钟（当前值: {{ $value }}/5 分钟）"
+
+      # CSRF 攻击检测
+      - alert: PossibleCSRFAttack
+        expr: rate(csrf_validation_failures_total[5m]) > 20
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "可能的 CSRF 攻击"
+          description: "CSRF 验证失败超过 20/5 分钟（当前值: {{ $value }}/5 分钟）"

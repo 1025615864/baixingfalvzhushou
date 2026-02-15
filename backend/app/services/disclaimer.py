@@ -12,7 +12,8 @@ class DisclaimerManager:
         RiskLevel.MEDIUM: "\n\n---\n\n🟡 **风险提示**：此类问题情况复杂，建议结合实际情况咨询专业律师。",
     }
 
-    def get_disclaimer(self, *, risk_level: RiskLevel, strategy: ResponseStrategy) -> str:
+    def get_disclaimer(self, *, risk_level: RiskLevel,
+                       strategy: ResponseStrategy) -> str:
         parts: list[str] = []
         risk = self.RISK_DISCLAIMERS.get(risk_level)
         if risk:

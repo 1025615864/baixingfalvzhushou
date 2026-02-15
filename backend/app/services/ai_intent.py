@@ -21,16 +21,21 @@ class AiIntentClassifier:
 
     INTENT_PATTERNS: list[tuple[str, list[str]]] = [
         ("labor", ["工资", "加班", "劳动合同", "辞退", "社保", "工伤", "仲裁", "试用期", "离职"]),
-        ("contract", ["合同", "违约", "甲方", "乙方", "定金", "赔偿", "解除合同", "履行", "收款", "付款"]),
-        ("marriage", ["离婚", "结婚", "彩礼", "抚养", "夫妻", "出轨", "家暴", "财产分割", "探望权"]),
-        ("property", ["房产", "买房", "卖房", "物业", "开发商", "房东", "租房", "租客", "押金", "拆迁"]),
+        ("contract", ["合同", "违约", "甲方", "乙方",
+         "定金", "赔偿", "解除合同", "履行", "收款", "付款"]),
+        ("marriage", ["离婚", "结婚", "彩礼", "抚养",
+         "夫妻", "出轨", "家暴", "财产分割", "探望权"]),
+        ("property", ["房产", "买房", "卖房", "物业",
+         "开发商", "房东", "租房", "租客", "押金", "拆迁"]),
         ("traffic", ["交通事故", "车祸", "交警", "保险", "责任认定", "赔付", "伤残", "医疗费"]),
         ("loan", ["借钱", "借款", "欠钱", "欠款", "借条", "欠条", "还款", "利息", "转账", "网贷"]),
         ("criminal", ["刑事", "犯罪", "拘留", "逮捕", "判刑", "坐牢", "诈骗", "盗窃", "故意伤害"]),
     ]
 
-    _time_re = re.compile(r"(\d{4}年|\d{1,2}月|\d{1,2}日|\d{1,2}号|昨天|今天|前天|上周|本周|下周)")
-    _amount_re = re.compile(r"(\d+(?:\.\d+)?\s*(?:万|元|块|人民币)|[一二三四五六七八九十百千万]+\s*(?:万|元))")
+    _time_re = re.compile(
+        r"(\d{4}年|\d{1,2}月|\d{1,2}日|\d{1,2}号|昨天|今天|前天|上周|本周|下周)")
+    _amount_re = re.compile(
+        r"(\d+(?:\.\d+)?\s*(?:万|元|块|人民币)|[一二三四五六七八九十百千万]+\s*(?:万|元))")
     _evidence_re = re.compile(r"(合同|转账|聊天记录|录音|截图|发票|借条|欠条|证据|鉴定|判决|裁定)")
 
     def classify(self, text: str) -> IntentResult:
@@ -48,7 +53,10 @@ class AiIntentClassifier:
 
         questions = self._build_clarifying_questions(intent, s)
         needs = len(questions) > 0
-        return IntentResult(intent=intent, needs_clarification=needs, clarifying_questions=questions)
+        return IntentResult(
+            intent=intent,
+            needs_clarification=needs,
+            clarifying_questions=questions)
 
     def _build_clarifying_questions(self, intent: str, text: str) -> list[str]:
         s = str(text or "")

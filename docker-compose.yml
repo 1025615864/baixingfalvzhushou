@@ -1,4 +1,22 @@
-version: "3.8"
+name: baixing
+
+# YAML扩展字段 - 通用配置
+x-base-logging: &base-logging
+  driver: "json-file"
+  options:
+    max-size: "50m"
+    max-file: "3"
+
+x-common-resource-limits: &common-resource-limits
+  reservations:
+    cpus: "0.25"
+    memory: 256M
+
+x-backend-logging: &backend-logging
+  driver: "json-file"
+  options:
+    max-size: "100m"
+    max-file: "5"
 
 services:
   # PostgreSQL数据库
@@ -6,18 +24,79 @@ services:
     image: postgres:15-alpine
     container_name: baixing_db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres123
-      POSTGRES_DB: baixing_law
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:-baixing_law}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: ${DB_CPU_LIMIT:-1}
+          memory: ${DB_MEMORY_LIMIT:-1G}
+          pids: 100
+        <<: *common-resource-limits
+    logging: *base-logging
+    networks:
+      - backend-network
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    container_name: baixing_redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set} --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis123}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: ${REDIS_CPU_LIMIT:-0.5}
+          memory: ${REDIS_MEMORY_LIMIT:-512M}
+          pids: 50
+        <<: *common-resource-limits
+    logging: *base-logging
+    networks:
+      - backend-network
+
+  # Redis指标导出
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.60.0
+    container_name: baixing_redis_exporter
+    environment:
+      REDIS_ADDR: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    command:
+      - "--redis.addr=redis://redis:6379"
+      - "--redis.password=${REDIS_PASSWORD:?REDIS_PASSWORD must be set}"
+    expose:
+      - "9121"
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+          pids: 50
+        <<: *common-resource-limits
+    logging: *base-logging
+    networks:
+      - backend-network
+      - monitoring-network
 
   # 后端服务
   backend:
@@ -26,33 +105,186 @@ services:
       dockerfile: Dockerfile
     container_name: baixing_backend
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres123@db:5432/baixing_law
-      - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production
-      - DEBUG=true
-      - CORS_ALLOW_ORIGINS=["http://localhost:3000","http://localhost:5173"]
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-baixing_law}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      DEBUG: ${DEBUG:-true}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-'["http://localhost:3000","http://localhost:5173"]'}
+      DB_ALLOW_RUNTIME_DDL: "1"
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/0
+      AI_QUALITY_REDIS_ENABLED: ${AI_QUALITY_REDIS_ENABLED:-true}
+      AI_QUALITY_REDIS_KEY_PREFIX: ${AI_QUALITY_REDIS_KEY_PREFIX:-ai_quality:}
+      AI_QUALITY_MAX_RECENT_LOGS: ${AI_QUALITY_MAX_RECENT_LOGS:-1000}
+      AI_QUALITY_TTL_SECONDS: ${AI_QUALITY_TTL_SECONDS:-604800}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      AI_MODEL: ${AI_MODEL:-deepseek-chat}
+      SENTRY_DSN: ${SENTRY_DSN}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-1.0.0}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+      SENTRY_PROFILES_SAMPLE_RATE: ${SENTRY_PROFILES_SAMPLE_RATE:-0.0}
+      PROMETHEUS_ENABLED: ${PROMETHEUS_ENABLED:-true}
+      PROMETHEUS_PORT: ${PROMETHEUS_PORT:-8001}
+      METRICS_AUTH_TOKEN: ${METRICS_AUTH_TOKEN}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      VERSION: ${VERSION:-1.0.0}
     ports:
       - "8000:8000"
+      - "8001:8001"
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./backend:/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      - ./data/sherpa_models:/app/data/sherpa_models:ro
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: ${BACKEND_CPU_LIMIT:-2}
+          memory: ${BACKEND_MEMORY_LIMIT:-2G}
+          pids: 200
+        reservations:
+          cpus: "1"
+          memory: 512M
+    logging: *backend-logging
+    networks:
+      - backend-network
+      - frontend-network
 
-  # 前端服务
+  # Prometheus监控服务
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: baixing_prometheus
+    ports:
+      - "19090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/ai-quality-alerts.yml:/etc/prometheus/ai-quality-alerts.yml:ro
+      - ./prometheus/backend-alerts.yml:/etc/prometheus/backend-alerts.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    depends_on:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+          pids: 100
+        <<: *common-resource-limits
+    logging: *base-logging
+    networks:
+      - monitoring-network
+      - backend-network
+
+  # Grafana监控面板
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: baixing_grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin123}
+      - GF_DEFAULT_LANGUAGE=zh-Hans
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+          pids: 100
+        <<: *common-resource-limits
+    logging: *base-logging
+    networks:
+      - monitoring-network
+
+  # Alertmanager告警服务
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: baixing_alertmanager
+    ports:
+      - "9200:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+          pids: 50
+        <<: *common-resource-limits
+    logging: *base-logging
+    networks:
+      - monitoring-network
+
+  # 前端服务 (frontend-v2)
   frontend:
     build:
-      context: ./frontend
+      context: ./frontend-v2
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: /api
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+        VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:8000/ws}
     container_name: baixing_frontend
+    image: baixing-assistant-frontend-v2:latest
     ports:
       - "3000:3000"
     depends_on:
       - backend
     environment:
-      - VITE_API_BASE_URL=/api
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
+      - VITE_WS_URL=${VITE_WS_URL:-ws://localhost:8000/ws}
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+          pids: 50
+        <<: *common-resource-limits
+    logging: *base-logging
+    networks:
+      - frontend-network
 
 volumes:
   postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  alertmanager_data:
+  schemathesis_results:
+    driver: local
+
+networks:
+  backend-network:
+    driver: bridge
+  frontend-network:
+    driver: bridge
+  monitoring-network:
+    driver: bridge

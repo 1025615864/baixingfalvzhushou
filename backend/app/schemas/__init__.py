@@ -1,7 +1,7 @@
 """Pydantic模式"""
 from .ai import (
-    ChatRequest, 
-    ChatResponse, 
+    ChatRequest,
+    ChatResponse,
     ConsultationCreate,
     ConsultationResponse,
     MessageResponse
@@ -12,10 +12,23 @@ from .calendar import (
     CalendarReminderResponse,
     CalendarReminderListResponse,
 )
+from .channel import (
+    ChannelCreate,
+    ChannelUpdate,
+    ChannelResponse,
+    ChannelListResponse,
+    ChannelStats,
+    ChannelMetricsResponse,
+    ConversionFunnel,
+    ChannelAnalytics,
+    ChannelParams,
+    TrackEvent,
+    ChannelListParams,
+)
 
 __all__ = [
-    "ChatRequest", 
-    "ChatResponse", 
+    "ChatRequest",
+    "ChatResponse",
     "ConsultationCreate",
     "ConsultationResponse",
     "MessageResponse",
@@ -23,4 +36,15 @@ __all__ = [
     "CalendarReminderUpdate",
     "CalendarReminderResponse",
     "CalendarReminderListResponse",
+    "ChannelCreate",
+    "ChannelUpdate",
+    "ChannelResponse",
+    "ChannelListResponse",
+    "ChannelStats",
+    "ChannelMetricsResponse",
+    "ConversionFunnel",
+    "ChannelAnalytics",
+    "ChannelParams",
+    "TrackEvent",
+    "ChannelListParams",
 ]

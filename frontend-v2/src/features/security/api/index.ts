@@ -1,6 +1,6 @@
 /**
  * Security（安全中心）API 层
- * 基于统一的 apiClient，对接后端 /api/v1/user/security 端点
+ * 基于统一的 apiClient，对接后端 /api/security 端点
  */
 
 import { apiClient } from "@/shared/lib/api/client";
@@ -28,7 +28,7 @@ import type {
 
 
 // API 基础路径
-const API_BASE = '/user/security';
+const API_BASE = '/security';
 
 // ==================== 后端响应类型定义 ====================
 

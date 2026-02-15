@@ -113,7 +113,13 @@ async def get_effective_voice_settings(
     if force_raw is None or (not str(force_raw).strip()):
         force_raw = os.getenv("VOICE_TRANSCRIBE_FORCE_ENABLED", "")
 
-    force_enabled = _parse_bool(force_raw, bool(getattr(base_settings, "voice_transcribe_force_enabled", False)))
+    force_enabled = _parse_bool(
+        force_raw,
+        bool(
+            getattr(
+                base_settings,
+                "voice_transcribe_force_enabled",
+                False)))
 
     if not force_enabled:
         return base_settings, {}, False
@@ -128,7 +134,8 @@ async def get_effective_voice_settings(
             continue
 
         if attr in {"sherpa_asr_enabled", "sherpa_onnx_debug"}:
-            merged[attr] = _parse_bool(raw, bool(getattr(base_settings, attr, False)))
+            merged[attr] = _parse_bool(
+                raw, bool(getattr(base_settings, attr, False)))
             continue
 
         if attr in {
@@ -137,19 +144,68 @@ async def get_effective_voice_settings(
             "sherpa_onnx_sample_rate",
             "sherpa_onnx_feature_dim",
         }:
-            merged[attr] = _parse_int(raw, int(getattr(base_settings, attr, 0) or 0))
+            merged[attr] = _parse_int(
+                raw, int(getattr(base_settings, attr, 0) or 0))
             continue
 
         merged[attr] = str(raw)
 
-    provider = str(merged.get("voice_transcribe_provider", getattr(base_settings, "voice_transcribe_provider", "auto")) or "").strip().lower()
+    provider = str(
+        merged.get(
+            "voice_transcribe_provider",
+            getattr(
+                base_settings,
+                "voice_transcribe_provider",
+                "auto")) or "").strip().lower()
     if provider not in {"auto", "openai", "sherpa"}:
         provider = "auto"
     merged["voice_transcribe_provider"] = provider
 
-    mode = str(merged.get("sherpa_asr_mode", getattr(base_settings, "sherpa_asr_mode", "off")) or "").strip().lower()
+    mode = str(
+        merged.get(
+            "sherpa_asr_mode",
+            getattr(
+                base_settings,
+                "sherpa_asr_mode",
+                "off")) or "").strip().lower()
     if mode not in {"off", "local", "remote"}:
         mode = "off"
     merged["sherpa_asr_mode"] = mode
+
+    try:
+        from .sherpa_asr_service import sherpa_is_ready
+    except Exception:
+        sherpa_is_ready = None
+
+    sherpa_enabled = bool(
+        merged.get(
+            "sherpa_asr_enabled",
+            bool(
+                getattr(
+                    base_settings,
+                    "sherpa_asr_enabled",
+                    False)))
+    )
+    remote_url = str(
+        merged.get(
+            "sherpa_asr_remote_url",
+            getattr(
+                base_settings,
+                "sherpa_asr_remote_url",
+                ""))
+        or ""
+    ).strip()
+    if sherpa_enabled and mode == "local" and remote_url and sherpa_is_ready is not None:
+        local_ready = False
+        try:
+            local_ready = bool(
+                sherpa_is_ready(
+                    _SettingsOverlay(
+                        base_settings,
+                        merged)))
+        except Exception:
+            local_ready = False
+        if not local_ready:
+            merged["sherpa_asr_mode"] = "remote"
 
     return _SettingsOverlay(base_settings, merged), overrides, True

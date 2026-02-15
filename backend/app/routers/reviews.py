@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
 import json
 import os
+import logging
+from datetime import datetime, timezone, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -10,6 +11,8 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
+
+logger = logging.getLogger(__name__)
 from ..models.consultation import Consultation
 from ..models.consultation_review import ConsultationReviewTask, ConsultationReviewVersion
 from ..models.payment import PaymentOrder, PaymentStatus
@@ -49,6 +52,7 @@ def _parse_int(value: object | None, default: int) -> int:
             return int(default)
         return int(float(s))
     except Exception:
+        logger.exception("Failed to parse int value")
         return int(default)
 
 
@@ -57,8 +61,13 @@ async def _load_review_sla_config(db: AsyncSession) -> dict[str, object]:
     try:
         res = await db.execute(select(SystemConfig).where(SystemConfig.key == CONSULT_REVIEW_SLA_CONFIG_KEY))
         cfg = res.scalar_one_or_none()
-        raw = str(getattr(cfg, "value", "") or "").strip() if cfg is not None else ""
+        raw = str(
+            getattr(
+                cfg,
+                "value",
+                "") or "").strip() if cfg is not None else ""
     except Exception:
+        logger.exception("Failed to load review SLA config from database")
         raw = ""
 
     if not raw:
@@ -70,7 +79,7 @@ async def _load_review_sla_config(db: AsyncSession) -> dict[str, object]:
             if isinstance(obj_raw, dict):
                 return dict(obj_raw)
         except Exception:
-            pass
+            logger.exception("Failed to parse review SLA config JSON")
 
     return {
         "pending_sla_minutes": 24 * 60,
@@ -79,7 +88,8 @@ async def _load_review_sla_config(db: AsyncSession) -> dict[str, object]:
     }
 
 
-def _compute_review_due_at(task: ConsultationReviewTask, cfg: dict[str, object]) -> datetime | None:
+def _compute_review_due_at(
+        task: ConsultationReviewTask, cfg: dict[str, object]) -> datetime | None:
     status = str(getattr(task, "status", "") or "").strip().lower()
     if status == "submitted":
         return None
@@ -117,11 +127,14 @@ def _as_int(value: object | None) -> int | None:
         try:
             return int(value.strip())
         except Exception:
+            logger.exception("Failed to convert value to int")
             return None
     return None
 
 
-async def _build_latest_versions(db: AsyncSession, task_ids: list[int]) -> dict[int, ConsultationReviewVersionItem]:
+async def _build_latest_versions(db: AsyncSession,
+                                 task_ids: list[int]) -> dict[int,
+                                                              ConsultationReviewVersionItem]:
     if not task_ids:
         return {}
 
@@ -160,11 +173,15 @@ async def get_review_task_for_consultation(
     )
     consultation = res.scalar_one_or_none()
     if consultation is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="咨询不存在")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="咨询不存在")
 
     owner_user_id = _as_int(getattr(consultation, "user_id", None))
     if owner_user_id != int(current_user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限访问该咨询")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="无权限访问该咨询")
 
     task_res = await db.execute(
         select(ConsultationReviewTask)
@@ -185,7 +202,8 @@ async def get_review_task_for_consultation(
     is_overdue = bool(due_at is not None and now > due_at)
 
     latest_versions = await _build_latest_versions(db, [int(task.id)])
-    item = ConsultationReviewTaskItem.model_validate(task).model_copy(update={"due_at": due_at, "is_overdue": is_overdue})
+    item = ConsultationReviewTaskItem.model_validate(task).model_copy(
+        update={"due_at": due_at, "is_overdue": is_overdue})
     latest = latest_versions.get(int(task.id))
     if latest is not None:
         item = item.model_copy(update={"latest_version": latest})
@@ -207,9 +225,13 @@ async def lawyer_list_review_tasks(
 ):
     lawyer = await settlement_service.get_current_lawyer(db, int(current_user.id))
     if lawyer is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="未绑定律师资料")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="未绑定律师资料")
     if not bool(getattr(lawyer, "is_verified", False)):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="律师认证未通过")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="律师认证未通过")
 
     q = select(ConsultationReviewTask).where(
         or_(
@@ -231,7 +253,9 @@ async def lawyer_list_review_tasks(
 
     total = int((await db.execute(cq)).scalar() or 0)
     res = await db.execute(
-        q.order_by(ConsultationReviewTask.created_at.desc(), ConsultationReviewTask.id.desc())
+        q.order_by(
+            ConsultationReviewTask.created_at.desc(),
+            ConsultationReviewTask.id.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
     )
@@ -247,13 +271,15 @@ async def lawyer_list_review_tasks(
     for t in tasks:
         due_at = _compute_review_due_at(t, cfg)
         is_overdue = bool(due_at is not None and now > due_at)
-        item = ConsultationReviewTaskItem.model_validate(t).model_copy(update={"due_at": due_at, "is_overdue": is_overdue})
+        item = ConsultationReviewTaskItem.model_validate(t).model_copy(
+            update={"due_at": due_at, "is_overdue": is_overdue})
         latest = latest_versions.get(int(t.id))
         if latest is not None:
             item = item.model_copy(update={"latest_version": latest})
         items.append(item)
 
-    return LawyerReviewTaskListResponse(items=items, total=total, page=page, page_size=page_size)
+    return LawyerReviewTaskListResponse(
+        items=items, total=total, page=page, page_size=page_size)
 
 
 @router.post(
@@ -268,9 +294,13 @@ async def lawyer_claim_review_task(
 ):
     lawyer = await settlement_service.get_current_lawyer(db, int(current_user.id))
     if lawyer is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="未绑定律师资料")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="未绑定律师资料")
     if not bool(getattr(lawyer, "is_verified", False)):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="律师认证未通过")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="律师认证未通过")
 
     now = _now()
 
@@ -292,7 +322,9 @@ async def lawyer_claim_review_task(
         res = await db.execute(select(ConsultationReviewTask).where(ConsultationReviewTask.id == int(task_id)))
         task = res.scalar_one_or_none()
         if task is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="任务不存在")
         cur_status = str(getattr(task, "status", "") or "")
         if str(getattr(task, "lawyer_id", None) or ""):
             raise HTTPException(status_code=400, detail="任务已被领取")
@@ -305,7 +337,8 @@ async def lawyer_claim_review_task(
     cfg = await _load_review_sla_config(db)
     due_at = _compute_review_due_at(task2, cfg)
     is_overdue = bool(due_at is not None and _now() > due_at)
-    return ConsultationReviewTaskItem.model_validate(task2).model_copy(update={"due_at": due_at, "is_overdue": is_overdue})
+    return ConsultationReviewTaskItem.model_validate(task2).model_copy(
+        update={"due_at": due_at, "is_overdue": is_overdue})
 
 
 @router.post(
@@ -321,17 +354,25 @@ async def lawyer_submit_review_task(
 ):
     lawyer = await settlement_service.get_current_lawyer(db, int(current_user.id))
     if lawyer is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="未绑定律师资料")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="未绑定律师资料")
     if not bool(getattr(lawyer, "is_verified", False)):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="律师认证未通过")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="律师认证未通过")
 
     res = await db.execute(select(ConsultationReviewTask).where(ConsultationReviewTask.id == int(task_id)))
     task = res.scalar_one_or_none()
     if task is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="任务不存在")
 
     if int(getattr(task, "lawyer_id", 0) or 0) != int(lawyer.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限处理该任务")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="无权限处理该任务")
 
     if str(getattr(task, "status", "") or "") != "claimed":
         raise HTTPException(status_code=400, detail="仅已领取任务可提交")
@@ -381,6 +422,9 @@ async def lawyer_submit_review_task(
     due_at = _compute_review_due_at(out_task, cfg)
     is_overdue = bool(due_at is not None and _now() > due_at)
     out_item = ConsultationReviewTaskItem.model_validate(out_task).model_copy(
-        update={"latest_version": latest, "due_at": due_at, "is_overdue": is_overdue}
+        update={
+            "latest_version": latest,
+            "due_at": due_at,
+            "is_overdue": is_overdue}
     )
     return out_item

@@ -579,6 +579,15 @@ async def test_lawyer_sensitive_endpoints_require_phone_and_email_verified(
     client: AsyncClient,
     test_session: AsyncSession,
 ):
+    def _error_message(response) -> str:
+        body = response.json()
+        if isinstance(body, dict):
+            detail = body.get("detail")
+            if detail:
+                return str(detail)
+            return str(body.get("error", {}).get("message", ""))
+        return str(body)
+
     lawyer_user = await _create_user(
         test_session,
         username="lawyer_unverified",
@@ -592,42 +601,42 @@ async def test_lawyer_sensitive_endpoints_require_phone_and_email_verified(
         headers=_auth_header(lawyer_user),
     )
     assert res_bank.status_code == 403
-    assert "手机号" in str(res_bank.json().get("detail") or "")
+    assert "手机号" in _error_message(res_bank)
 
     res_wallet = await client.get(
         "/api/lawyer/wallet",
         headers=_auth_header(lawyer_user),
     )
     assert res_wallet.status_code == 403
-    assert "手机号" in str(res_wallet.json().get("detail") or "")
+    assert "手机号" in _error_message(res_wallet)
 
     res_income = await client.get(
         "/api/lawyer/income-records",
         headers=_auth_header(lawyer_user),
     )
     assert res_income.status_code == 403
-    assert "手机号" in str(res_income.json().get("detail") or "")
+    assert "手机号" in _error_message(res_income)
 
     res_income_export = await client.get(
         "/api/lawyer/income-records/export",
         headers=_auth_header(lawyer_user),
     )
     assert res_income_export.status_code == 403
-    assert "手机号" in str(res_income_export.json().get("detail") or "")
+    assert "手机号" in _error_message(res_income_export)
 
     res_list = await client.get(
         "/api/lawyer/withdrawals",
         headers=_auth_header(lawyer_user),
     )
     assert res_list.status_code == 403
-    assert "手机号" in str(res_list.json().get("detail") or "")
+    assert "手机号" in _error_message(res_list)
 
     res_detail = await client.get(
         "/api/lawyer/withdrawals/1",
         headers=_auth_header(lawyer_user),
     )
     assert res_detail.status_code == 403
-    assert "手机号" in str(res_detail.json().get("detail") or "")
+    assert "手机号" in _error_message(res_detail)
 
     lawyer_user.phone_verified = True
     lawyer_user.phone_verified_at = datetime.now(timezone.utc)
@@ -639,11 +648,11 @@ async def test_lawyer_sensitive_endpoints_require_phone_and_email_verified(
         headers=_auth_header(lawyer_user),
     )
     assert res_bank2.status_code == 403
-    assert "邮箱" in str(res_bank2.json().get("detail") or "")
+    assert "邮箱" in _error_message(res_bank2)
 
     res_wallet2 = await client.get(
         "/api/lawyer/wallet",
         headers=_auth_header(lawyer_user),
     )
     assert res_wallet2.status_code == 403
-    assert "邮箱" in str(res_wallet2.json().get("detail") or "")
+    assert "邮箱" in _error_message(res_wallet2)

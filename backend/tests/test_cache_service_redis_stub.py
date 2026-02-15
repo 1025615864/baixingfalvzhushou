@@ -5,6 +5,15 @@ import pytest
 from app.services import cache_service as cache_module
 
 
+@pytest.fixture(autouse=True)
+def _reset_cache_service_state():
+    """Reset cache_service state before each test."""
+    cache_module.cache_service._redis = None
+    cache_module.cache_service._connected = False
+    cache_module._memory_cache.clear()
+    yield
+
+
 class _DummyRedis:
     def __init__(self) -> None:
         self.kv: dict[str, str] = {}

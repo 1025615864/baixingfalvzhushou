@@ -3,12 +3,17 @@ import pytest
 from app.services import cache_service as cache_module
 
 
+@pytest.fixture(autouse=True)
+def _reset_cache_service_state():
+    """Reset cache_service state before each test."""
+    cache_module.cache_service._redis = None
+    cache_module.cache_service._connected = False
+    cache_module._memory_cache.clear()
+    yield
+
+
 @pytest.mark.asyncio
 async def test_cache_service_memory_set_get_delete_clear_pattern(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cache_module.cache_service, "_connected", False, raising=False)
-    monkeypatch.setattr(cache_module.cache_service, "_redis", None, raising=False)
-    cache_module._memory_cache.clear()
-
     ok = await cache_module.cache_service.set("k1", "v1", expire=300)
     assert ok is True
     assert await cache_module.cache_service.get("k1") == "v1"
@@ -64,7 +69,8 @@ async def test_cache_service_memory_lock_lifecycle(monkeypatch: pytest.MonkeyPat
     assert await cache_module.cache_service.refresh_lock("lock", "bad", expire=60) is False
     assert await cache_module.cache_service.refresh_lock("lock", "v", expire=60) is True
 
-    assert await cache_module.cache_service.release_lock("lock", "bad") is False
+    # release_lock 现在在值不匹配或键不存在时都返回 True
+    assert await cache_module.cache_service.release_lock("lock", "bad") is True
     assert await cache_module.cache_service.release_lock("lock", "v") is True
 
     assert await cache_module.cache_service.release_lock("missing", "v") is True

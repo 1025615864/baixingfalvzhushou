@@ -4,6 +4,8 @@ import pytest
 
 from app.main import app
 from app.utils.deps import get_current_user
+from tests.helpers.test_data_factory import UserFactory, PostFactory
+from tests.helpers.assertion_helpers import assert_response_success
 
 
 @pytest.mark.asyncio
@@ -74,10 +76,14 @@ async def test_forum_toggle_reaction(client, monkeypatch):
         return post_obj if int(post_id) == 1 else None
 
     async def fake_toggle(db, post_id, user_id, emoji):
-        return True, [{"emoji": emoji, "count": 2}]
+        return True, [{"type": emoji, "count": 2}]
+
+    async def fake_get_post_reactions(db, post_id):
+        return [{"type": "😀", "count": 2}]
 
     monkeypatch.setattr(react_router.forum_service, "get_post", fake_get_post, raising=True)
     monkeypatch.setattr(react_router.forum_service, "toggle_reaction", fake_toggle, raising=True)
+    monkeypatch.setattr(react_router.forum_service, "get_post_reactions", fake_get_post_reactions, raising=True)
 
     try:
         nf = await client.post("/api/forum/posts/2/reaction", json={"emoji": "😀"})
@@ -89,7 +95,7 @@ async def test_forum_toggle_reaction(client, monkeypatch):
         assert body["reacted"] is True
         assert body["emoji"] == "😀"
         assert body["message"] == "已添加反应"
-        assert isinstance(body.get("reactions"), list) and body["reactions"][0]["count"] == 2
+        assert isinstance(body.get("reactions"), list) and len(body["reactions"]) > 0 and body["reactions"][0]["count"] == 2
 
     finally:
         app.dependency_overrides.pop(get_current_user, None)

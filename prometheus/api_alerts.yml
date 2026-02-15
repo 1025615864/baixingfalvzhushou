@@ -1,0 +1,257 @@
+# 百姓助手 API 告警规则
+
+groups:
+  - name: api_alerts
+    interval: 30s
+    rules:
+      # API错误率告警
+      - alert: HighErrorRate
+        expr: sum(rate(api_errors_total[5m])) / sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: backend
+          team: backend
+        annotations:
+          summary: "API错误率过高"
+          description: "API错误率超过5% (当前值: {{ $value | humanizePercentage }})"
+          runbook_url: "https://docs.example.com/runbooks/api-error-rate"
+
+      # API错误率警告
+      - alert: ModerateErrorRate
+        expr: sum(rate(api_errors_total[5m])) / sum(rate(http_requests_total[5m])) > 0.01
+        for: 10m
+        labels:
+          severity: warning
+          service: backend
+          team: backend
+        annotations:
+          summary: "API错误率偏高"
+          description: "API错误率超过1% (当前值: {{ $value | humanizePercentage }})"
+
+      # API响应时间告警
+      - alert: SlowAPIResponse
+        expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+          team: backend
+        annotations:
+          summary: "API响应时间过长"
+          description: "99分位的API响应时间超过1s (当前值: {{ $value | humanizeDuration }})"
+          threshold: "< 1s"
+
+      # 极慢API响应
+      - alert: VerySlowAPIResponse
+        expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m])) > 3
+        for: 2m
+        labels:
+          severity: critical
+          service: backend
+          team: backend
+        annotations:
+          summary: "API响应时间严重过长"
+          description: "99分位的API响应时间超过3s (当前值: {{ $value | humanizeDuration }})"
+          threshold: "< 3s"
+
+      # P95延迟告警
+      - alert: HighP95Latency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          service: backend
+          team: backend
+        annotations:
+          summary: "P95延迟过高"
+          description: "P95延迟超过500ms (当前值: {{ $value | humanizeDuration }})"
+
+  - name: system_alerts
+    interval: 30s
+    rules:
+      # 服务健康检查失败告警
+      - alert: ServiceHealthCheckFailed
+        expr: up{job="backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: backend
+          team: backend
+        annotations:
+          summary: "后端服务健康检查失败"
+          description: "后端服务无法访问"
+
+      # 服务不可用
+      - alert: ServiceDown
+        expr: up{job="backend"} == 0
+        for: 3m
+        labels:
+          severity: critical
+          service: backend
+          team: backend
+        annotations:
+          summary: "后端服务不可用"
+          description: "后端服务已停止超过3分钟"
+
+      # 内存使用告警
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes{job="backend"} / 1073741824 > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+          team: backend
+        annotations:
+          summary: "内存使用过高"
+          description: "内存使用超过80% (当前值: {{ $value | humanizePercentage }})"
+          threshold: "80%"
+
+      # 严重内存使用
+      - alert: CriticalMemoryUsage
+        expr: process_resident_memory_bytes{job="backend"} / 1073741824 > 0.9
+        for: 2m
+        labels:
+          severity: critical
+          service: backend
+          team: backend
+        annotations:
+          summary: "内存使用严重过高"
+          description: "内存使用超过90% (当前值: {{ $value | humanizePercentage }})"
+          threshold: "90%"
+
+  - name: database_alerts
+    interval: 30s
+    rules:
+      # 数据库连接告警
+      - alert: HighDatabaseConnections
+        expr: active_connections{database="postgresql"} > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+          team: backend
+        annotations:
+          summary: "数据库连接数过高"
+          description: "数据库连接数超过80 (当前值: {{ $value }})"
+          threshold: "< 80"
+
+      # 数据库连接池告警
+      - alert: DatabasePoolHighUtilization
+        expr: db_pool_utilization_percent > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+          team: backend
+        annotations:
+          summary: "数据库连接池使用率过高"
+          description: "数据库连接池使用率超过85% (当前值: {{ $value }}%)"
+          threshold: "< 85%"
+
+      # 数据库连接池告警（严重）
+      - alert: DatabasePoolCriticalUtilization
+        expr: db_pool_utilization_percent > 95
+        for: 2m
+        labels:
+          severity: critical
+          service: database
+          team: backend
+        annotations:
+          summary: "数据库连接池即将耗尽"
+          description: "数据库连接池使用率超过95% (当前值: {{ $value }}%)"
+          threshold: "< 95%"
+
+  - name: ai_alerts
+    interval: 30s
+    rules:
+      # AI错误率告警
+      - alert: HighAIErrorRate
+        expr: sum(rate(ai_errors_total[5m])) / sum(rate(ai_requests_total[5m])) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: ai
+          team: backend
+        annotations:
+          summary: "AI错误率过高"
+          description: "AI错误率超过10% (当前值: {{ $value | humanizePercentage }})"
+          threshold: "< 10%"
+
+      # AI响应时间告警
+      - alert: SlowAIResponse
+        expr: histogram_quantile(0.99, rate(ai_request_duration_seconds_bucket[5m])) > 30
+        for: 5m
+        labels:
+          severity: warning
+          service: ai
+          team: backend
+        annotations:
+          summary: "AI响应时间过长"
+          description: "AI请求P99响应时间超过30秒 (当前值: {{ $value | humanizeDuration }})"
+          threshold: "< 30s"
+
+  - name: cache_alerts
+    interval: 30s
+    rules:
+      # 缓存命中率过低
+      - alert: LowCacheHitRate
+        expr: |
+          rate(cache_hits_total[5m]) / 
+          (rate(cache_hits_total[5m]) + rate(cache_misses_total[5m])) < 0.7
+        for: 10m
+        labels:
+          severity: warning
+          service: cache
+          team: backend
+        annotations:
+          summary: "缓存命中率过低"
+          description: "缓存命中率低于70% (当前值: {{ $value | humanizePercentage }})"
+          threshold: "> 70%"
+
+      # 缓存未命中率过高
+      - alert: HighCacheMissRate
+        expr: |
+          rate(cache_misses_total[5m]) / 
+          (rate(cache_hits_total[5m]) + rate(cache_misses_total[5m])) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+          service: cache
+          team: backend
+        annotations:
+          summary: "缓存未命中率高"
+          description: "缓存未命中率超过30% (当前值: {{ $value | humanizePercentage }})"
+          threshold: "< 30%"
+
+  - name: business_alerts
+    interval: 30s
+    rules:
+      # 活跃用户数异常下降
+      - alert: ActiveUsersDrop
+        expr: |
+          (
+            active_users offset 10m
+            /
+            active_users offset 10m
+          ) < 0.3
+        for: 5m
+        labels:
+          severity: info
+          service: business
+          team: backend
+        annotations:
+          summary: "活跃用户数异常下降"
+          description: "活跃用户数下降超过70% (当前值: {{ $value | humanizePercentage }})"
+
+      # 会话数告警
+      - alert: HighActiveSessions
+        expr: user_sessions_active{status="active"} > 1000
+        for: 10m
+        labels:
+          severity: info
+          service: business
+          team: backend
+        annotations:
+          summary: "活跃会话数高"
+          description: "活跃会话数超过1000 (当前值: {{ $value }})"

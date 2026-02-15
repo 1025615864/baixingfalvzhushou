@@ -1,0 +1,58 @@
+# Prometheus configuration for 百姓法律助手
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'baixing-legal-assistant'
+    env: '${ENV:-development}'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+      timeout: 10s
+      api_version: v2
+
+# Load rules and alerts
+rule_files:
+  - /etc/prometheus/ai-quality-alerts.yml
+  - /etc/prometheus/backend-alerts.yml
+  - /etc/prometheus/api_alerts.yml
+
+scrape_configs:
+  # Backend metrics
+  - job_name: 'backend'
+    static_configs:
+      - targets: ['backend:8000']
+    metrics_path: '/metrics'
+    scheme: http
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  # AI Quality metrics
+  - job_name: 'ai-quality'
+    static_configs:
+      - targets: ['backend:8000']
+    metrics_path: '/api/system/ai-quality/prometheus'
+    scheme: http
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Redis metrics (if redis_exporter is available)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'redis_memory_used_bytes|redis_connected_clients|redis_keyspace_hits_total|redis_keyspace_misses_total'
+        action: keep

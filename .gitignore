@@ -1,7 +1,17 @@
+# Environment files
 .env
-.env.*
+.env.local
+.env.production
 env.local
 backend/env.local
+# Allow .env.example as template
+!.env.example
+
+# JWT密钥文件 - 包含敏感的RSA私钥，不应提交到版本控制
+.env.jwt
+jwt_private.pem
+jwt_public.pem
+*.pem
 *.db
 *.sqlite
 *.sqlite3
@@ -19,6 +29,7 @@ backend/data/
 backend/uploads/
 backend/app/__pycache__/
 backend/backups/
+backend/logs/
 frontend/node_modules/
 frontend/dist/
 *.pid
@@ -28,6 +39,7 @@ Thumbs.db
 
 frontend/playwright-report/
 frontend/test-results/
+frontend/data/
 test-results/
 
 helm/baixing-assistant/charts/
@@ -43,8 +55,90 @@ backend/.coverage
 backend/coverage.xml
 backend/coverage.json
 backend/tmp_cov.json
+backend/coverage_html/
 
 .windsurf_chat_port
 .windsurfrules
 .xinghuo_continue_port
 c98c09bcd75c9923/
+
+# Temp files
+*.swp
+tmp_*
+nul
+
+# IDE工具
+.codebuddy/
+.cospec/
+.trae/
+
+# 测试工具
+.hypothesis/
+
+# 日志和备份
+*.log
+*.bak
+logs/
+backups/
+
+# 数据库备份
+*.db.bak
+
+# 性能数据
+perf_baseline*.json
+
+# 临时数据目录
+data/sherpa_models/
+frontend/data/
+
+# 临时文档
+frontend/*.md
+frontend/E2E_FIX_PLAN.md
+frontend/e2e-test-report.md
+frontend/PAGE_FLICK_BUG_DIAGNOSIS.md
+frontend/PAGE_FLICK_FIX_SUMMARY.md
+frontend/PAGE_FLICK_TEST_GUIDE.md
+frontend/CORE_MODULES_REFACTORING_COMPLETE.md
+frontend/FRONTEND_RECONSTRUCTION_SUMMARY.md
+frontend/INFRASTRUCTURE_SETUP_COMPLETE.md
+frontend/TEST_MIGRATION_GUIDE.md
+
+# 临时配置
+frontend/.eslintrc.json
+frontend/.prettierignore
+frontend/.prettierrc.json
+
+# 重复配置
+backend/alembic_ascii.ini
+
+# Frontend v2 构建产物
+frontend-v2/node_modules/
+frontend-v2/dist/
+frontend-v2/coverage/
+frontend-v2/playwright-report/
+frontend-v2/.eslintcache
+frontend-v2/eslint_output.json
+
+# IDE
+.idea/
+.vscode/
+*.code-workspace
+
+# 归档目录（保留但不追踪内容）
+archive/*/
+!archive/*/.gitkeep
+
+# Claude Code
+.claude/
+
+# Coverage reports
+
+# htmlcov/
+# .coverage/
+# coverage.xml
+# coverage.json
+# backend/.coverage
+# backend/coverage.xml
+# backend/coverage.json
+# backend/tmp_cov.json
+# backend/htmlcov/

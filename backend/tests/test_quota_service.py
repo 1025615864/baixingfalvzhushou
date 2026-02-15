@@ -1,271 +1,757 @@
-from datetime import date, datetime, timedelta, timezone
+"""
+配额服务单元测试
 
+测试覆盖：
+- 配额检查
+- 配额更新
+- 配额验证
+- 配额重置
+- VIP用户特殊处理
+- 每日配额管理
+- 配额包余额管理
+"""
 import pytest
+from datetime import date, datetime, timedelta, timezone
+from fastapi import HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.system import SystemConfig
+from app.services.quota_service import (
+    QuotaService,
+    quota_service,
+    FREE_AI_CHAT_DAILY_LIMIT,
+    VIP_AI_CHAT_DAILY_LIMIT,
+    FREE_DOCUMENT_GENERATE_DAILY_LIMIT,
+    VIP_DOCUMENT_GENERATE_DAILY_LIMIT,
+    _is_vip_active,
+    _is_vip_active_on_day,
+)
 from app.models.user import User
 from app.models.user_quota import UserQuotaDaily, UserQuotaPackBalance
-from app.services.quota_service import QuotaService, _get_int_env, _is_vip_active, _get_int_config
-
-
-def test_get_int_env_default_and_invalid(monkeypatch):
-    monkeypatch.delenv("X_TEST_INT", raising=False)
-    assert _get_int_env("X_TEST_INT", 7) == 7
-
-    monkeypatch.setenv("X_TEST_INT", "abc")
-    assert _get_int_env("X_TEST_INT", 7) == 7
-
-    monkeypatch.setenv("X_TEST_INT", "42")
-    assert _get_int_env("X_TEST_INT", 7) == 42
-
-
-def test_is_vip_active_handles_none_and_naive_datetime() -> None:
-    assert _is_vip_active(None) is False
-
-    u = User(username="u", email="u@example.com", nickname="u", hashed_password="x")
-    u.vip_expires_at = "not-a-datetime"  # type: ignore[assignment]
-    assert _is_vip_active(u) is False
-
-    u.vip_expires_at = datetime.utcnow() + timedelta(days=1)
-    assert _is_vip_active(u) is True
-
-    u.vip_expires_at = datetime.utcnow() - timedelta(days=1)
-    assert _is_vip_active(u) is False
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_today_and_pack_balance_integrityerror_fallback(monkeypatch, test_session):
-    svc = QuotaService()
+async def test_get_or_create_today_new(db: AsyncSession):
+    """测试创建今日配额记录（首次）"""
+    service = QuotaService()
+    user_id = 1
 
-    user = User(username="quota_u", email="quota_u@example.com", nickname="quota_u", hashed_password="x")
-    test_session.add(user)
-    await test_session.commit()
-    await test_session.refresh(user)
+    # Act
+    row = await service._get_or_create_today(db, user_id)
 
-    orig_commit = test_session.commit
-
-    async def commit_then_raise():
-        await orig_commit()
-        raise IntegrityError("stmt", {}, Exception("orig"))
-
-    monkeypatch.setattr(test_session, "commit", commit_then_raise, raising=True)
-
-    row = await svc._get_or_create_today(test_session, int(user.id))
-    assert row.user_id == user.id
-
-    pack = await svc._get_or_create_pack_balance(test_session, int(user.id))
-    assert pack.user_id == user.id
+    # Assert
+    assert row is not None
+    assert row.user_id == user_id
+    assert row.day == date.today()
+    assert row.ai_chat_count == 0
+    assert row.document_generate_count == 0
 
 
 @pytest.mark.asyncio
-async def test_quota_service_enforce_and_record_ai_chat_uses_pack_when_over_limit(test_session):
-    svc = QuotaService()
+async def test_get_or_create_today_existing(db: AsyncSession):
+    """测试获取已存在的今日配额记录"""
+    service = QuotaService()
+    user_id = 2
 
-    user = User(username="q1", email="q1@example.com", nickname="q1", hashed_password="x")
-    test_session.add(user)
-    await test_session.commit()
-    await test_session.refresh(user)
+    # 首次创建
+    await service._get_or_create_today(db, user_id)
 
-    test_session.add_all(
-        [
-            SystemConfig(key="FREE_AI_CHAT_DAILY_LIMIT", value="1"),
-            SystemConfig(key="VIP_AI_CHAT_DAILY_LIMIT", value="999999"),
-        ]
+    # Act - 再次获取
+    row = await service._get_or_create_today(db, user_id)
+
+    # Assert
+    assert row is not None
+    assert row.user_id == user_id
+    assert row.day == date.today()
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_today_concurrent(db: AsyncSession):
+    """测试并发创建今日配额记录"""
+    import asyncio
+
+    service = QuotaService()
+    user_id = 3
+
+    # Act - 并发创建
+    results = await asyncio.gather(
+        *[service._get_or_create_today(db, user_id) for _ in range(3)]
     )
-    await test_session.commit()
 
-    today = date.today()
-    test_session.add(UserQuotaDaily(user_id=user.id, day=today, ai_chat_count=1, document_generate_count=0))
-    test_session.add(UserQuotaPackBalance(user_id=user.id, ai_chat_credits=0, document_generate_credits=0))
-    await test_session.commit()
-
-    with pytest.raises(Exception) as ei:
-        await svc.enforce_ai_chat_quota(test_session, user)
-    assert getattr(ei.value, "status_code", None) == 429
-
-    res = await test_session.execute(
-        select(UserQuotaPackBalance).where(UserQuotaPackBalance.user_id == user.id)
-    )
-    p = res.scalar_one()
-    p.ai_chat_credits = 2
-    test_session.add(p)
-    await test_session.commit()
-
-    await svc.enforce_ai_chat_quota(test_session, user)
-
-
-@pytest.mark.asyncio
-async def test_quota_service_record_ai_chat_usage_increments_then_decrements_pack(test_session):
-    svc = QuotaService()
-
-    user = User(username="q2", email="q2@example.com", nickname="q2", hashed_password="x")
-    test_session.add(user)
-    await test_session.commit()
-    await test_session.refresh(user)
-
-    test_session.add(SystemConfig(key="FREE_AI_CHAT_DAILY_LIMIT", value="1"))
-    await test_session.commit()
-
-    today = date.today()
-    test_session.add(UserQuotaDaily(user_id=user.id, day=today, ai_chat_count=0, document_generate_count=0))
-    test_session.add(UserQuotaPackBalance(user_id=user.id, ai_chat_credits=1, document_generate_credits=0))
-    await test_session.commit()
-
-    await svc.record_ai_chat_usage(test_session, user)
-
-    res = await test_session.execute(
-        select(UserQuotaDaily).where(
-            UserQuotaDaily.user_id == user.id, UserQuotaDaily.day == today
+    # Assert - 所有结果应该指向同一记录
+    assert all(r is not None for r in results)
+    # 检查数据库中只有一条记录
+    from sqlalchemy import func
+    count_result = await db.execute(
+        select(func.count()).select_from(UserQuotaDaily).where(
+            UserQuotaDaily.user_id == user_id,
+            UserQuotaDaily.day == date.today()
         )
     )
-    row = res.scalar_one()
-    assert row.ai_chat_count == 1
+    count = count_result.scalar()
+    assert count == 1
 
-    await svc.record_ai_chat_usage(test_session, user)
 
-    res2 = await test_session.execute(
-        select(UserQuotaPackBalance).where(UserQuotaPackBalance.user_id == user.id)
-    )
-    pack = res2.scalar_one()
+@pytest.mark.asyncio
+async def test_get_or_create_pack_balance_new(db: AsyncSession):
+    """测试创建配额包余额（首次）"""
+    service = QuotaService()
+    user_id = 1
+
+    # Act
+    pack = await service._get_or_create_pack_balance(db, user_id)
+
+    # Assert
+    assert pack is not None
+    assert pack.user_id == user_id
     assert pack.ai_chat_credits == 0
+    assert pack.document_generate_credits == 0
 
 
 @pytest.mark.asyncio
-async def test_quota_service_document_quota_paths(test_session):
-    svc = QuotaService()
+async def test_get_or_create_pack_balance_existing(db: AsyncSession):
+    """测试获取已存在的配额包余额"""
+    service = QuotaService()
+    user_id = 2
 
-    user = User(username="q3", email="q3@example.com", nickname="q3", hashed_password="x")
-    test_session.add(user)
-    await test_session.commit()
-    await test_session.refresh(user)
+    # 首次创建
+    await service._get_or_create_pack_balance(db, user_id)
 
-    test_session.add_all(
-        [
-            SystemConfig(key="FREE_DOCUMENT_GENERATE_DAILY_LIMIT", value="1"),
-            SystemConfig(key="VIP_DOCUMENT_GENERATE_DAILY_LIMIT", value="999"),
-        ]
-    )
-    await test_session.commit()
+    # Act - 再次获取
+    pack = await service._get_or_create_pack_balance(db, user_id)
 
-    today = date.today()
-    test_session.add(UserQuotaDaily(user_id=user.id, day=today, ai_chat_count=0, document_generate_count=1))
-    test_session.add(UserQuotaPackBalance(user_id=user.id, ai_chat_credits=0, document_generate_credits=0))
-    await test_session.commit()
-
-    with pytest.raises(Exception) as ei:
-        await svc.enforce_document_generate_quota(test_session, user)
-    assert getattr(ei.value, "status_code", None) == 429
-
-    res = await test_session.execute(
-        select(UserQuotaPackBalance).where(UserQuotaPackBalance.user_id == user.id)
-    )
-    pack = res.scalar_one()
-    pack.document_generate_credits = 1
-    test_session.add(pack)
-    await test_session.commit()
-
-    await svc.record_document_generate_usage(test_session, user)
-
-    res2 = await test_session.execute(
-        select(UserQuotaPackBalance).where(UserQuotaPackBalance.user_id == user.id)
-    )
-    pack2 = res2.scalar_one()
-    assert pack2.document_generate_credits == 0
+    # Assert
+    assert pack is not None
+    assert pack.user_id == user_id
 
 
 @pytest.mark.asyncio
-async def test_quota_service_get_today_quota_includes_limits_and_remaining(test_session):
-    svc = QuotaService()
+async def test_ai_chat_limit_for_user_free(db: AsyncSession):
+    """测试普通用户的AI聊天限额"""
+    service = QuotaService()
 
     user = User(
-        username="q4",
-        email="q4@example.com",
-        nickname="q4",
-        hashed_password="x",
+        username="testuser1",
+        email="test1@example.com",
+        hashed_password="hash",
+        vip_expires_at=None,  # 非VIP
+    )
+    db.add(user)
+    await db.commit()
+
+    # Act
+    limit = await service._ai_chat_limit_for_user(db, user)
+
+    # Assert
+    assert limit == FREE_AI_CHAT_DAILY_LIMIT
+
+
+@pytest.mark.asyncio
+async def test_ai_chat_limit_for_user_vip(db: AsyncSession):
+    """测试VIP用户的AI聊天限额"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser2",
+        email="test2@example.com",
+        hashed_password="hash",
+        vip_expires_at=datetime.now(timezone.utc) + timedelta(days=30),  # VIP
+    )
+    db.add(user)
+    await db.commit()
+
+    # Act
+    limit = await service._ai_chat_limit_for_user(db, user)
+
+    # Assert
+    assert limit == VIP_AI_CHAT_DAILY_LIMIT
+
+
+@pytest.mark.asyncio
+async def test_ai_chat_limit_for_user_admin(db: AsyncSession):
+    """测试管理员的AI聊天限额"""
+    service = QuotaService()
+
+    user = User(
+        username="admin",
+        email="admin@example.com",
+        hashed_password="hash",
+        role="admin",
+    )
+    db.add(user)
+    await db.commit()
+
+    # Act
+    limit = await service._ai_chat_limit_for_user(db, user)
+
+    # Assert
+    assert limit == 10**9  # 无限制
+
+
+@pytest.mark.asyncio
+async def test_ai_chat_limit_for_user_super_admin(db: AsyncSession):
+    """测试超级管理员的AI聊天限额"""
+    service = QuotaService()
+
+    user = User(
+        username="superadmin",
+        email="superadmin@example.com",
+        hashed_password="hash",
+        role="super_admin",
+    )
+    db.add(user)
+    await db.commit()
+
+    # Act
+    limit = await service._ai_chat_limit_for_user(db, user)
+
+    # Assert
+    assert limit == 10**9  # 无限制
+
+
+@pytest.mark.asyncio
+async def test_ai_chat_limit_for_user_vip_expired(db: AsyncSession):
+    """测试VIP已过期的用户"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser3",
+        email="test3@example.com",
+        hashed_password="hash",
+        vip_expires_at=datetime.now(timezone.utc) - timedelta(days=1),  # VIP已过期
+    )
+    db.add(user)
+    await db.commit()
+
+    # Act
+    limit = await service._ai_chat_limit_for_user(db, user)
+
+    # Assert
+    assert limit == FREE_AI_CHAT_DAILY_LIMIT
+
+
+@pytest.mark.asyncio
+async def test_enforce_ai_chat_quota_within_limit(db: AsyncSession):
+    """测试AI聊天配额检查（未超限）"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser4",
+        email="test4@example.com",
+        hashed_password="hash",
+    )
+    db.add(user)
+    await db.commit()
+
+    # Act - 不应该抛出异常
+    await service.enforce_ai_chat_quota(db, user)
+
+
+@pytest.mark.asyncio
+async def test_enforce_ai_chat_quota_over_limit(db: AsyncSession):
+    """测试AI聊天配额检查（已超限）"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser5",
+        email="test5@example.com",
+        hashed_password="hash",
+    )
+    db.add(user)
+    await db.flush()
+
+    # 创建今日配额记录并设置已使用次数
+    daily = UserQuotaDaily(
+        user_id=user.id,
+        day=date.today(),
+        ai_chat_count=100,  # 超过FREE_AI_CHAT_DAILY_LIMIT
+        document_generate_count=0,
+    )
+    db.add(daily)
+    await db.commit()
+
+    # Act & Assert - 应该抛出HTTPException
+    with pytest.raises(HTTPException) as exc_info:
+        await service.enforce_ai_chat_quota(db, user)
+
+    assert exc_info.value.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+    assert "今日 AI 咨询次数已用尽" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+async def test_enforce_ai_chat_quota_with_pack_credits(db: AsyncSession):
+    """测试AI聊天配额检查（有配额包余额）"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser6",
+        email="test6@example.com",
+        hashed_password="hash",
+    )
+    db.add(user)
+    await db.flush()
+
+    # 创建今日配额记录并设置已使用次数
+    daily = UserQuotaDaily(
+        user_id=user.id,
+        day=date.today(),
+        ai_chat_count=100,
+        document_generate_count=0,
+    )
+    db.add(daily)
+
+    # 创建配额包余额
+    pack = UserQuotaPackBalance(
+        user_id=user.id,
+        ai_chat_credits=10,  # 有配额包余额
+        document_generate_credits=0,
+    )
+    db.add(pack)
+    await db.commit()
+
+    # Act - 不应该抛出异常（因为配额包有余额）
+    await service.enforce_ai_chat_quota(db, user)
+
+
+@pytest.mark.asyncio
+async def test_record_ai_chat_usage_within_limit(db: AsyncSession):
+    """测试记录AI聊天使用（未超限）"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser7",
+        email="test7@example.com",
+        hashed_password="hash",
+    )
+    db.add(user)
+    await db.commit()
+
+    # Act
+    await service.record_ai_chat_usage(db, user)
+
+    # Assert
+    daily = await service._get_or_create_today(db, user.id)
+    assert daily.ai_chat_count == 1
+
+
+@pytest.mark.asyncio
+async def test_record_ai_chat_usage_multiple_times(db: AsyncSession):
+    """测试多次记录AI聊天使用"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser8",
+        email="test8@example.com",
+        hashed_password="hash",
+    )
+    db.add(user)
+    await db.commit()
+
+    # Act - 记录3次
+    await service.record_ai_chat_usage(db, user)
+    await service.record_ai_chat_usage(db, user)
+    await service.record_ai_chat_usage(db, user)
+
+    # Assert
+    daily = await service._get_or_create_today(db, user.id)
+    assert daily.ai_chat_count == 3
+
+
+@pytest.mark.asyncio
+async def test_record_ai_chat_usage_from_pack(db: AsyncSession):
+    """测试从配额包记录AI聊天使用"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser9",
+        email="test9@example.com",
+        hashed_password="hash",
+    )
+    db.add(user)
+    await db.flush()
+
+    # 创建今日配额记录并设置已使用次数
+    daily = UserQuotaDaily(
+        user_id=user.id,
+        day=date.today(),
+        ai_chat_count=100,
+        document_generate_count=0,
+    )
+    db.add(daily)
+
+    # 创建配额包余额
+    pack = UserQuotaPackBalance(
+        user_id=user.id,
+        ai_chat_credits=10,
+        document_generate_credits=0,
+    )
+    db.add(pack)
+    await db.commit()
+
+    # Act
+    await service.record_ai_chat_usage(db, user)
+
+    # Assert - 配额包余额应该减少
+    pack_result = await db.execute(
+        select(UserQuotaPackBalance).where(UserQuotaPackBalance.user_id == user.id)
+    )
+    updated_pack = pack_result.scalar_one()
+    assert updated_pack.ai_chat_credits == 9
+
+
+@pytest.mark.asyncio
+async def test_record_ai_chat_usage_over_limit_no_pack(db: AsyncSession):
+    """测试记录AI聊天使用（超限且无配额包）"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser10",
+        email="test10@example.com",
+        hashed_password="hash",
+    )
+    db.add(user)
+    await db.flush()
+
+    # 创建今日配额记录并设置已使用次数
+    daily = UserQuotaDaily(
+        user_id=user.id,
+        day=date.today(),
+        ai_chat_count=100,
+        document_generate_count=0,
+    )
+    db.add(daily)
+    await db.commit()
+
+    # Act & Assert - 应该抛出异常
+    with pytest.raises(HTTPException) as exc_info:
+        await service.record_ai_chat_usage(db, user)
+
+    assert exc_info.value.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+
+
+@pytest.mark.asyncio
+async def test_consume_ai_chat_within_limit(db: AsyncSession):
+    """测试消费AI聊天配额（未超限）"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser11",
+        email="test11@example.com",
+        hashed_password="hash",
+    )
+    db.add(user)
+    await db.commit()
+
+    # Act - 不应该抛出异常
+    await service.consume_ai_chat(db, user)
+
+    # Assert - 使用次数应该增加
+    daily = await service._get_or_create_today(db, user.id)
+    assert daily.ai_chat_count == 1
+
+
+@pytest.mark.asyncio
+async def test_enforce_document_generate_quota_within_limit(db: AsyncSession):
+    """测试文档生成配额检查（未超限）"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser12",
+        email="test12@example.com",
+        hashed_password="hash",
+    )
+    db.add(user)
+    await db.commit()
+
+    # Act - 不应该抛出异常
+    await service.enforce_document_generate_quota(db, user)
+
+
+@pytest.mark.asyncio
+async def test_enforce_document_generate_quota_over_limit(db: AsyncSession):
+    """测试文档生成配额检查（已超限）"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser13",
+        email="test13@example.com",
+        hashed_password="hash",
+    )
+    db.add(user)
+    await db.flush()
+
+    # 创建今日配额记录并设置已使用次数
+    daily = UserQuotaDaily(
+        user_id=user.id,
+        day=date.today(),
+        ai_chat_count=0,
+        document_generate_count=100,  # 超过FREE_DOCUMENT_GENERATE_DAILY_LIMIT
+    )
+    db.add(daily)
+    await db.commit()
+
+    # Act & Assert - 应该抛出HTTPException
+    with pytest.raises(HTTPException) as exc_info:
+        await service.enforce_document_generate_quota(db, user)
+
+    assert exc_info.value.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+    assert "今日文书生成次数已用尽" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+async def test_record_document_generate_usage_within_limit(db: AsyncSession):
+    """测试记录文档生成使用（未超限）"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser14",
+        email="test14@example.com",
+        hashed_password="hash",
+    )
+    db.add(user)
+    await db.commit()
+
+    # Act
+    await service.record_document_generate_usage(db, user)
+
+    # Assert
+    daily = await service._get_or_create_today(db, user.id)
+    assert daily.document_generate_count == 1
+
+
+@pytest.mark.asyncio
+async def test_record_document_generate_usage_multiple_times(db: AsyncSession):
+    """测试多次记录文档生成使用"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser15",
+        email="test15@example.com",
+        hashed_password="hash",
+    )
+    db.add(user)
+    await db.commit()
+
+    # Act - 记录3次
+    await service.record_document_generate_usage(db, user)
+    await service.record_document_generate_usage(db, user)
+    await service.record_document_generate_usage(db, user)
+
+    # Assert
+    daily = await service._get_or_create_today(db, user.id)
+    assert daily.document_generate_count == 3
+
+
+@pytest.mark.asyncio
+async def test_document_generate_limit_for_user_free(db: AsyncSession):
+    """测试普通用户的文档生成限额"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser16",
+        email="test16@example.com",
+        hashed_password="hash",
+        vip_expires_at=None,
+    )
+    db.add(user)
+    await db.commit()
+
+    # Act
+    limit = await service._doc_limit_for_user(db, user)
+
+    # Assert
+    assert limit == FREE_DOCUMENT_GENERATE_DAILY_LIMIT
+
+
+@pytest.mark.asyncio
+async def test_document_generate_limit_for_user_vip(db: AsyncSession):
+    """测试VIP用户的文档生成限额"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser17",
+        email="test17@example.com",
+        hashed_password="hash",
+        vip_expires_at=datetime.now(timezone.utc) + timedelta(days=30),
+    )
+    db.add(user)
+    await db.commit()
+
+    # Act
+    limit = await service._doc_limit_for_user(db, user)
+
+    # Assert
+    assert limit == VIP_DOCUMENT_GENERATE_DAILY_LIMIT
+
+
+@pytest.mark.asyncio
+async def test_consume_document_generate_within_limit(db: AsyncSession):
+    """测试消费文档生成配额（未超限）"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser18",
+        email="test18@example.com",
+        hashed_password="hash",
+    )
+    db.add(user)
+    await db.commit()
+
+    # Act - 不应该抛出异常
+    await service.consume_document_generate(db, user)
+
+    # Assert - 使用次数应该增加
+    daily = await service._get_or_create_today(db, user.id)
+    assert daily.document_generate_count == 1
+
+
+@pytest.mark.asyncio
+async def test_get_today_quota_info(db: AsyncSession):
+    """测试获取今日配额信息"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser19",
+        email="test19@example.com",
+        hashed_password="hash",
+    )
+    db.add(user)
+    await db.flush()
+
+    # 创建配额记录
+    daily = UserQuotaDaily(
+        user_id=user.id,
+        day=date.today(),
+        ai_chat_count=3,
+        document_generate_count=5,
+    )
+    db.add(daily)
+    await db.commit()
+
+    # Act
+    quota_info = await service.get_today_quota(db, user)
+
+    # Assert
+    assert quota_info["day"] == date.today()
+    assert "ai_chat_limit" in quota_info
+    assert "ai_chat_used" in quota_info
+    assert "ai_chat_remaining" in quota_info
+    assert "document_generate_limit" in quota_info
+    assert "document_generate_used" in quota_info
+    assert "document_generate_remaining" in quota_info
+    assert quota_info["ai_chat_used"] == 3
+    assert quota_info["document_generate_used"] == 5
+    assert "is_vip_active" in quota_info
+
+
+@pytest.mark.asyncio
+async def test_get_today_quota_with_pack_balance(db: AsyncSession):
+    """测试获取今日配额信息（包含配额包）"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser20",
+        email="test20@example.com",
+        hashed_password="hash",
+    )
+    db.add(user)
+    await db.flush()
+
+    # 创建配额包余额
+    pack = UserQuotaPackBalance(
+        user_id=user.id,
+        ai_chat_credits=20,
+        document_generate_credits=10,
+    )
+    db.add(pack)
+    await db.commit()
+
+    # Act
+    quota_info = await service.get_today_quota(db, user)
+
+    # Assert
+    assert quota_info["ai_chat_pack_remaining"] == 20
+    assert quota_info["document_generate_pack_remaining"] == 10
+
+
+@pytest.mark.asyncio
+async def test_is_vip_active_none_user():
+    """测试VIP状态检查（用户为None）"""
+    # Act & Assert
+    assert _is_vip_active(None) is False
+
+
+@pytest.mark.asyncio
+async def test_is_vip_active_no_expires_at():
+    """测试VIP状态检查（无过期时间）"""
+    user = User(
+        username="testuser21",
+        email="test21@example.com",
+        hashed_password="hash",
+        vip_expires_at=None,
+    )
+
+    # Act & Assert
+    assert _is_vip_active(user) is False
+
+
+@pytest.mark.asyncio
+async def test_is_vip_active_future():
+    """测试VIP状态检查（未来过期）"""
+    user = User(
+        username="testuser22",
+        email="test22@example.com",
+        hashed_password="hash",
+        vip_expires_at=datetime.now(timezone.utc) + timedelta(days=30),
+    )
+
+    # Act & Assert
+    assert _is_vip_active(user) is True
+
+
+@pytest.mark.asyncio
+async def test_is_vip_active_past():
+    """测试VIP状态检查（过去过期）"""
+    user = User(
+        username="testuser23",
+        email="test23@example.com",
+        hashed_password="hash",
+        vip_expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+    )
+
+    # Act & Assert
+    assert _is_vip_active(user) is False
+
+
+@pytest.mark.asyncio
+async def test_is_vip_active_on_day_specific_date(db: AsyncSession):
+    """测试特定日期的VIP状态"""
+    service = QuotaService()
+
+    user = User(
+        username="testuser24",
+        email="test24@example.com",
+        hashed_password="hash",
         vip_expires_at=datetime.now(timezone.utc) + timedelta(days=10),
     )
-    test_session.add(user)
-    await test_session.commit()
-    await test_session.refresh(user)
+    db.add(user)
+    await db.commit()
 
-    test_session.add_all(
-        [
-            SystemConfig(key="FREE_AI_CHAT_DAILY_LIMIT", value="1"),
-            SystemConfig(key="VIP_AI_CHAT_DAILY_LIMIT", value="9"),
-            SystemConfig(key="FREE_DOCUMENT_GENERATE_DAILY_LIMIT", value="2"),
-            SystemConfig(key="VIP_DOCUMENT_GENERATE_DAILY_LIMIT", value="8"),
-        ]
-    )
-    await test_session.commit()
-
+    # Act - 检查今天和10天后的状态
     today = date.today()
-    test_session.add(UserQuotaDaily(user_id=user.id, day=today, ai_chat_count=1, document_generate_count=3))
-    test_session.add(UserQuotaPackBalance(user_id=user.id, ai_chat_credits=2, document_generate_credits=1))
-    await test_session.commit()
+    future_date = today + timedelta(days=5)
 
-    info = await svc.get_today_quota(test_session, user)
-    assert info["ai_chat_limit"] == 9
-    assert info["document_generate_limit"] == 8
-    assert info["ai_chat_pack_remaining"] == 2
-    assert info["document_generate_pack_remaining"] == 1
-    assert info["is_vip_active"] is True
+    limit_today = await service._ai_chat_limit_for_user_on_day(db, user, today)
+    limit_future = await service._ai_chat_limit_for_user_on_day(db, user, future_date)
+
+    # Assert - 两日期应该都是VIP限额
+    assert limit_today == VIP_AI_CHAT_DAILY_LIMIT
+    assert limit_future == VIP_AI_CHAT_DAILY_LIMIT
 
 
 @pytest.mark.asyncio
-async def test_get_int_config_missing_and_invalid_values_fallback_to_default(test_session):
-    assert await _get_int_config(test_session, "MISSING_KEY", 123) == 123
-
-    test_session.add(SystemConfig(key="BAD_INT", value="abc"))
-    await test_session.commit()
-    assert await _get_int_config(test_session, "BAD_INT", 456) == 456
-
-    test_session.add(SystemConfig(key="NONE_INT", value=None))
-    await test_session.commit()
-    assert await _get_int_config(test_session, "NONE_INT", 789) == 789
-
-
-@pytest.mark.asyncio
-async def test_quota_service_admin_role_is_unlimited_and_consume_calls(test_session):
-    svc = QuotaService()
-    user = User(username="qadmin", email="qadmin@example.com", nickname="qadmin", hashed_password="x", role="admin")
-    test_session.add(user)
-    await test_session.commit()
-    await test_session.refresh(user)
-
-    await svc.consume_ai_chat(test_session, user)
-    await svc.consume_document_generate(test_session, user)
-
-
-@pytest.mark.asyncio
-async def test_quota_service_list_quota_usage_pagination_and_limits(test_session):
-    svc = QuotaService()
-
-    user = User(username="q5", email="q5@example.com", nickname="q5", hashed_password="x")
-    test_session.add(user)
-    await test_session.commit()
-    await test_session.refresh(user)
-
-    test_session.add_all(
-        [
-            SystemConfig(key="FREE_AI_CHAT_DAILY_LIMIT", value="1"),
-            SystemConfig(key="FREE_DOCUMENT_GENERATE_DAILY_LIMIT", value="2"),
-        ]
-    )
-    await test_session.commit()
-
-    today = date.today()
-    test_session.add_all(
-        [
-            UserQuotaDaily(user_id=user.id, day=today, ai_chat_count=1, document_generate_count=2),
-            UserQuotaDaily(user_id=user.id, day=today - timedelta(days=1), ai_chat_count=0, document_generate_count=1),
-        ]
-    )
-    await test_session.commit()
-
-    resp = await svc.list_quota_usage(test_session, user, days=0, page=0, page_size=999)
-    assert resp["page"] == 1
-    assert resp["page_size"] == 100
-    assert resp["total"] >= 1
-    assert isinstance(resp["items"], list)
+async def test_quota_service_singleton():
+    """测试配额服务单例"""
+    # Act & Assert
+    assert quota_service is not None
+    assert isinstance(quota_service, QuotaService)

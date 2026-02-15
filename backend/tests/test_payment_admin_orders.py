@@ -120,7 +120,9 @@ async def test_payment_admin_refund_order_update_rowcount_zero_rollbacks(client,
 
         res = await client.post("/api/payment/admin/refund/ord-paid-rowcount0")
         assert res.status_code == 400
-        assert res.json().get("detail") == "订单状态异常"
+        error_data = res.json()
+        error_msg = error_data.get("error", {}).get("message", "")
+        assert "订单状态异常" in error_msg
 
     finally:
         app.dependency_overrides.pop(require_admin, None)
@@ -167,7 +169,9 @@ async def test_payment_admin_mark_paid_order_update_rowcount_zero_rollbacks(clie
             json={"payment_method": "wechat"},
         )
         assert res.status_code == 400
-        assert res.json().get("detail") == "订单状态异常"
+        error_data = res.json()
+        error_msg = error_data.get("error", {}).get("message", "")
+        assert "订单状态异常" in error_msg
 
     finally:
         app.dependency_overrides.pop(require_admin, None)

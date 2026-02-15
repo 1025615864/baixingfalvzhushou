@@ -59,15 +59,18 @@ class AiMetrics:
             self.errors_total += 1
             ec = str(error_code)
             ep = str(endpoint)
-            self._error_code_counts[ec] = int(self._error_code_counts.get(ec, 0)) + 1
-            self._endpoint_error_counts[ep] = int(self._endpoint_error_counts.get(ep, 0)) + 1
+            self._error_code_counts[ec] = int(
+                self._error_code_counts.get(ec, 0)) + 1
+            self._endpoint_error_counts[ep] = int(
+                self._endpoint_error_counts.get(ep, 0)) + 1
             self._recent_errors.append(
                 AiRecentError(
                     ts=float(time.time()),
                     request_id=str(request_id),
                     endpoint=str(endpoint),
                     error_code=str(error_code),
-                    status_code=(int(status_code) if status_code is not None else None),
+                    status_code=(
+                        int(status_code) if status_code is not None else None),
                     message=(str(message) if message is not None else None),
                 )
             )

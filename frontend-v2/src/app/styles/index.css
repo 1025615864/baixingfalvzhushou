@@ -1,0 +1,573 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 引入思源黑体 */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700;900&family=Noto+Serif+SC:wght@400;600;700&display=swap');
+
+/* ============================================
+   基础样式 - 百姓助手法律服务平台
+   ============================================ */
+@layer base {
+  html {
+    font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900;
+    letter-spacing: 0.01em;
+  }
+
+  /* 选中文本样式 - 使用品牌色 */
+  ::selection {
+    @apply bg-primary-200 text-primary-900;
+  }
+
+  /* 自定义滚动条 - 法律主题蓝色 */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-slate-100 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-primary-300 rounded-full transition-colors hover:bg-primary-400;
+  }
+
+  ::-webkit-scrollbar-corner {
+    @apply bg-transparent;
+  }
+
+  /* 隐藏滚动条但保持功能 */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 标题字体 */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold text-slate-900;
+    letter-spacing: -0.01em;
+  }
+
+  h1 { @apply text-4xl; }
+  h2 { @apply text-3xl; }
+  h3 { @apply text-2xl; }
+  h4 { @apply text-xl; }
+  h5 { @apply text-lg; }
+  h6 { @apply text-base; }
+
+  /* 链接默认样式 */
+  a {
+    @apply transition-colors duration-200;
+  }
+
+  /* 焦点样式 */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2;
+  }
+
+  /* 表格样式 */
+  table {
+    @apply w-full border-collapse;
+  }
+
+  th {
+    @apply text-left font-semibold text-slate-700;
+  }
+
+  /* 代码块样式 */
+  code {
+    @apply font-mono text-sm bg-slate-100 px-1.5 py-0.5 rounded;
+  }
+
+  pre {
+    @apply font-mono text-sm bg-slate-900 text-slate-100 p-4 rounded-xl overflow-x-auto;
+  }
+
+  pre code {
+    @apply bg-transparent p-0;
+  }
+}
+
+/* ============================================
+   组件样式
+   ============================================ */
+@layer components {
+  /* 按钮样式 */
+  .btn {
+    @apply inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary-600 text-white hover:bg-primary-700 hover:shadow-lg hover:shadow-primary-500/25 focus:ring-primary-500 active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    @apply btn bg-secondary-500 text-white hover:bg-secondary-600 hover:shadow-lg hover:shadow-secondary-500/25 focus:ring-secondary-500 active:scale-[0.98];
+  }
+
+  .btn-accent {
+    @apply btn bg-accent-500 text-white hover:bg-accent-600 hover:shadow-lg hover:shadow-accent-500/25 focus:ring-accent-500 active:scale-[0.98];
+  }
+
+  .btn-gold {
+    @apply btn bg-gold-500 text-white hover:bg-gold-600 hover:shadow-lg hover:shadow-gold-500/25 focus:ring-gold-500 active:scale-[0.98];
+  }
+
+  .btn-outline {
+    @apply btn border-2 border-primary-600 text-primary-600 hover:bg-primary-50 focus:ring-primary-500 active:scale-[0.98];
+  }
+
+  .btn-ghost {
+    @apply btn text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:ring-slate-500;
+  }
+
+  .btn-white {
+    @apply btn bg-white text-primary-600 hover:bg-primary-50 focus:ring-white shadow-lg active:scale-[0.98];
+  }
+
+  .btn-danger {
+    @apply btn bg-red-500 text-white hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/25 focus:ring-red-500 active:scale-[0.98];
+  }
+
+  /* 卡片样式 */
+  .card {
+    @apply bg-white rounded-2xl shadow-card border border-slate-100/80 overflow-hidden transition-all duration-300;
+  }
+
+  .card-hover {
+    @apply card hover:shadow-card-hover hover:-translate-y-1 hover:border-primary-100;
+  }
+
+  .card-interactive {
+    @apply card-hover cursor-pointer active:scale-[0.99];
+  }
+
+  .card-flat {
+    @apply bg-white rounded-2xl border border-slate-200 overflow-hidden;
+  }
+
+  /* 输入框样式 */
+  .input {
+    @apply w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 hover:border-slate-300;
+  }
+
+  .input-error {
+    @apply input border-red-300 focus:ring-red-500/20 focus:border-red-500 bg-red-50/50;
+  }
+
+  .input-success {
+    @apply input border-green-300 focus:ring-green-500/20 focus:border-green-500 bg-green-50/50;
+  }
+
+  .input-lg {
+    @apply input px-5 py-4 text-lg;
+  }
+
+  /* 标签样式 */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-primary {
+    @apply badge bg-primary-100 text-primary-700;
+  }
+
+  .badge-secondary {
+    @apply badge bg-secondary-100 text-secondary-700;
+  }
+
+  .badge-accent {
+    @apply badge bg-accent-100 text-accent-700;
+  }
+
+  .badge-gold {
+    @apply badge bg-gold-100 text-gold-700;
+  }
+
+  .badge-success {
+    @apply badge bg-green-100 text-green-700;
+  }
+
+  .badge-warning {
+    @apply badge bg-yellow-100 text-yellow-700;
+  }
+
+  .badge-error {
+    @apply badge bg-red-100 text-red-700;
+  }
+
+  /* 玻璃态效果 */
+  .glass {
+    @apply bg-white/80 backdrop-blur-xl border border-white/20;
+  }
+
+  .glass-dark {
+    @apply bg-slate-900/80 backdrop-blur-xl border border-white/10;
+  }
+
+  .glass-primary {
+    @apply bg-primary-600/80 backdrop-blur-xl border border-primary-400/20;
+  }
+
+  /* 导航链接样式 */
+  .nav-link {
+    @apply relative text-slate-600 hover:text-primary-600 transition-colors font-medium py-2 px-1;
+  }
+
+  .nav-link::after {
+    @apply content-[''] absolute bottom-0 left-0 w-0 h-0.5 bg-primary-600 transition-all duration-300;
+  }
+
+  .nav-link:hover::after {
+    @apply w-full;
+  }
+
+  .nav-link-active {
+    @apply text-primary-600 font-semibold;
+  }
+
+  .nav-link-active::after {
+    @apply w-full;
+  }
+
+  /* 分割线 */
+  .divider {
+    @apply h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent;
+  }
+
+  .divider-vertical {
+    @apply w-px bg-gradient-to-b from-transparent via-slate-200 to-transparent;
+  }
+
+  /* 加载动画 */
+  .loading-dots {
+    @apply inline-flex space-x-1;
+  }
+
+  .loading-dots span {
+    @apply w-2 h-2 bg-primary-600 rounded-full animate-bounce;
+  }
+
+  .loading-dots span:nth-child(2) {
+    animation-delay: 0.1s;
+  }
+
+  .loading-dots span:nth-child(3) {
+    animation-delay: 0.2s;
+  }
+
+  /* 骨架屏 */
+  .skeleton {
+    @apply bg-slate-200 animate-pulse rounded;
+  }
+
+  .skeleton-shimmer {
+    @apply bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 bg-[length:200%_100%] animate-shimmer;
+  }
+
+  /* 法律相关特殊组件 */
+  .trust-badge {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-full text-sm font-medium border border-primary-100;
+  }
+
+  .verified-badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-700 rounded-full text-xs font-medium;
+  }
+
+  .lawyer-badge {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 bg-gold-50 text-gold-700 rounded-lg text-sm font-medium border border-gold-200;
+  }
+
+  /* 页面标题区 */
+  .page-header {
+    @apply mb-8;
+  }
+
+  .page-title {
+    @apply text-2xl font-bold text-slate-900;
+  }
+
+  .page-subtitle {
+    @apply text-slate-500 mt-1;
+  }
+
+  /* 空状态 */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-16 text-center;
+  }
+
+  .empty-state-icon {
+    @apply w-16 h-16 text-slate-300 mb-4;
+  }
+
+  .empty-state-title {
+    @apply text-lg font-medium text-slate-600 mb-2;
+  }
+
+  .empty-state-description {
+    @apply text-slate-400 max-w-sm;
+  }
+}
+
+/* ============================================
+   工具类
+   ============================================ */
+@layer utilities {
+  /* 文字渐变 */
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-secondary-500;
+  }
+
+  .text-gradient-gold {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-gold-500 to-gold-600;
+  }
+
+  .text-gradient-primary {
+    @apply bg-clip-text text-transparent bg-gradient-to-br from-primary-500 to-primary-700;
+  }
+
+  .text-gradient-hero {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-600 via-primary-500 to-secondary-500;
+  }
+
+  /* 背景渐变 */
+  .bg-gradient-primary {
+    @apply bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800;
+  }
+
+  .bg-gradient-secondary {
+    @apply bg-gradient-to-br from-secondary-500 via-secondary-600 to-secondary-700;
+  }
+
+  .bg-gradient-hero {
+    background: linear-gradient(135deg, #1433e1 0%, #1a44f5 50%, #3366ff 100%);
+  }
+
+  .bg-gradient-trust {
+    background: linear-gradient(135deg, #047857 0%, #10b981 50%, #34d399 100%);
+  }
+
+  .bg-gradient-justice {
+    background: linear-gradient(135deg, #1433e1 0%, #047857 100%);
+  }
+
+  /* 聚焦环 */
+  .ring-focus {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2;
+  }
+
+  /* 悬停效果 */
+  .hover-lift {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-card-hover;
+  }
+
+  .hover-scale {
+    @apply transition-transform duration-300 hover:scale-105;
+  }
+
+  .hover-glow {
+    @apply transition-shadow duration-300 hover:shadow-glow;
+  }
+
+  .hover-brightness {
+    @apply transition-all duration-200 hover:brightness-110;
+  }
+
+  /* 文字截断 */
+  .line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* 网格背景 */
+  .bg-grid {
+    background-image: linear-gradient(to right, rgba(51, 102, 255, 0.05) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(51, 102, 255, 0.05) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .bg-dots {
+    background-image: radial-gradient(circle, rgba(51, 102, 255, 0.1) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  /* 安全区域 */
+  .safe-area-inset-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* 动画延迟 */
+  .delay-100 { animation-delay: 100ms; }
+  .delay-200 { animation-delay: 200ms; }
+  .delay-300 { animation-delay: 300ms; }
+  .delay-400 { animation-delay: 400ms; }
+  .delay-500 { animation-delay: 500ms; }
+  .delay-600 { animation-delay: 600ms; }
+  .delay-700 { animation-delay: 700ms; }
+  .delay-800 { animation-delay: 800ms; }
+
+  /* 安全文本颜色 */
+  .text-safe {
+    color: #1e293b;
+  }
+
+  /* 渐变边框 */
+  .border-gradient {
+    border: 2px solid transparent;
+    background: linear-gradient(white, white) padding-box,
+                linear-gradient(135deg, #1433e1, #10b981) border-box;
+  }
+}
+
+/* ============================================
+   页面过渡动画
+   ============================================ */
+.page-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms, transform 300ms;
+}
+
+.page-exit {
+  opacity: 1;
+}
+
+.page-exit-active {
+  opacity: 0;
+  transition: opacity 300ms;
+}
+
+/* ============================================
+   响应式调整
+   ============================================ */
+@media (max-width: 640px) {
+  html {
+    font-size: 14px;
+  }
+
+  .container {
+    @apply px-4;
+  }
+}
+
+@media (min-width: 1536px) {
+  html {
+    font-size: 17px;
+  }
+}
+
+/* ============================================
+   打印样式
+   ============================================ */
+@media print {
+  body {
+    @apply bg-white text-black;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  a {
+    text-decoration: none;
+  }
+}
+
+/* ============================================
+   特殊页面样式 - 登录/注册
+   ============================================ */
+.auth-page {
+  @apply min-h-screen flex items-center justify-center;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef4ff 50%, #f0fdfa 100%);
+}
+
+.auth-card {
+  @apply bg-white rounded-3xl shadow-soft-xl p-8 w-full max-w-md;
+  border: 1px solid rgba(51, 102, 255, 0.1);
+}
+
+/* ============================================
+   Hero 区域样式
+   ============================================ */
+.hero-section {
+  background: linear-gradient(135deg, #1433e1 0%, #1a44f5 50%, #3366ff 100%);
+  @apply text-white relative overflow-hidden;
+}
+
+.hero-section::before {
+  content: '';
+  @apply absolute inset-0 opacity-10;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* ============================================
+   法律相关特殊效果
+   ============================================ */
+/* 天平图标动画 */
+.scale-icon {
+  animation: balance 3s ease-in-out infinite;
+}
+
+@keyframes balance {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+
+/* 正义徽章 */
+.justice-badge {
+  @apply relative inline-flex items-center;
+}
+
+.justice-badge::before {
+  content: '⚖️';
+  @apply mr-2;
+}
+
+/* 信任印章 */
+.trust-seal {
+  @apply flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-soft border border-slate-100;
+}
+
+.trust-seal-icon {
+  @apply w-5 h-5 text-primary-600;
+}

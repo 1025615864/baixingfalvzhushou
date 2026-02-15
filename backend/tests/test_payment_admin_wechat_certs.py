@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -6,6 +6,7 @@ from app.main import app
 from app.models.system import SystemConfig
 from app.models.user import User
 from app.utils.deps import require_admin
+from app.utils.wechatpay_v3 import WeChatPayPlatformCert, dump_platform_certs_json
 
 
 @pytest.mark.asyncio
@@ -26,10 +27,8 @@ async def test_payment_admin_wechat_platform_certs_list_empty_and_nonempty(clien
         assert d0["total"] == 0
         assert d0["items"] == []
 
-        from app.routers import payment_legacy as legacy
-
-        raw = legacy.dump_platform_certs_json(
-            [legacy.WeChatPayPlatformCert(serial_no="B", pem="pem", expire_time="x")]
+        raw = dump_platform_certs_json(
+            [WeChatPayPlatformCert(serial_no="B", pem="pem", expire_time="x")]
         )
         test_session.add(SystemConfig(key="WECHATPAY_PLATFORM_CERTS_JSON", value=raw, category="payment"))
         await test_session.commit()
@@ -69,10 +68,8 @@ async def test_payment_admin_import_wechat_platform_certs_variants(client, test_
         )
         assert bad2.status_code == 400
 
-        from app.routers import payment_legacy as legacy
-
-        incoming = legacy.dump_platform_certs_json(
-            [legacy.WeChatPayPlatformCert(serial_no="SER1", pem="pem1", expire_time="x")]
+        incoming = dump_platform_certs_json(
+            [WeChatPayPlatformCert(serial_no="SER1", pem="pem1", expire_time="x")]
         )
         ok1 = await client.post(
             "/api/payment/admin/wechat/platform-certs/import",
@@ -81,8 +78,8 @@ async def test_payment_admin_import_wechat_platform_certs_variants(client, test_
         assert ok1.status_code == 200
         assert ok1.json()["count"] == 1
 
-        incoming2 = legacy.dump_platform_certs_json(
-            [legacy.WeChatPayPlatformCert(serial_no="SER2", pem="pem2", expire_time="x")]
+        incoming2 = dump_platform_certs_json(
+            [WeChatPayPlatformCert(serial_no="SER2", pem="pem2", expire_time="x")]
         )
         ok2 = await client.post(
             "/api/payment/admin/wechat/platform-certs/import",
@@ -115,8 +112,8 @@ async def test_payment_admin_import_wechat_platform_certs_variants(client, test_
             .issuer_name(issuer)
             .public_key(key.public_key())
             .serial_number(x509.random_serial_number())
-            .not_valid_before(datetime.utcnow() - timedelta(days=1))
-            .not_valid_after(datetime.utcnow() + timedelta(days=365))
+            .not_valid_before(datetime.now(timezone.utc) - timedelta(days=1))
+            .not_valid_after(datetime.now(timezone.utc) + timedelta(days=365))
             .sign(key, hashes.SHA256())
         )
         cert_pem = cert_obj.public_bytes(serialization.Encoding.PEM).decode("utf-8")
@@ -145,30 +142,31 @@ async def test_payment_admin_refresh_wechat_platform_certs_branches(client, test
     app.dependency_overrides[require_admin] = override_admin
 
     try:
-        import app.routers.payment_legacy as legacy
+        from app.config import get_settings
+        settings = get_settings()
 
-        monkeypatch.setattr(legacy.settings, "wechatpay_mch_id", "", raising=False)
-        monkeypatch.setattr(legacy.settings, "wechatpay_mch_serial_no", "", raising=False)
+        monkeypatch.setattr(settings, "wechatpay_mch_id", "", raising=False)
+        monkeypatch.setattr(settings, "wechatpay_mch_serial_no", "", raising=False)
         r0 = await client.post("/api/payment/admin/wechat/platform-certs/refresh")
         assert r0.status_code == 400
 
-        monkeypatch.setattr(legacy.settings, "wechatpay_mch_id", "mch", raising=False)
-        monkeypatch.setattr(legacy.settings, "wechatpay_mch_serial_no", "serial", raising=False)
-        monkeypatch.setattr(legacy.settings, "wechatpay_private_key", "", raising=False)
+        monkeypatch.setattr(settings, "wechatpay_mch_id", "mch", raising=False)
+        monkeypatch.setattr(settings, "wechatpay_mch_serial_no", "serial", raising=False)
+        monkeypatch.setattr(settings, "wechatpay_private_key", "", raising=False)
         r1 = await client.post("/api/payment/admin/wechat/platform-certs/refresh")
         assert r1.status_code == 400
 
-        monkeypatch.setattr(legacy.settings, "wechatpay_private_key", "key", raising=False)
-        monkeypatch.setattr(legacy.settings, "wechatpay_api_v3_key", "", raising=False)
+        monkeypatch.setattr(settings, "wechatpay_private_key", "key", raising=False)
+        monkeypatch.setattr(settings, "wechatpay_api_v3_key", "", raising=False)
         r2 = await client.post("/api/payment/admin/wechat/platform-certs/refresh")
         assert r2.status_code == 400
 
-        monkeypatch.setattr(legacy.settings, "wechatpay_api_v3_key", "0123456789abcdef0123456789abcdef", raising=False)
+        monkeypatch.setattr(settings, "wechatpay_api_v3_key", "0123456789abcdef0123456789abcdef", raising=False)
 
         import app.routers.payment as payment_router
 
         async def _fake_fetch(**_kwargs):
-            return [legacy.WeChatPayPlatformCert(serial_no="SERX", pem="pem", expire_time="x")]
+            return [WeChatPayPlatformCert(serial_no="SERX", pem="pem", expire_time="x")]
 
         monkeypatch.setattr(payment_router, "fetch_platform_certificates", _fake_fetch, raising=True)
 

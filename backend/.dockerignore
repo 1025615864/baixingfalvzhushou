@@ -22,3 +22,5 @@ backups/
 *.log
 .DS_Store
 Thumbs.db
+
+tests/temp_test_files/

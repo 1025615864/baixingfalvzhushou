@@ -6,16 +6,20 @@ from datetime import datetime
 
 class ChatRequest(BaseModel):
     """聊天请求"""
-    message: str = Field(..., min_length=1, max_length=2000, description="用户消息")
+    message: str = Field(...,
+                         min_length=1,
+                         max_length=2000,
+                         description="用户消息")
     session_id: str | None = Field(None, description="会话ID，为空则创建新会话")
 
 
 class LawReference(BaseModel):
     """法律引用"""
-    law_name: str = Field(..., description="法律名称")
-    article: str = Field(..., description="条款编号")
+    law_name: str = Field("", description="法律名称")
+    article: str = Field("", description="条款编号")
     content: str = Field(..., description="条款内容")
-    relevance: float = Field(..., description="相关度分数")
+    relevance: float = Field(0.0, description="相关度分数")
+    similarity: float = Field(0.0, description="相似度分数")
 
     source: str | None = Field(None, description="来源")
     source_url: str | None = Field(None, description="来源链接")
@@ -36,20 +40,24 @@ class ChatResponse(BaseModel):
     """聊天响应"""
     session_id: str = Field(..., description="会话ID")
     answer: str = Field(..., description="AI回复内容")
-    references: Annotated[list[LawReference], Field(default_factory=list, description="引用的法律条文")]
-    assistant_message_id: int | None = Field(None, description="本次AI回复对应的消息ID（用于评价）")
+    references: Annotated[list[LawReference], Field(
+        default_factory=list, description="引用的法律条文")]
+    assistant_message_id: int | None = Field(
+        None, description="本次AI回复对应的消息ID（用于评价）")
     strategy_used: str | None = Field(None, description="回答策略")
     strategy_reason: str | None = Field(None, description="策略选择原因")
     confidence: str | None = Field(None, description="置信度")
     risk_level: str | None = Field(None, description="风险等级")
-    search_quality: SearchQualityInfo | None = Field(None, description="检索质量信息")
+    search_quality: SearchQualityInfo | None = Field(
+        None, description="检索质量信息")
     disclaimer: str | None = Field(None, description="免责声明")
     model_used: str | None = Field(None, description="实际使用的模型")
     fallback_used: bool | None = Field(None, description="是否发生模型降级")
     model_attempts: list[str] | None = Field(None, description="尝试过的模型列表")
     intent: str | None = Field(None, description="识别到的意图类别")
     needs_clarification: bool | None = Field(None, description="是否需要追问补充信息")
-    clarifying_questions: list[str] | None = Field(None, description="建议追问的问题列表")
+    clarifying_questions: list[str] | None = Field(
+        None, description="建议追问的问题列表")
     created_at: datetime = Field(default_factory=datetime.now)
 
 
@@ -67,7 +75,7 @@ class MessageResponse(BaseModel):
     rating: int | None = None
     feedback: str | None = None
     created_at: datetime
-    
+
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
 
@@ -81,13 +89,13 @@ class SharedMessageResponse(BaseModel):
     role: str
     content: str
     references: str | None = None
-    created_at: datetime
+    created_at: datetime | None
 
 
 class SharedConsultationResponse(BaseModel):
     session_id: str
     title: str | None
-    created_at: datetime
+    created_at: datetime | None
     messages: list[SharedMessageResponse] = []
 
 
@@ -99,7 +107,7 @@ class ConsultationResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     messages: list[MessageResponse] = []
-    
+
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
 
@@ -110,7 +118,7 @@ class ConsultationListItem(BaseModel):
     title: str | None
     created_at: datetime
     message_count: int = 0
-    
+
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
 
@@ -128,13 +136,21 @@ class RatingResponse(BaseModel):
 
 
 class QuickRepliesRequest(BaseModel):
-    user_message: str = Field(..., min_length=1, max_length=2000, description="用户消息")
-    assistant_answer: str = Field(..., min_length=1, max_length=8000, description="AI回复")
-    references: Annotated[list[LawReference], Field(default_factory=list, description="引用的法律条文")]
+    user_message: str = Field(...,
+                              min_length=1,
+                              max_length=2000,
+                              description="用户消息")
+    assistant_answer: str = Field(...,
+                                  min_length=1,
+                                  max_length=8000,
+                                  description="AI回复")
+    references: Annotated[list[LawReference], Field(
+        default_factory=list, description="引用的法律条文")]
 
 
 class QuickRepliesResponse(BaseModel):
-    replies: Annotated[list[str], Field(default_factory=list, description="快捷回复候选")]
+    replies: Annotated[list[str], Field(
+        default_factory=list, description="快捷回复候选")]
 
 
 class TranscribeResponse(BaseModel):

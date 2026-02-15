@@ -2,13 +2,14 @@ from types import SimpleNamespace
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.main import app
 from app.models.consultation import Consultation
 from app.models.payment import PaymentOrder
 from app.models.system import SystemConfig
 from app.models.user import User
-from app.routers import payment_legacy as legacy
+from fastapi import HTTPException
 from app.routers.payment.orders_create import create_order
 from app.utils.deps import get_current_user
 
@@ -30,14 +31,18 @@ async def test_payment_orders_create_invalid_order_type_and_amount_leq_zero(clie
             json={"order_type": "nope", "amount": 1.0, "title": "t", "description": "d"},
         )
         assert bad_type.status_code == 400
-        assert bad_type.json().get("detail") == "无效的订单类型"
+        error_data = bad_type.json()
+        error_msg = error_data.get("error", {}).get("message", "")
+        assert "无效的订单类型" in error_msg
 
         bad_amount = await client.post(
             "/api/payment/orders",
             json={"order_type": "service", "amount": 0, "title": "t", "description": "d"},
         )
         assert bad_amount.status_code == 400
-        assert bad_amount.json().get("detail") == "金额必须大于0"
+        error_data = bad_amount.json()
+        error_msg = error_data.get("error", {}).get("message", "")
+        assert "金额必须大于0" in error_msg
 
     finally:
         app.dependency_overrides.pop(get_current_user, None)
@@ -77,7 +82,9 @@ async def test_payment_orders_create_ai_pack_invalid_related_type_and_pack(clien
             },
         )
         assert bad_rt.status_code == 400
-        assert bad_rt.json().get("detail") == "无效的次数包类型"
+        error_data = bad_rt.json()
+        error_msg = error_data.get("error", {}).get("message", "")
+        assert "无效的次数包类型" in error_msg
 
         bad_pack = await client.post(
             "/api/payment/orders",
@@ -91,7 +98,9 @@ async def test_payment_orders_create_ai_pack_invalid_related_type_and_pack(clien
             },
         )
         assert bad_pack.status_code == 400
-        assert bad_pack.json().get("detail") == "无效的次数包"
+        error_data = bad_pack.json()
+        error_msg = error_data.get("error", {}).get("message", "")
+        assert "无效的次数包" in error_msg
 
     finally:
         app.dependency_overrides.pop(get_current_user, None)
@@ -128,7 +137,9 @@ async def test_payment_orders_create_light_consult_review_invalid_params_and_per
             },
         )
         assert bad_rt.status_code == 400
-        assert bad_rt.json().get("detail") == "无效的关联类型"
+        error_data = bad_rt.json()
+        error_msg = error_data.get("error", {}).get("message", "")
+        assert "无效的关联类型" in error_msg
 
         missing_id = await client.post(
             "/api/payment/orders",
@@ -141,7 +152,9 @@ async def test_payment_orders_create_light_consult_review_invalid_params_and_per
             },
         )
         assert missing_id.status_code == 400
-        assert missing_id.json().get("detail") == "缺少咨询ID"
+        error_data = missing_id.json()
+        error_msg = error_data.get("error", {}).get("message", "")
+        assert "缺少咨询ID" in error_msg
 
         not_found = await client.post(
             "/api/payment/orders",
@@ -155,7 +168,9 @@ async def test_payment_orders_create_light_consult_review_invalid_params_and_per
             },
         )
         assert not_found.status_code == 404
-        assert not_found.json().get("detail") == "咨询记录不存在"
+        error_data = not_found.json()
+        error_msg = error_data.get("error", {}).get("message", "")
+        assert "咨询记录不存在" in error_msg
 
         forbidden = await client.post(
             "/api/payment/orders",
@@ -169,7 +184,9 @@ async def test_payment_orders_create_light_consult_review_invalid_params_and_per
             },
         )
         assert forbidden.status_code == 403
-        assert forbidden.json().get("detail") == "无权限购买该咨询的复核"
+        error_data = forbidden.json()
+        error_msg = error_data.get("error", {}).get("message", "")
+        assert "无权限购买该咨询的复核" in error_msg
 
     finally:
         app.dependency_overrides.pop(get_current_user, None)
@@ -205,7 +222,7 @@ async def test_payment_orders_create_direct_calls_cover_type_parsing_branches(te
         related_id=True,
         related_type="ai_chat",
     )
-    with pytest.raises(legacy.HTTPException) as exc:
+    with pytest.raises(HTTPException) as exc:
         await create_order(bad_bool, current_user=user, db=test_session)
     assert exc.value.status_code == 400
     assert exc.value.detail == "无效的次数包"
@@ -240,7 +257,7 @@ async def test_payment_orders_create_direct_calls_cover_type_parsing_branches(te
         related_id="abc",
         related_type="ai_chat",
     )
-    with pytest.raises(legacy.HTTPException) as exc2:
+    with pytest.raises(HTTPException) as exc2:
         await create_order(bad_str, current_user=user, db=test_session)
     assert exc2.value.status_code == 400
     assert exc2.value.detail == "无效的次数包"
@@ -275,7 +292,7 @@ async def test_payment_orders_create_direct_calls_cover_type_parsing_branches(te
         related_id=True,
         related_type="ai_consultation",
     )
-    with pytest.raises(legacy.HTTPException) as exc3:
+    with pytest.raises(HTTPException) as exc3:
         await create_order(bad_lr_bool, current_user=user, db=test_session)
     assert exc3.value.status_code == 400
     assert exc3.value.detail == "缺少咨询ID"
@@ -288,12 +305,12 @@ async def test_payment_orders_create_direct_calls_cover_type_parsing_branches(te
         related_id="bad",
         related_type="ai_consultation",
     )
-    with pytest.raises(legacy.HTTPException) as exc4:
+    with pytest.raises(HTTPException) as exc4:
         await create_order(bad_lr_str, current_user=user, db=test_session)
     assert exc4.value.status_code == 400
     assert exc4.value.detail == "缺少咨询ID"
 
     orders = await test_session.execute(
-        legacy.select(PaymentOrder).where(PaymentOrder.user_id == int(user.id))
+        select(PaymentOrder).where(PaymentOrder.user_id == int(user.id))
     )
     assert orders.scalars().first() is not None

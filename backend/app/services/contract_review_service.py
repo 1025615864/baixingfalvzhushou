@@ -9,7 +9,9 @@ from ..config import get_settings
 settings = get_settings()
 
 
-_JSON_BLOCK_RE = re.compile(r"```json\s*(\{.*?\})\s*```", re.DOTALL | re.IGNORECASE)
+_JSON_BLOCK_RE = re.compile(
+    r"```json\s*(\{.*?\})\s*```",
+    re.DOTALL | re.IGNORECASE)
 
 
 def _extract_json(text: str) -> dict[str, Any] | None:
@@ -33,7 +35,7 @@ def _extract_json(text: str) -> dict[str, Any] | None:
     left = candidate.find("{")
     right = candidate.rfind("}")
     if left >= 0 and right > left:
-        candidate2 = candidate[left : right + 1]
+        candidate2 = candidate[left: right + 1]
         try:
             obj = json.loads(candidate2)
             return obj if isinstance(obj, dict) else None
@@ -50,7 +52,8 @@ def _as_list(value: Any) -> list[Any]:
 def render_contract_review_markdown(report: dict[str, Any]) -> str:
     contract_type = str(report.get("contract_type") or "").strip()
     summary = str(report.get("summary") or "").strip()
-    level = str(report.get("overall_risk_level") or report.get("risk_level") or "").strip()
+    level = str(report.get("overall_risk_level")
+                or report.get("risk_level") or "").strip()
 
     md: list[str] = []
     md.append("# 合同风险体检报告")
@@ -127,8 +130,7 @@ def build_contract_review_prompt(
         "JSON 字段：contract_type, summary, overall_risk_level(low/medium/high), "
         "risks([{title,severity(low/medium/high),problem,suggestion}]), "
         "missing_clauses([string]), recommended_edits([{clause,before,after}]), questions_to_confirm([string])."
-        "如果无法确定，字段可以为空字符串或空数组，但必须是合法 JSON。"
-    )
+        "如果无法确定，字段可以为空字符串或空数组，但必须是合法 JSON。")
 
     if rules and isinstance(rules, dict):
         try:
@@ -220,7 +222,8 @@ def apply_contract_review_rules(
 
     risks = _as_list(report.get("risks"))
     risk_title_norm = set()
-    risk_max_rank = _severity_rank(report.get("overall_risk_level") or report.get("risk_level"))
+    risk_max_rank = _severity_rank(
+        report.get("overall_risk_level") or report.get("risk_level"))
 
     for it in risks:
         if not isinstance(it, dict):
@@ -263,7 +266,8 @@ def apply_contract_review_rules(
     report["missing_clauses"] = missing
     report["risks"] = risks
 
-    existing_level = str(report.get("overall_risk_level") or report.get("risk_level") or "").strip()
+    existing_level = str(report.get("overall_risk_level")
+                         or report.get("risk_level") or "").strip()
     if not existing_level:
         report["overall_risk_level"] = "low" if risk_max_rank <= 1 else "medium" if risk_max_rank == 2 else "high"
     else:
@@ -283,9 +287,12 @@ def call_openai_contract_review(
 ) -> tuple[dict[str, Any], str]:
     from openai import OpenAI
 
-    sys, user = build_contract_review_prompt(extracted_text=extracted_text, focus=focus, rules=rules)
+    sys, user = build_contract_review_prompt(
+        extracted_text=extracted_text, focus=focus, rules=rules)
 
-    client = OpenAI(api_key=settings.openai_api_key, base_url=settings.openai_base_url)
+    client = OpenAI(
+        api_key=settings.openai_api_key,
+        base_url=settings.openai_base_url)
     model = str(settings.ai_model or "").strip() or "gpt-4o-mini"
 
     res = client.chat.completions.create(
@@ -306,5 +313,6 @@ def call_openai_contract_review(
     content = str(getattr(msg, "content", "") or "")
 
     obj = _extract_json(content) or {}
-    md = render_contract_review_markdown(obj) if obj else (content.strip() + "\n")
+    md = render_contract_review_markdown(
+        obj) if obj else (content.strip() + "\n")
     return obj, md

@@ -45,7 +45,11 @@ async def load_review_sla_config(db: AsyncSession) -> dict[str, object]:
     try:
         res = await db.execute(select(SystemConfig).where(SystemConfig.key == CONSULT_REVIEW_SLA_CONFIG_KEY))
         cfg = res.scalar_one_or_none()
-        raw = str(getattr(cfg, "value", "") or "").strip() if cfg is not None else ""
+        raw = str(
+            getattr(
+                cfg,
+                "value",
+                "") or "").strip() if cfg is not None else ""
     except Exception:
         raw = ""
 
@@ -67,7 +71,8 @@ async def load_review_sla_config(db: AsyncSession) -> dict[str, object]:
     }
 
 
-def compute_review_due_at(task: ConsultationReviewTask, cfg: dict[str, object]) -> datetime | None:
+def compute_review_due_at(task: ConsultationReviewTask,
+                          cfg: dict[str, object]) -> datetime | None:
     status = str(getattr(task, "status", "") or "").strip().lower()
     if status == "submitted":
         return None
@@ -98,11 +103,15 @@ def compute_review_due_at(task: ConsultationReviewTask, cfg: dict[str, object]) 
 async def scan_and_notify_review_task_sla(db: AsyncSession) -> dict[str, int]:
     try:
         en_res = await db.execute(
-            select(SystemConfig.value).where(SystemConfig.key == ENABLE_NOTIFICATIONS_CONFIG_KEY)
+            select(
+                SystemConfig.value).where(
+                SystemConfig.key == ENABLE_NOTIFICATIONS_CONFIG_KEY)
         )
         en_val = en_res.scalar_one_or_none()
-        if isinstance(en_val, str) and en_val.strip() and en_val.strip().lower() in {"0", "false", "no", "off"}:
-            return {"scanned": 0, "candidates": 0, "inserted": 0, "due_soon": 0, "overdue": 0, "skipped": 1}
+        if isinstance(en_val, str) and en_val.strip(
+        ) and en_val.strip().lower() in {"0", "false", "no", "off"}:
+            return {"scanned": 0, "candidates": 0, "inserted": 0,
+                    "due_soon": 0, "overdue": 0, "skipped": 1}
     except Exception:
         pass
 
@@ -121,7 +130,8 @@ async def scan_and_notify_review_task_sla(db: AsyncSession) -> dict[str, int]:
         .limit(500)
     )
 
-    rows = cast(list[tuple[ConsultationReviewTask, int | None]], list(res.all()))
+    rows = cast(
+        list[tuple[ConsultationReviewTask, int | None]], list(res.all()))
 
     scanned = len(rows)
     values: list[dict[str, object]] = []
@@ -191,26 +201,41 @@ async def scan_and_notify_review_task_sla(db: AsyncSession) -> dict[str, int]:
         }
 
     bind = db.get_bind()
-    dialect_name = str(getattr(getattr(bind, "dialect", None), "name", "") or "")
+    dialect_name = str(
+        getattr(
+            getattr(
+                bind,
+                "dialect",
+                None),
+            "name",
+            "") or "")
 
     if dialect_name == "postgresql":
         stmt = (
-            pg_insert(Notification)
-            .values(values)
-            .on_conflict_do_nothing(index_elements=["user_id", "type", "dedupe_key"])
-            .returning(Notification.user_id, Notification.title, Notification.content, Notification.link, Notification.dedupe_key)
-        )
+            pg_insert(Notification) .values(values) .on_conflict_do_nothing(
+                index_elements=[
+                    "user_id",
+                    "type",
+                    "dedupe_key"]) .returning(
+                Notification.id,
+                Notification.user_id,
+                Notification.title,
+                Notification.content,
+                Notification.link,
+                Notification.dedupe_key,
+            ))
     else:
         stmt = sqlite_insert(Notification).values(values).on_conflict_do_nothing(
-            index_elements=["user_id", "type", "dedupe_key"]
-        )
+            index_elements=["user_id", "type", "dedupe_key"])
 
     result = await db.execute(stmt)
     await db.commit()
 
-    inserted_rows: list[tuple[object, object, object, object, object]] = []
+    inserted_rows: list[tuple[object, object,
+                              object, object, object, object]] = []
     if dialect_name == "postgresql":
-        inserted_rows = cast(list[tuple[object, object, object, object, object]], list(result.all()))
+        inserted_rows = cast(
+            list[tuple[object, object, object, object, object, object]], list(result.all()))
         inserted = int(len(inserted_rows))
     else:
         inserted = int(getattr(result, "rowcount", 0) or 0)
@@ -226,31 +251,33 @@ async def scan_and_notify_review_task_sla(db: AsyncSession) -> dict[str, int]:
 
     if inserted > 0:
         try:
-            from . import websocket_service
+            from .unified_notification_service import unified_notification_service
 
             if inserted_rows:
-                for user_id, title, content, link, dedupe_key in inserted_rows:
+                for notif_id, user_id, title, content, link, dedupe_key in inserted_rows:
                     uid = _parse_int(user_id, 0)
                     if uid <= 0:
                         continue
-                    _ = await websocket_service.notify_user(
-                        uid,
-                        websocket_service.MessageType.NOTIFICATION,
-                        str(title or ""),
-                        str(content or ""),
-                        data={"link": str(link or ""), "dedupe_key": str(dedupe_key or "")},
+                    _ = await unified_notification_service.notify_ws(
+                        user_id=uid,
+                        title=str(title or ""),
+                        content=str(content or ""),
+                        link=str(link or ""),
+                        dedupe_key=str(dedupe_key or ""),
+                        notification_id=_parse_int(notif_id, 0) or None,
                     )
             else:
                 for v in values:
                     uid = _parse_int(v.get("user_id"), 0)
                     if uid <= 0:
                         continue
-                    _ = await websocket_service.notify_user(
-                        uid,
-                        websocket_service.MessageType.NOTIFICATION,
-                        str(v.get("title") or ""),
-                        str(v.get("content") or ""),
-                        data={"link": str(v.get("link") or ""), "dedupe_key": str(v.get("dedupe_key") or "")},
+                    _ = await unified_notification_service.notify_ws(
+                        user_id=uid,
+                        title=str(v.get("title") or ""),
+                        content=str(v.get("content") or ""),
+                        link=str(v.get("link") or ""),
+                        dedupe_key=str(v.get("dedupe_key") or ""),
+                        notification_id=None,
                     )
         except Exception:
             logger.exception("review_task_sla websocket notify failed")

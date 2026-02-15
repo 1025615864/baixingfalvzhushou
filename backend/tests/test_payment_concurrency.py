@@ -69,7 +69,7 @@ async def test_alipay_notify_concurrent_idempotent(
     params["sign"] = payment_router._alipay_sign_rsa2(params, private_pem)
 
     async def _post_notify():
-        return await client.post("/api/payment/alipay/notify", data=params)
+        return await client.post("/api/payment/callback/alipay/notify", data=params)
 
     r1, r2 = await asyncio.gather(_post_notify(), _post_notify())
 

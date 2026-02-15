@@ -16,6 +16,7 @@ from ..config import get_settings
 from ..models.news import News
 from ..models.news_workbench import NewsAIGeneration, NewsLinkCheck
 from ..utils.pii import sanitize_pii
+from ..utils.security import validate_external_url
 
 
 class NewsWorkbenchService:
@@ -42,7 +43,7 @@ class NewsWorkbenchService:
         end = t.rfind("}")
         if start < 0 or end < 0 or end <= start:
             return None
-        chunk = t[start : end + 1]
+        chunk = t[start: end + 1]
         try:
             obj: object = json.loads(chunk)
         except Exception:
@@ -59,8 +60,11 @@ class NewsWorkbenchService:
     def extract_links_from_markdown(markdown: str) -> list[str]:
         text = str(markdown or "")
 
-        url_pattern = re.compile(r"https?://[^\s)\]}>\"']+", flags=re.IGNORECASE)
-        urls = set(m.group(0).strip() for m in url_pattern.finditer(text) if m.group(0).strip())
+        url_pattern = re.compile(
+            r"https?://[^\s)\]}>\"']+",
+            flags=re.IGNORECASE)
+        urls = set(m.group(0).strip()
+                   for m in url_pattern.finditer(text) if m.group(0).strip())
 
         return sorted(urls)
 
@@ -83,7 +87,9 @@ class NewsWorkbenchService:
             task_type=str(task_type),
             status=str(status),
             input_json=json.dumps(input_payload, ensure_ascii=False),
-            output_json=json.dumps(output_payload, ensure_ascii=False) if output_payload is not None else None,
+            output_json=json.dumps(
+                output_payload,
+                ensure_ascii=False) if output_payload is not None else None,
             raw_output=raw_output,
             error=error,
         )
@@ -211,8 +217,10 @@ class NewsWorkbenchService:
                 error="invalid_json",
             )
 
-        if append and content and isinstance(output_payload.get("content"), str):
-            output_payload["content"] = str(content) + "\n\n" + str(output_payload.get("content") or "")
+        if append and content and isinstance(
+                output_payload.get("content"), str):
+            output_payload["content"] = str(
+                content) + "\n\n" + str(output_payload.get("content") or "")
 
         return await self.create_generation(
             db,
@@ -234,10 +242,12 @@ class NewsWorkbenchService:
         news_id: int | None,
         limit: int = 50,
     ) -> list[NewsAIGeneration]:
-        q = select(NewsAIGeneration).where(NewsAIGeneration.user_id == int(user_id))
+        q = select(NewsAIGeneration).where(
+            NewsAIGeneration.user_id == int(user_id))
         if news_id is not None:
             q = q.where(NewsAIGeneration.news_id == int(news_id))
-        q = q.order_by(desc(NewsAIGeneration.created_at), desc(NewsAIGeneration.id)).limit(int(max(1, min(200, limit))))
+        q = q.order_by(desc(NewsAIGeneration.created_at), desc(
+            NewsAIGeneration.id)).limit(int(max(1, min(200, limit))))
         res = await db.execute(q)
         return list(res.scalars().all())
 
@@ -255,11 +265,21 @@ class NewsWorkbenchService:
         urls = self.extract_links_from_markdown(markdown)
         max_urls_int = int(max(1, min(200, max_urls)))
         urls = urls[:max_urls_int]
+        
+        # 验证 URL 安全性，过滤掉不安全的 URL
+        safe_urls = []
+        for url in urls:
+            if validate_external_url(url):
+                safe_urls.append(url)
+            else:
+                logger.warning(f"URL rejected due to security check: {url}")
+        urls = safe_urls
 
         concurrency = int(max(1, min(20, 10)))
         semaphore = asyncio.Semaphore(concurrency)
 
-        async def _check_one(client: httpx.AsyncClient, url: str) -> dict[str, Any]:
+        async def _check_one(client: httpx.AsyncClient,
+                             url: str) -> dict[str, Any]:
             async with semaphore:
                 ok = False
                 status_code: int | None = None
@@ -268,7 +288,9 @@ class NewsWorkbenchService:
                 try:
                     r = await client.get(url)
                     status_code = int(r.status_code)
-                    final_url = str(r.url) if getattr(r, "url", None) is not None else None
+                    final_url = str(
+                        r.url) if getattr(
+                        r, "url", None) is not None else None
                     ok = bool(status_code < 400)
                 except Exception as e:
                     err = str(e)
@@ -319,7 +341,8 @@ class NewsWorkbenchService:
         res = await db.execute(q)
         return list(res.scalars().all())
 
-    async def get_news_content_for_task(self, db: AsyncSession, news_id: int) -> tuple[str | None, str | None, str | None]:
+    async def get_news_content_for_task(
+            self, db: AsyncSession, news_id: int) -> tuple[str | None, str | None, str | None]:
         res = await db.execute(select(News).where(News.id == int(news_id)))
         news = res.scalar_one_or_none()
         if news is None:

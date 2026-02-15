@@ -7,16 +7,16 @@ SENSITIVE_WORDS = [
     "代办假证", "办假证", "伪造证件", "假学历", "假文凭",
     "洗钱", "黑钱", "赌博网站", "网络赌博", "六合彩",
     "毒品", "冰毒", "大麻", "可卡因", "海洛因",
-    
+
     # 诈骗相关
     "刷单兼职", "高额返利", "免费领取", "中奖通知",
-    
+
     # 暴力相关
     "杀人方法", "报复社会", "制造炸弹",
-    
+
     # 色情相关
     "色情网站", "成人视频", "约炮",
-    
+
     # 政治敏感（示例，实际需根据法规调整）
     "翻墙软件", "VPN代理",
 ]
@@ -35,7 +35,7 @@ DEFAULT_CHECK_PHONE = True
 
 class ContentFilter:
     """内容过滤器"""
-    
+
     def __init__(
         self,
         custom_words: list[str] | None = None,
@@ -45,7 +45,8 @@ class ContentFilter:
     ):
         self.sensitive_words: set[str] = set(SENSITIVE_WORDS)
         self.ad_words: set[str] = set(AD_WORDS)
-        self.ad_threshold: int = int(ad_threshold) if int(ad_threshold) > 0 else DEFAULT_AD_WORDS_THRESHOLD
+        self.ad_threshold: int = int(ad_threshold) if int(
+            ad_threshold) > 0 else DEFAULT_AD_WORDS_THRESHOLD
         self.check_url: bool = bool(check_url)
         self.check_phone: bool = bool(check_phone)
         if custom_words:
@@ -60,9 +61,11 @@ class ContentFilter:
         check_phone: bool | None = None,
     ) -> None:
         if sensitive_words is not None:
-            self.sensitive_words = {str(w).strip() for w in sensitive_words if str(w).strip()}
+            self.sensitive_words = {str(w).strip()
+                                    for w in sensitive_words if str(w).strip()}
         if ad_words is not None:
-            self.ad_words = {str(w).strip() for w in ad_words if str(w).strip()}
+            self.ad_words = {str(w).strip()
+                             for w in ad_words if str(w).strip()}
         if ad_threshold is not None:
             v = int(ad_threshold)
             self.ad_threshold = v if v > 0 else DEFAULT_AD_WORDS_THRESHOLD
@@ -70,77 +73,77 @@ class ContentFilter:
             self.check_url = bool(check_url)
         if check_phone is not None:
             self.check_phone = bool(check_phone)
-    
+
     def check_content(self, content: str) -> tuple[bool, str, list[str]]:
         """
         检查内容是否包含敏感词
-        
+
         Returns:
             Tuple[bool, str, list[str]]: (是否通过, 原因, 匹配到的敏感词列表)
         """
         if not content:
             return True, "", []
-        
+
         content_lower = content.lower()
         matched_sensitive: list[str] = []
         matched_ads: list[str] = []
-        
+
         # 检查敏感词
         for word in self.sensitive_words:
             if word.lower() in content_lower:
                 matched_sensitive.append(word)
-        
+
         # 检查广告词
         for word in self.ad_words:
             if word.lower() in content_lower:
                 matched_ads.append(word)
-        
+
         if matched_sensitive:
             return False, "内容包含敏感词汇", matched_sensitive
-        
+
         if len(matched_ads) >= int(self.ad_threshold):
             return False, "内容疑似广告", matched_ads
-        
+
         return True, "", []
-    
+
     def filter_content(self, content: str, replacement: str = "***") -> str:
         """
         过滤敏感词，替换为指定字符
-        
+
         Args:
             content: 原始内容
             replacement: 替换字符
-            
+
         Returns:
             过滤后的内容
         """
         if not content:
             return content
-        
+
         result = content
         all_words = list(self.sensitive_words) + list(self.ad_words)
-        
+
         for word in all_words:
             pattern = re.compile(re.escape(word), re.IGNORECASE)
             result = pattern.sub(replacement, result)
-        
+
         return result
-    
+
     def get_risk_level(self, content: str) -> str:
         """
         获取内容风险等级
-        
+
         Returns:
             'safe' | 'warning' | 'danger'
         """
         passed, _, matched = self.check_content(content)
-        
+
         if passed:
             return 'safe'
-        
+
         if len(matched) >= 3:
             return 'danger'
-        
+
         return 'warning'
 
 
@@ -167,7 +170,7 @@ def apply_content_filter_config(
 def check_post_content(title: str, content: str) -> tuple[bool, str]:
     """
     检查帖子内容
-    
+
     Returns:
         Tuple[bool, str]: (是否通过, 错误信息)
     """
@@ -177,21 +180,21 @@ def check_post_content(title: str, content: str) -> tuple[bool, str]:
         if reason == "内容疑似广告":
             return True, ""
         return False, f"标题{reason}"
-    
+
     # 检查内容
     passed, reason, _ = content_filter.check_content(content)
     if not passed:
         if reason == "内容疑似广告":
             return True, ""
         return False, f"内容{reason}"
-    
+
     return True, ""
 
 
 def check_comment_content(content: str) -> tuple[bool, str]:
     """
     检查评论内容
-    
+
     Returns:
         Tuple[bool, str]: (是否通过, 错误信息)
     """
@@ -200,14 +203,14 @@ def check_comment_content(content: str) -> tuple[bool, str]:
         if reason == "内容包含敏感词汇":
             return False, reason
         return True, ""
-    
+
     return True, ""
 
 
 def needs_review(content: str) -> tuple[bool, str]:
     """
     判断内容是否需要人工审核
-    
+
     Returns:
         Tuple[bool, str]: (是否需要审核, 原因)
     """
@@ -216,22 +219,22 @@ def needs_review(content: str) -> tuple[bool, str]:
         return True, reason
 
     risk_level = content_filter.get_risk_level(content)
-    
+
     if risk_level == 'danger':
         return True, "内容风险较高，需要人工审核"
-    
+
     # 检查是否包含链接
     if content_filter.check_url:
         url_pattern = r'https?://[^\s]+'
         if re.search(url_pattern, content):
             return True, "内容包含链接，需要人工审核"
-    
+
     # 检查是否包含联系方式
     if content_filter.check_phone:
         phone_pattern = r'1[3-9]\d{9}'
         if re.search(phone_pattern, content):
             return True, "内容包含联系方式，需要人工审核"
-    
+
     return False, ""
 
 

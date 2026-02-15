@@ -34,7 +34,8 @@ def build_consultation_report_from_export_data(
             created_at = None
 
     messages = export_data.get("messages")
-    msg_list: list[dict[str, Any]] = messages if isinstance(messages, list) else []
+    msg_list: list[dict[str, Any]] = messages if isinstance(
+        messages, list) else []
 
     user_msgs: list[str] = []
     assistant_msgs: list[str] = []
@@ -166,7 +167,8 @@ def generate_consultation_report_pdf(report: ConsultationReport) -> bytes:
 
     story.append(Paragraph("法律咨询报告", title_style))
 
-    created_at_text = report.created_at.strftime("%Y年%m月%d日 %H:%M") if report.created_at else "-"
+    created_at_text = report.created_at.strftime(
+        "%Y年%m月%d日 %H:%M") if report.created_at else "-"
 
     info_data = [
         ["咨询编号", report.session_id or "-"],
@@ -211,7 +213,10 @@ def generate_consultation_report_pdf(report: ConsultationReport) -> bytes:
             title = f"《{law_name}》{article}" if law_name or article else "相关法条"
             story.append(Paragraph(_escape_paragraph(title), body_style))
             if content:
-                story.append(Paragraph(_escape_paragraph(content), small_style))
+                story.append(
+                    Paragraph(
+                        _escape_paragraph(content),
+                        small_style))
             story.append(Spacer(1, 4))
 
     story.append(Spacer(1, 18))

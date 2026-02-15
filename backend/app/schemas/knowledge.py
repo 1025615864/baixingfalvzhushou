@@ -23,13 +23,22 @@ class LegalKnowledgeBase(BaseModel):
     category: str = Field(..., min_length=1, max_length=50, description="分类")
     keywords: str | None = Field(None, max_length=500, description="关键词，逗号分隔")
     source: str | None = Field(None, max_length=200, description="来源")
-    source_url: str | None = Field(None, max_length=500, description="来源链接")
-    source_version: str | None = Field(None, max_length=50, description="来源版本")
-    source_hash: str | None = Field(None, max_length=64, description="来源内容哈希")
-    ingest_batch_id: str | None = Field(None, max_length=36, description="导入批次ID")
-    effective_date: str | None = Field(None, max_length=20, description="生效日期")
-    weight: float = Field(1.0, ge=0, le=10, description="权重")
-    is_active: bool = Field(True, description="是否启用")
+    source_url: str | None = Field(
+        default=None,
+        max_length=500,
+        description="来源链接")
+    source_version: str | None = Field(
+        default=None, max_length=50, description="来源版本")
+    source_hash: str | None = Field(
+        default=None,
+        max_length=64,
+        description="来源内容哈希")
+    ingest_batch_id: str | None = Field(
+        default=None, max_length=36, description="导入批次ID")
+    effective_date: str | None = Field(
+        default=None, max_length=20, description="生效日期")
+    weight: float = Field(default=1.0, ge=0, le=10, description="权重")
+    is_active: bool = Field(default=True, description="是否启用")
 
 
 class LegalKnowledgeCreate(LegalKnowledgeBase):
@@ -62,7 +71,7 @@ class LegalKnowledgeResponse(LegalKnowledgeBase):
     is_vectorized: bool
     created_at: datetime
     updated_at: datetime
-    
+
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
 
@@ -87,7 +96,8 @@ class ConsultationTemplateBase(BaseModel):
     description: str | None = Field(None, max_length=500, description="描述")
     category: str = Field(..., min_length=1, max_length=50, description="分类")
     icon: str = Field("MessageSquare", max_length=50, description="图标名称")
-    questions: list[TemplateQuestionItem] = Field(..., min_length=1, description="问题列表")
+    questions: list[TemplateQuestionItem] = Field(
+        ..., min_length=1, description="问题列表")
     sort_order: int = Field(0, ge=0, description="排序顺序")
     is_active: bool = Field(True, description="是否启用")
 
@@ -120,7 +130,7 @@ class ConsultationTemplateResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    
+
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
 
@@ -159,7 +169,8 @@ class BatchOperationResponse(BaseModel):
 
 
 class BatchImportKnowledgeRequest(BaseModel):
-    items: list[LegalKnowledgeCreate] = Field(..., min_length=1, description="要导入的知识条目")
+    items: list[LegalKnowledgeCreate] = Field(
+        ..., min_length=1, description="要导入的知识条目")
     dry_run: bool = Field(False, description="仅校验不入库")
 
 

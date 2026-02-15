@@ -5,6 +5,8 @@ import pytest
 
 from app.main import app
 from app.utils.deps import get_current_user, get_current_user_optional
+from tests.helpers.test_data_factory import UserFactory, PostFactory
+from tests.helpers.assertion_helpers import assert_response_success
 
 
 def _comment_payload(*, comment_id: int, post_id: int, user_id: int, content: str, created_at: datetime, review_status: str | None = None, review_reason: str | None = None):
@@ -62,7 +64,9 @@ async def test_forum_create_comment_branches(client, monkeypatch):
         monkeypatch.setattr(c_router, "check_comment_content", bad_check, raising=True)
         r1 = await client.post("/api/forum/posts/1/comments", json={"content": "x"})
         assert r1.status_code == 400
-        assert r1.json().get("detail") == "bad"
+        error_data = r1.json()
+        error_msg = error_data.get("error", {}).get("message", "")
+        assert "bad" in error_msg
 
         def ok_check(_content: str):
             return True, None
@@ -92,7 +96,9 @@ async def test_forum_create_comment_branches(client, monkeypatch):
             json={"content": "x", "parent_id": 1},
         )
         assert r3.status_code == 400
-        assert r3.json().get("detail") == "父评论不存在"
+        error_data = r3.json()
+        error_msg = error_data.get("error", {}).get("message", "")
+        assert "父评论不存在" in error_msg
 
         parent_wrong_post = SimpleNamespace(id=1, post_id=2)
 

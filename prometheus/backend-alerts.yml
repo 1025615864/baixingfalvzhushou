@@ -1,0 +1,269 @@
+# Backend System Alerts
+# 后端系统告警规则
+
+groups:
+  - name: backend_api_performance
+    interval: 30s
+    rules:
+      # API响应时间告警
+      - alert: BackendAPIResponseTimeP95High
+        expr: |
+          histogram_quantile(0.95, 
+            rate(baixing_http_request_duration_seconds_bucket[5m])
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          service: api
+        annotations:
+          summary: "API响应时间P95超过500ms"
+          description: |
+            API响应时间P95过高
+            当前值: {{ $value | humanizeDuration }}
+            目标值: < 500ms
+            建议: 检查慢接口，优化数据库查询
+
+      - alert: BackendAPIResponseTimeP99High
+        expr: |
+          histogram_quantile(0.99, 
+            rate(baixing_http_request_duration_seconds_bucket[10m])
+          ) > 3.0
+        for: 10m
+        labels:
+          severity: critical
+          team: backend
+          service: api
+        annotations:
+          summary: "API响应时间P99超过3秒"
+          description: |
+            API响应时间P99过高
+            当前值: {{ $value | humanizeDuration }}
+            目标值: < 3s
+            建议: 立即检查系统性能，考虑扩容
+
+      # API错误率告警
+      - alert: BackendAPIErrorRateHigh
+        expr: |
+          (
+            sum(rate(baixing_http_requests_total{status=~"5.."}[5m]))
+            /
+            sum(rate(baixing_http_requests_total[5m]))
+          ) * 100 > 5
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          service: api
+        annotations:
+          summary: "API错误率超过5%"
+          description: |
+            API错误率过高
+            当前错误率: {{ $value | humanizePercentage }}
+            目标错误率: < 5%
+            建议: 检查错误日志，定位问题
+
+      - alert: BackendAPIErrorRateCritical
+        expr: |
+          (
+            sum(rate(baixing_http_requests_total{status=~"5.."}[5m]))
+            /
+            sum(rate(baixing_http_requests_total[5m]))
+          ) * 100 > 10
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+          service: api
+        annotations:
+          summary: "API错误率超过10%（严重）"
+          description: |
+            API错误率严重过高
+            当前错误率: {{ $value | humanizePercentage }}
+            目标错误率: < 1%
+            建议: 立即检查系统状态
+
+  - name: backend_database
+    interval: 30s
+    rules:
+      # 数据库连接池告警
+      - alert: DatabasePoolConnectionsHigh
+        expr: |
+          baixing_db_pool_active_connections 
+          / 
+          baixing_db_pool_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          service: database
+        annotations:
+          summary: "数据库连接池使用率超过80%"
+          description: |
+            数据库连接池使用率过高
+            当前使用率: {{ $value | humanizePercentage }}
+            建议: 检查连接泄漏，增加连接池大小
+
+      - alert: DatabasePoolOverflow
+        expr: |
+          baixing_db_pool_overflow > 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+          service: database
+        annotations:
+          summary: "数据库连接池溢出"
+          description: |
+            数据库连接池溢出
+            溢出连接数: {{ $value }}
+            建议: 立即增加连接池大小或优化查询
+
+      # 慢查询告警
+      - alert: DatabaseSlowQueryRateHigh
+        expr: |
+          rate(baixing_sql_slow_queries_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          service: database
+        annotations:
+          summary: "慢查询速率过高"
+          description: |
+            慢查询速率过高
+            当前速率: {{ $value }}/秒
+            建议: 检查慢查询日志，优化SQL语句
+
+      - alert: DatabaseSlowQueryDurationHigh
+        expr: |
+          baixing_sql_slow_query_max_duration_seconds > 1.0
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+          service: database
+        annotations:
+          summary: "存在超过1秒的慢查询"
+          description: |
+            最慢查询时间: {{ $value | humanizeDuration }}
+            建议: 立即优化该查询
+
+  - name: backend_redis
+    interval: 30s
+    rules:
+      # Redis连接告警（需要redis_exporter）
+      - alert: RedisConnectionFailed
+        expr: |
+          up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+          service: redis
+        annotations:
+          summary: "Redis连接失败"
+          description: |
+            Redis服务不可用
+            建议: 检查Redis服务状态
+
+      - alert: RedisMemoryUsageHigh
+        expr: |
+          redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          service: redis
+        annotations:
+          summary: "Redis内存使用率超过90%"
+          description: |
+            Redis内存使用率: {{ $value | humanizePercentage }}
+            建议: 清理过期键，增加内存
+
+  - name: backend_system
+    interval: 30s
+    rules:
+      # 系统资源告警（需要node_exporter）
+      - alert: SystemCPUHigh
+        expr: |
+          100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          service: system
+        annotations:
+          summary: "CPU使用率超过80%"
+          description: |
+            CPU使用率: {{ $value | humanizePercentage }}
+            建议: 检查高CPU进程，考虑扩容
+
+      - alert: SystemMemoryHigh
+        expr: |
+          (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          service: system
+        annotations:
+          summary: "内存使用率超过85%"
+          description: |
+            内存使用率: {{ $value | humanizePercentage }}
+            建议: 检查内存泄漏，增加内存
+
+      - alert: SystemDiskHigh
+        expr: |
+          (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.*"} / node_filesystem_size_bytes) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          service: system
+        annotations:
+          summary: "磁盘使用率超过90%"
+          description: |
+            磁盘使用率: {{ $value | humanizePercentage }}
+            挂载点: {{ $labels.mountpoint }}
+            建议: 清理日志文件，扩容磁盘
+
+  - name: backend_business
+    interval: 30s
+    rules:
+      # 业务指标告警
+      - alert: AIConsultationErrorRateHigh
+        expr: |
+          (
+            baixing_ai_errors_total
+            /
+            clamp_min(baixing_ai_chat_requests_total, 1)
+          ) * 100 > 10
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+          service: ai
+        annotations:
+          summary: "AI咨询错误率超过10%"
+          description: |
+            AI咨询错误率: {{ $value | humanizePercentage }}
+            建议: 检查AI服务日志
+
+      - alert: PaymentCallbackErrorRateHigh
+        expr: |
+          (
+            sum(rate(baixing_payment_callback_events_total{result="error"}[5m]))
+            /
+            sum(rate(baixing_payment_callback_events_total[5m]))
+          ) * 100 > 5
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          service: payment
+        annotations:
+          summary: "支付回调错误率超过5%"
+          description: |
+            支付回调错误率: {{ $value | humanizePercentage }}
+            建议: 检查支付回调日志

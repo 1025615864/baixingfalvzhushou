@@ -1,4 +1,11 @@
 """知识库管理API路由"""
+import io
+import csv
+from fastapi import UploadFile, File
+from ..models.knowledge import KnowledgeCategory
+from sqlalchemy import select
+from pydantic import BaseModel, ConfigDict
+from typing import ClassVar
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -39,7 +46,7 @@ async def create_knowledge(
 ):
     """
     创建法律知识条目
-    
+
     - **knowledge_type**: 知识类型 (law/case/regulation/interpretation)
     - **title**: 标题（法律名称或案例名称）
     - **article_number**: 条款编号（可选）
@@ -65,7 +72,7 @@ async def list_knowledge(
 ):
     """
     获取法律知识列表
-    
+
     支持分页、类型过滤、分类过滤、关键词搜索
     """
     _ = current_user
@@ -180,7 +187,9 @@ async def vectorize_knowledge(
     _ = current_user
     success = await service.vectorize_knowledge(db, knowledge_id)
     if not success:
-        raise HTTPException(status_code=400, detail="向量化失败，请检查知识条目是否存在或AI服务是否配置")
+        raise HTTPException(
+            status_code=400,
+            detail="向量化失败，请检查知识条目是否存在或AI服务是否配置")
     return {"message": "向量化成功"}
 
 
@@ -252,7 +261,7 @@ async def create_template(
 ):
     """
     创建咨询模板
-    
+
     - **name**: 模板名称
     - **category**: 分类
     - **questions**: 预设问题列表
@@ -279,8 +288,10 @@ async def list_templates(
     db: Annotated[AsyncSession, Depends(get_db)],
     service: Annotated[KnowledgeService, Depends(get_knowledge_service)],
     category: Annotated[str | None, Query(description="分类过滤")] = None,
-    is_active: Annotated[str | None, Query(description="是否启用（true/false，为空表示不筛选）")] = None,
-    current_user: Annotated[User | None, Depends(get_current_user_optional)] = None,
+    is_active: Annotated[str | None, Query(
+        description="是否启用（true/false，为空表示不筛选）")] = None,
+    current_user: Annotated[User | None, Depends(
+        get_current_user_optional)] = None,
 ):
     """获取咨询模板列表"""
 
@@ -296,10 +307,13 @@ async def list_templates(
         elif value in {"false", "0", "no", "n"}:
             parsed_is_active = False
         else:
-            raise HTTPException(status_code=422, detail="is_active 参数无效，应为 true/false")
+            raise HTTPException(
+                status_code=422,
+                detail="is_active 参数无效，应为 true/false")
 
     if parsed_is_active is not True:
-        if current_user is None or not (current_user.role in {"admin", "super_admin"}):
+        if current_user is None or not (
+                current_user.role in {"admin", "super_admin"}):
             raise HTTPException(status_code=403, detail="需要管理员权限")
 
     templates = await service.list_templates(db, category, parsed_is_active)
@@ -321,7 +335,8 @@ async def list_templates(
     return result
 
 
-@router.get("/templates/{template_id}", response_model=ConsultationTemplateResponse)
+@router.get("/templates/{template_id}",
+            response_model=ConsultationTemplateResponse)
 async def get_template(
     template_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -333,7 +348,7 @@ async def get_template(
     template = await service.get_template(db, template_id)
     if not template:
         raise HTTPException(status_code=404, detail="模板不存在")
-    
+
     questions = service.parse_template_questions(template)
     return ConsultationTemplateResponse(
         id=template.id,
@@ -349,7 +364,8 @@ async def get_template(
     )
 
 
-@router.put("/templates/{template_id}", response_model=ConsultationTemplateResponse)
+@router.put("/templates/{template_id}",
+            response_model=ConsultationTemplateResponse)
 async def update_template(
     template_id: int,
     data: ConsultationTemplateUpdate,
@@ -362,7 +378,7 @@ async def update_template(
     template = await service.update_template(db, template_id, data)
     if not template:
         raise HTTPException(status_code=404, detail="模板不存在")
-    
+
     questions = service.parse_template_questions(template)
     return ConsultationTemplateResponse(
         id=template.id,
@@ -394,11 +410,6 @@ async def delete_template(
 
 
 # === 分类管理 API ===
-
-from typing import ClassVar
-from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select
-from ..models.knowledge import KnowledgeCategory
 
 
 class CategoryCreate(BaseModel):
@@ -440,7 +451,7 @@ async def list_categories(
     _ = current_user
     query = select(KnowledgeCategory).order_by(KnowledgeCategory.sort_order)
     if not include_inactive:
-        query = query.where(KnowledgeCategory.is_active == True)
+        query = query.where(KnowledgeCategory.is_active)
     result = await db.execute(query)
     categories = result.scalars().all()
     return [CategoryResponse.model_validate(c) for c in categories]
@@ -460,7 +471,7 @@ async def create_category(
     )
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="分类名称已存在")
-    
+
     category = KnowledgeCategory(
         name=data.name,
         description=data.description,
@@ -489,7 +500,7 @@ async def update_category(
     category = result.scalar_one_or_none()
     if not category:
         raise HTTPException(status_code=404, detail="分类不存在")
-    
+
     if data.name is not None:
         category.name = data.name
     if data.description is not None:
@@ -502,7 +513,7 @@ async def update_category(
         category.sort_order = data.sort_order
     if data.is_active is not None:
         category.is_active = data.is_active
-    
+
     await db.commit()
     await db.refresh(category)
     return CategoryResponse.model_validate(category)
@@ -522,17 +533,13 @@ async def delete_category(
     category = result.scalar_one_or_none()
     if not category:
         raise HTTPException(status_code=404, detail="分类不存在")
-    
+
     await db.delete(category)
     await db.commit()
     return {"message": "删除成功"}
 
 
 # === 批量导入 API ===
-
-from fastapi import UploadFile, File
-import csv
-import io
 
 
 class BatchImportItem(BaseModel):
@@ -562,19 +569,20 @@ async def batch_import_knowledge_legacy(
 ):
     """
     批量导入法律知识
-    
+
     接收JSON格式的数据列表进行批量导入
     """
     _ = current_user
     success_count = 0
     failed_items: list[dict[str, object]] = []
-    
+
     for idx, item in enumerate(data.items):
         try:
             try:
                 parsed_knowledge_type = KnowledgeType(item.knowledge_type)
             except Exception:
-                raise HTTPException(status_code=422, detail="knowledge_type 参数无效")
+                raise HTTPException(
+                    status_code=422, detail="knowledge_type 参数无效")
 
             create_data = LegalKnowledgeCreate(
                 knowledge_type=parsed_knowledge_type,
@@ -596,8 +604,9 @@ async def batch_import_knowledge_legacy(
             _ = await service.create_knowledge(db, create_data)
             success_count += 1
         except Exception as e:
-            failed_items.append({"index": idx, "title": item.title, "error": str(e)})
-    
+            failed_items.append(
+                {"index": idx, "title": item.title, "error": str(e)})
+
     return {
         "message": f"导入完成",
         "success_count": success_count,
@@ -615,7 +624,7 @@ async def import_csv(
 ):
     """
     从CSV文件导入法律知识
-    
+
     CSV格式要求（首行为标题行）:
     - title: 标题（必填）
     - content: 内容（必填）
@@ -631,29 +640,33 @@ async def import_csv(
 
     if not file.filename or not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="请上传CSV文件")
-    
+
     content = await file.read()
     try:
         text = content.decode('utf-8-sig')  # 支持带BOM的UTF-8
     except UnicodeDecodeError:
         text = content.decode('gbk')  # 尝试GBK编码
-    
+
     reader = csv.DictReader(io.StringIO(text))
-    
+
     success_count = 0
     failed_items: list[dict[str, object]] = []
-    
+
     for idx, row in enumerate(reader):
         try:
-            if not row.get('title') or not row.get('content') or not row.get('category'):
-                failed_items.append({"row": idx + 2, "error": "缺少必填字段(title/content/category)"})
+            if not row.get('title') or not row.get(
+                    'content') or not row.get('category'):
+                failed_items.append(
+                    {"row": idx + 2, "error": "缺少必填字段(title/content/category)"})
                 continue
 
             try:
-                parsed_knowledge_type = KnowledgeType(str(row.get('knowledge_type', 'law')))
+                parsed_knowledge_type = KnowledgeType(
+                    str(row.get('knowledge_type', 'law')))
             except Exception:
-                raise HTTPException(status_code=422, detail="knowledge_type 参数无效")
-            
+                raise HTTPException(
+                    status_code=422, detail="knowledge_type 参数无效")
+
             create_data = LegalKnowledgeCreate(
                 knowledge_type=parsed_knowledge_type,
                 title=row['title'],
@@ -674,8 +687,9 @@ async def import_csv(
             _ = await service.create_knowledge(db, create_data)
             success_count += 1
         except Exception as e:
-            failed_items.append({"row": idx + 2, "title": row.get('title', ''), "error": str(e)})
-    
+            failed_items.append(
+                {"row": idx + 2, "title": row.get('title', ''), "error": str(e)})
+
     return {
         "message": "CSV导入完成",
         "success_count": success_count,

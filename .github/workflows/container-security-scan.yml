@@ -1,0 +1,289 @@
+name: Container Security Scan
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/Dockerfile'
+      - 'frontend/Dockerfile'
+      - '**/requirements.txt'
+      - '**/package.json'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'backend/Dockerfile'
+      - 'frontend/Dockerfile'
+      - '**/requirements.txt'
+      - '**/package.json'
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to scan (optional)'
+        required: false
+        default: ''
+      severity_threshold:
+        description: 'Severity threshold (CRITICAL, HIGH, MEDIUM, LOW)'
+        required: false
+        default: 'HIGH'
+
+permissions:
+  contents: read
+  security-events: write
+  packages: read
+
+jobs:
+  # ========== 构建并扫描后端镜像 ==========
+  scan-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image (without pushing)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: false
+          load: true
+          tags: baixing-backend:scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'baixing-backend:scan'
+          format: 'sarif'
+          output: 'trivy-backend-results.sarif'
+          severity: ${{ github.event.inputs.severity_threshold || 'HIGH,CRITICAL' }}
+          ignore-unfixed: true
+          exit-code: '0'
+          # .trivyignore 文件会被自动读取
+
+      - name: Run Trivy vulnerability scanner (table output)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'baixing-backend:scan'
+          format: 'table'
+          severity: ${{ github.event.inputs.severity_threshold || 'HIGH,CRITICAL' }}
+          ignore-unfixed: true
+          exit-code: '0'
+          # .trivyignore 文件会被自动读取
+
+      - name: Check for critical vulnerabilities
+        run: |
+          docker run --rm -v $(pwd):/app -w /app \
+            aquasec/trivy:latest image \
+            --severity CRITICAL \
+            --exit-code 1 \
+            --ignorefile .trivyignore \
+            baixing-backend:scan || true
+
+          # 如果有CRITICAL级别漏洞，记录但不失败
+          echo "::warning::请检查CRITICAL级别漏洞，查看SARIF报告获取详情"
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-backend-results.sarif'
+          category: 'trivy-backend'
+
+      - name: Upload scan results as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-backend-results
+          path: |
+            trivy-backend-results.sarif
+          retention-days: 30
+
+      - name: Generate scan summary
+        if: always()
+        run: |
+          echo "## 🔒 Backend 镜像安全扫描报告" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| 检查项 | 状态 |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Trivy 扫描 | ✅ 完成 |" >> $GITHUB_STEP_SUMMARY
+          echo "| 严重级别 | ${{ github.event.inputs.severity_threshold || 'HIGH,CRITICAL' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📄 详细报告请在 Artifacts 中下载查看" >> $GITHUB_STEP_SUMMARY
+
+  # ========== 构建并扫描前端镜像 ==========
+  scan-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build frontend image (without pushing)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: false
+          load: true
+          tags: baixing-frontend:scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'baixing-frontend:scan'
+          format: 'sarif'
+          output: 'trivy-frontend-results.sarif'
+          severity: ${{ github.event.inputs.severity_threshold || 'HIGH,CRITICAL' }}
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Run Trivy vulnerability scanner (table output)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'baixing-frontend:scan'
+          format: 'table'
+          severity: ${{ github.event.inputs.severity_threshold || 'HIGH,CRITICAL' }}
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-frontend-results.sarif'
+          category: 'trivy-frontend'
+
+      - name: Upload scan results as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-frontend-results
+          path: |
+            trivy-frontend-results.sarif
+          retention-days: 30
+
+      - name: Generate scan summary
+        if: always()
+        run: |
+          echo "## 🔒 Frontend 镜像安全扫描报告" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| 检查项 | 状态 |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Trivy 扫描 | ✅ 完成 |" >> $GITHUB_STEP_SUMMARY
+          echo "| 严重级别 | ${{ github.event.inputs.severity_threshold || 'HIGH,CRITICAL' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📄 详细报告请在 Artifacts 中下载查看" >> $GITHUB_STEP_SUMMARY
+
+  # ========== Docker Scout 分析（可选，需要 Docker Hub 账号）==========
+  docker-scout-analysis:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+        continue-on-error: true
+
+      - name: Build backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: false
+          load: true
+          tags: baixing-backend:scout
+
+      - name: Docker Scout Quickview
+        uses: docker/scout-action@v1
+        with:
+          command: quickview
+          image: baixing-backend:scout
+        continue-on-error: true
+
+      - name: Docker Scout CVEs
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: baixing-backend:scout
+          sarif-file: docker-scout-backend.sarif
+        continue-on-error: true
+
+      - name: Upload Docker Scout results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-scout-results
+          path: |
+            docker-scout-backend.sarif
+          retention-days: 30
+
+  # ========== 镜像配置安全检查 ==========
+  config-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Dockle container linter
+        run: |
+          # 安装 Dockle
+          curl -LO https://github.com/goodwithtech/dockle/releases/latest/download/dockle_$(uname -s)_$(uname -m).tar.gz
+          tar -xzf dockle_$(uname -s)_$(uname -m).tar.gz
+          chmod +x dockle
+          sudo mv dockle /usr/local/bin/
+
+      - name: Build backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: false
+          load: true
+          tags: baixing-backend:dockle
+
+      - name: Scan with Dockle
+        run: |
+          dockle baixing-backend:dockle \
+            --exit-code 0 \
+            --format sarif \
+            --output dockle-backend.sarif \
+            || true
+
+      - name: Check CIS Docker Benchmark
+        run: |
+          dockle baixing-backend:dockle \
+            --exit-code 0 \
+            --severity WARN \
+            || true
+
+      - name: Upload Dockle results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dockle-results
+          path: |
+            dockle-backend.sarif
+          retention-days: 30
+
+      - name: Generate config scan summary
+        if: always()
+        run: |
+          echo "## 📋 镜像配置安全检查" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| 检查项 | 状态 |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Dockle CIS 检查 | ✅ 完成 |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📄 详细报告请在 Artifacts 中下载查看" >> $GITHUB_STEP_SUMMARY

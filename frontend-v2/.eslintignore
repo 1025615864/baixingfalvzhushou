@@ -1,0 +1,24 @@
+# Config files
+postcss.config.js
+tailwind.config.js
+vite.config.ts
+vitest.config.ts
+
+# Build output
+dist/
+build/
+
+# Dependencies
+node_modules/
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Generated files
+*.generated.ts
+*.d.ts
+
+# Test coverage
+coverage/

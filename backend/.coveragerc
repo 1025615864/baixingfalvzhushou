@@ -1,3 +1,58 @@
+# 覆盖率配置文件
+# 用于 pytest-cov 插件
+
 [run]
-concurrency = greenlet,thread
-relative_files = true
+# 源代码目录
+source = app
+
+# 分支覆盖率
+branch = True
+
+# 并行运行
+parallel = True
+
+# 排除文件
+omit =
+    */tests/*
+    */__pycache__/*
+    */site-packages/*
+    */migrations/*
+    */seeding.py
+    */repair.py
+
+[report]
+# 覆盖率阈值
+fail_under = 60
+
+# 显示缺失的行
+show_missing = True
+
+# 跳过覆盖的文件
+skip_covered = False
+
+# 跳过空文件
+skip_empty = True
+
+# 排除行
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+    @abc.abstractmethod
+
+[html]
+# HTML 报告目录
+directory = coverage_html
+
+[xml]
+# XML 报告文件
+output = coverage.xml
+
+[json]
+# JSON 报告文件
+output = coverage.json
+show_contexts = True

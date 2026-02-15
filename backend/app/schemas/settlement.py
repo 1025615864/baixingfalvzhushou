@@ -95,7 +95,8 @@ class LawyerBankAccountCreate(BaseModel):
 class LawyerBankAccountUpdate(BaseModel):
     bank_name: str | None = Field(default=None, max_length=100)
     account_no: str | None = Field(default=None, min_length=4, max_length=100)
-    account_holder: str | None = Field(default=None, min_length=1, max_length=50)
+    account_holder: str | None = Field(
+        default=None, min_length=1, max_length=50)
     is_default: bool | None = None
     is_active: bool | None = None
 
@@ -185,7 +186,7 @@ class AdminWithdrawalDetailResponse(BaseModel):
     actual_amount: float
 
     withdraw_method: str
-    account_info: str
+    account_info_masked: str
 
     status: str
     reject_reason: str | None

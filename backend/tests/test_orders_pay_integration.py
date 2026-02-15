@@ -22,7 +22,9 @@ async def test_orders_pay_integration_invalid_method(client: AsyncClient) -> Non
             json={"payment_method": "bad"},
         )
         assert res.status_code == 400
-        assert str(res.json().get("detail"))
+        error_data = res.json()
+        error_msg = error_data.get("error", {}).get("message", "")
+        assert error_msg
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
@@ -39,7 +41,9 @@ async def test_orders_pay_integration_order_not_found(client: AsyncClient) -> No
             json={"payment_method": "alipay"},
         )
         assert res.status_code == 404
-        assert str(res.json().get("detail"))
+        error_data = res.json()
+        error_msg = error_data.get("error", {}).get("message", "")
+        assert error_msg
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 

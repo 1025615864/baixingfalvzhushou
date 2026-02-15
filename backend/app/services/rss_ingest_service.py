@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.news import News, NewsSource, NewsIngestRun
+from ..utils.security import validate_rss_url
 
 
 logger = logging.getLogger(__name__)
@@ -55,7 +56,8 @@ def _normalize_url(raw: str) -> str:
         "fbclid",
         "gclid",
     }
-    query_items = [(k, v) for (k, v) in query_items if str(k).strip().lower() not in drop_keys]
+    query_items = [(k, v) for (k, v) in query_items if str(
+        k).strip().lower() not in drop_keys]
     new_query = urlencode(query_items, doseq=True)
     new_p = p._replace(query=new_query, fragment="")
     return urlunparse(new_p)
@@ -203,7 +205,7 @@ class RSSIngestService:
     async def _load_enabled_sources(db: AsyncSession) -> list[NewsSource]:
         res = await db.execute(
             select(NewsSource)
-            .where(NewsSource.is_enabled == True)
+            .where(NewsSource.is_enabled)
             .where(NewsSource.source_type == "rss")
             .order_by(NewsSource.id.asc())
         )
@@ -227,10 +229,13 @@ class RSSIngestService:
             v = str(override).strip().lower()
             if v in allowed:
                 return v
-        env_default = os.getenv("RSS_DEFAULT_CATEGORY", "general").strip().lower() or "general"
+        env_default = os.getenv(
+            "RSS_DEFAULT_CATEGORY",
+            "general").strip().lower() or "general"
         return env_default if env_default in allowed else "general"
 
-    async def run_once(self, db: AsyncSession, *, source_id: int | None = None) -> dict[str, int]:
+    async def run_once(self, db: AsyncSession, *,
+                       source_id: int | None = None) -> dict[str, int]:
         sources: list[NewsSource] = []
         if source_id is not None:
             res = await db.execute(select(NewsSource).where(NewsSource.id == int(source_id)))
@@ -243,33 +248,61 @@ class RSSIngestService:
         env_specs = self._parse_feed_specs() if not sources else []
 
         if (not sources) and (not env_specs):
-            return {"feeds": 0, "fetched": 0, "inserted": 0, "skipped": 0, "errors": 0}
+            return {"feeds": 0, "fetched": 0,
+                    "inserted": 0, "skipped": 0, "errors": 0}
 
         fetched_total = 0
         inserted_total = 0
         skipped_total = 0
         errors_total = 0
 
-        default_timeout = float(os.getenv("RSS_FETCH_TIMEOUT_SECONDS", "20").strip() or "20")
-        default_max_items_per_feed = int(os.getenv("RSS_MAX_ITEMS_PER_FEED", "20").strip() or "20")
+        default_timeout = float(
+            os.getenv(
+                "RSS_FETCH_TIMEOUT_SECONDS",
+                "20").strip() or "20")
+        default_max_items_per_feed = int(
+            os.getenv(
+                "RSS_MAX_ITEMS_PER_FEED",
+                "20").strip() or "20")
 
-        fetch_retries: int = int(os.getenv("RSS_FETCH_RETRIES", "0").strip() or "0")
-        fetch_backoff_seconds: float = float(os.getenv("RSS_FETCH_RETRY_BACKOFF_SECONDS", "0.5").strip() or "0.5")
+        fetch_retries: int = int(
+            os.getenv(
+                "RSS_FETCH_RETRIES",
+                "0").strip() or "0")
+        fetch_backoff_seconds: float = float(
+            os.getenv(
+                "RSS_FETCH_RETRY_BACKOFF_SECONDS",
+                "0.5").strip() or "0.5")
 
-        dedupe_strategy = str(os.getenv("NEWS_DEDUPE_STRATEGY", "url_only") or "url_only").strip().lower()
+        dedupe_strategy = str(
+            os.getenv(
+                "NEWS_DEDUPE_STRATEGY",
+                "url_only") or "url_only").strip().lower()
         use_hash_dedupe = dedupe_strategy in {"url_hash", "hash", "url+hash"}
 
-        hash_duplicate_action = str(os.getenv("NEWS_DEDUPE_HASH_DUPLICATE_ACTION", "skip") or "skip").strip().lower()
+        hash_duplicate_action = str(
+            os.getenv(
+                "NEWS_DEDUPE_HASH_DUPLICATE_ACTION",
+                "skip") or "skip").strip().lower()
         if hash_duplicate_action not in {"skip", "pending"}:
             hash_duplicate_action = "skip"
 
-        feed_jobs: list[tuple[int | None, str | None, str, str | None, str | None, float, int]] = []
+        feed_jobs: list[tuple[int | None, str | None,
+                              str, str | None, str | None, float, int]] = []
         for s in sources:
             feed_url = str(getattr(s, "feed_url", "") or "").strip()
             if not feed_url:
                 continue
-            timeout = float(getattr(s, "fetch_timeout_seconds", None) or default_timeout)
-            max_items = int(getattr(s, "max_items_per_feed", None) or default_max_items_per_feed)
+            timeout = float(
+                getattr(
+                    s,
+                    "fetch_timeout_seconds",
+                    None) or default_timeout)
+            max_items = int(
+                getattr(
+                    s,
+                    "max_items_per_feed",
+                    None) or default_max_items_per_feed)
             feed_jobs.append(
                 (
                     int(s.id),
@@ -283,26 +316,42 @@ class RSSIngestService:
             )
 
         for feed_url, site_override, category_override in env_specs:
+            feed_url_str = str(feed_url).strip()
+            # 验证 RSS URL 安全性
+            if not validate_rss_url(feed_url_str):
+                logger.warning(f"RSS URL rejected due to security check: {feed_url_str}")
+                continue
             feed_jobs.append(
                 (
                     None,
                     None,
-                    str(feed_url).strip(),
+                    feed_url_str,
                     site_override,
                     category_override,
                     default_timeout,
                     default_max_items_per_feed,
                 )
             )
+        
+        # 再次验证所有 feed_jobs 中的 URL
+        validated_feed_jobs = []
+        for job in feed_jobs:
+            feed_url = job[2]
+            if not validate_rss_url(feed_url):
+                logger.warning(f"RSS URL rejected due to security check: {feed_url}")
+                continue
+            validated_feed_jobs.append(job)
+        feed_jobs = validated_feed_jobs
 
         seen_urls: set[str] = set()
-        timeout_all = max([j[5] for j in feed_jobs] + [default_timeout])
+        timeout_all = max([j[5] for j in feed_jobs] + [default_timeout]) if feed_jobs else default_timeout
 
         async with httpx.AsyncClient(timeout=timeout_all, follow_redirects=True) as client:
             for job_source_id, job_source_name, feed_url, site_override, category_override, _timeout, max_items in feed_jobs:
                 started_at = datetime.now()
                 run = NewsIngestRun(
-                    source_id=int(job_source_id) if job_source_id is not None else None,
+                    source_id=int(
+                        job_source_id) if job_source_id is not None else None,
                     source_name=job_source_name,
                     feed_url=_truncate(feed_url, 500),
                     status="running",
@@ -332,7 +381,8 @@ class RSSIngestService:
                             if int(resp2.status_code) == 200:
                                 break
 
-                            retryable_statuses: set[int] = {408, 429, 500, 502, 503, 504}
+                            retryable_statuses: set[int] = {
+                                408, 429, 500, 502, 503, 504}
                             if (
                                 attempt < int(fetch_retries)
                                 and int(resp2.status_code) in retryable_statuses
@@ -347,7 +397,8 @@ class RSSIngestService:
                         except Exception as ex:
                             last_exc = ex
                             resp = None
-                            if attempt < int(fetch_retries) and float(fetch_backoff_seconds) > 0:
+                            if attempt < int(fetch_retries) and float(
+                                    fetch_backoff_seconds) > 0:
                                 attempt_i2: int = int(attempt)
                                 backoff2: float = float(fetch_backoff_seconds)
                                 delay2: float = backoff2 * pow(2.0, attempt_i2)
@@ -356,12 +407,14 @@ class RSSIngestService:
                             raise
 
                     if resp is None:
-                        raise last_exc if last_exc is not None else RuntimeError("RSS fetch failed")
+                        raise last_exc if last_exc is not None else RuntimeError(
+                            "RSS fetch failed")
                     if int(resp.status_code) != 200:
                         errors += 1
                         run.status = "failed"
                         run.errors = int(errors)
-                        run.last_error = _truncate(f"HTTP {int(resp.status_code)}", 800)
+                        run.last_error = _truncate(
+                            f"HTTP {int(resp.status_code)}", 800)
                         continue
 
                     feed_title, items = _extract_items(resp.text)
@@ -395,36 +448,57 @@ class RSSIngestService:
                     existing_urls: set[str] = set()
                     if urls_to_check:
                         res = await db.execute(select(News.source_url).where(News.source_url.in_(list(urls_to_check))))
-                        existing_urls = {str(u).strip() for u in res.scalars().all() if u}
+                        existing_urls = {str(u).strip()
+                                         for u in res.scalars().all() if u}
 
                     existing_hashes: set[str] = set()
                     if use_hash_dedupe and candidates:
                         hashes: list[str] = []
                         for it in candidates:
-                            link_norm = str(it.get("_link_norm", "") or "").strip()
-                            title_for_hash = str(it.get("title", "") or "").strip() or link_norm
-                            summary_for_hash = str(it.get("summary", "") or "").strip()
-                            content_for_hash = str(it.get("content", "") or "").strip() or summary_for_hash
+                            link_norm = str(
+                                it.get(
+                                    "_link_norm",
+                                    "") or "").strip()
+                            title_for_hash = str(
+                                it.get("title", "") or "").strip() or link_norm
+                            summary_for_hash = str(
+                                it.get("summary", "") or "").strip()
+                            content_for_hash = str(
+                                it.get(
+                                    "content",
+                                    "") or "").strip() or summary_for_hash
                             if not content_for_hash:
                                 content_for_hash = title_for_hash
                             hashes.append(
-                                _make_dedupe_hash(title=title_for_hash, content=content_for_hash, source_url=link_norm)
+                                _make_dedupe_hash(
+                                    title=title_for_hash,
+                                    content=content_for_hash,
+                                    source_url=link_norm)
                             )
                         res2 = await db.execute(select(News.dedupe_hash).where(News.dedupe_hash.in_(hashes)))
-                        existing_hashes = {str(h).strip() for h in res2.scalars().all() if h}
+                        existing_hashes = {str(h).strip()
+                                           for h in res2.scalars().all() if h}
 
                     seen_hashes: set[str] = set()
 
                     to_create: list[News] = []
                     for item in candidates:
-                        link = str(item.get("_link_norm", "") or "").strip() or str(item.get("link", "") or "").strip()
+                        link = str(
+                            item.get(
+                                "_link_norm",
+                                "") or "").strip() or str(
+                            item.get(
+                                "link",
+                                "") or "").strip()
                         link = _normalize_url(link)
                         link_raw = str(item.get("_link_raw", "") or "").strip()
-                        if (link in existing_urls) or (link_raw and (link_raw in existing_urls)):
+                        if (link in existing_urls) or (
+                                link_raw and (link_raw in existing_urls)):
                             skipped += 1
                             continue
 
-                        title = _truncate(str(item.get("title", "") or "").strip() or link, 200) or link
+                        title = _truncate(
+                            str(item.get("title", "") or "").strip() or link, 200) or link
                         summary = _truncate(item.get("summary"), 500)
                         content = str(item.get("content", "") or "").strip()
                         if not content:
@@ -433,15 +507,21 @@ class RSSIngestService:
                             content = title
 
                         author = _truncate(item.get("author"), 50)
-                        category_value = str(item.get("category", "general") or "general").strip().lower() or "general"
-                        source_site = _truncate(str(item.get("_site", "") or "").strip(), 100)
-                        source = _truncate(str(item.get("_feed_title", "") or "").strip(), 100) or source_site
+                        category_value = str(
+                            item.get(
+                                "category",
+                                "general") or "general").strip().lower() or "general"
+                        source_site = _truncate(
+                            str(item.get("_site", "") or "").strip(), 100)
+                        source = _truncate(
+                            str(item.get("_feed_title", "") or "").strip(), 100) or source_site
 
                         review_reason: str | None = None
 
                         dedupe_hash: str | None = None
                         if use_hash_dedupe:
-                            dh = _make_dedupe_hash(title=title, content=content, source_url=link)
+                            dh = _make_dedupe_hash(
+                                title=title, content=content, source_url=link)
                             if dh in seen_hashes:
                                 skipped += 1
                                 continue
@@ -454,7 +534,8 @@ class RSSIngestService:
                             seen_hashes.add(dh)
                             dedupe_hash = dh
                             if is_hash_dup and hash_duplicate_action == "pending":
-                                review_reason = _truncate(f"dedupe_hash_duplicate:{str(dh)[:10]}", 200)
+                                review_reason = _truncate(
+                                    f"dedupe_hash_duplicate:{str(dh)[:10]}", 200)
 
                         news = News(
                             title=title,
@@ -464,7 +545,8 @@ class RSSIngestService:
                             category=category_value,
                             source=source,
                             source_url=_truncate(link, 500),
-                            dedupe_hash=_truncate(dedupe_hash, 40) if dedupe_hash else None,
+                            dedupe_hash=_truncate(
+                                dedupe_hash, 40) if dedupe_hash else None,
                             source_site=source_site,
                             author=author,
                             is_top=False,

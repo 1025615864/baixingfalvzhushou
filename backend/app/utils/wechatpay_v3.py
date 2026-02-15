@@ -47,7 +47,8 @@ def wechatpay_verify_signature(
     except Exception:
         return False
 
-    message = timestamp.encode("utf-8") + b"\n" + nonce.encode("utf-8") + b"\n" + body + b"\n"
+    message = timestamp.encode("utf-8") + b"\n" + \
+        nonce.encode("utf-8") + b"\n" + body + b"\n"
     pub_key = load_rsa_public_key_from_cert_pem(cert_pem)
     try:
         pub_key.verify(signature, message, padding.PKCS1v15(), hashes.SHA256())
@@ -56,14 +57,20 @@ def wechatpay_verify_signature(
         return False
 
 
-def wechatpay_decrypt_resource(*, api_v3_key: str, nonce: str, associated_data: str, ciphertext: str) -> bytes:
+def wechatpay_decrypt_resource(
+    *,
+    api_v3_key: str,
+    nonce: str,
+    associated_data: str,
+        ciphertext: str) -> bytes:
     key_bytes = api_v3_key.encode("utf-8")
     if len(key_bytes) != 32:
         raise ValueError("WECHATPAY_API_V3_KEY must be 32 bytes")
 
     aesgcm = AESGCM(key_bytes)
     nonce_bytes = nonce.encode("utf-8")
-    ad_bytes = associated_data.encode("utf-8") if associated_data is not None else b""
+    ad_bytes = associated_data.encode(
+        "utf-8") if associated_data is not None else b""
     cipher_bytes = base64.b64decode(ciphertext)
     return aesgcm.decrypt(nonce_bytes, cipher_bytes, ad_bytes)
 
@@ -84,17 +91,18 @@ def wechatpay_build_authorization(
     if nonce_str is None:
         nonce_str = uuid.uuid4().hex
 
-    message = f"{method}\n{url_path}\n{timestamp}\n{nonce_str}\n{body}\n".encode("utf-8")
+    message = f"{method}\n{url_path}\n{timestamp}\n{nonce_str}\n{body}\n".encode(
+        "utf-8")
     key = load_rsa_private_key(private_key_pem)
     signature = key.sign(message, padding.PKCS1v15(), hashes.SHA256())
     signature_b64 = base64.b64encode(signature).decode("utf-8")
 
     return (
         "WECHATPAY2-SHA256-RSA2048 "
-        f'mchid="{mch_id}",' 
-        f'nonce_str="{nonce_str}",' 
-        f'signature="{signature_b64}",' 
-        f'timestamp="{timestamp}",' 
+        f'mchid="{mch_id}",'
+        f'nonce_str="{nonce_str}",'
+        f'signature="{signature_b64}",'
+        f'timestamp="{timestamp}",'
         f'serial_no="{serial_no}"'
     )
 
@@ -166,13 +174,17 @@ async def fetch_platform_certificates(
             ciphertext=ciphertext,
         )
         pem = plain.decode("utf-8")
-        out.append(WeChatPayPlatformCert(serial_no=serial, pem=pem, expire_time=expire_time))
+        out.append(
+            WeChatPayPlatformCert(
+                serial_no=serial,
+                pem=pem,
+                expire_time=expire_time))
 
     return out
 
 
 def dump_platform_certs_json(certs: list[WeChatPayPlatformCert]) -> str:
-    payload = {
+    payload: dict[str, object] = {
         "updated_at": int(time.time()),
         "certs": [
             {"serial_no": c.serial_no, "pem": c.pem, "expire_time": c.expire_time}
@@ -204,5 +216,6 @@ def load_platform_certs_json(raw: str) -> dict[str, WeChatPayPlatformCert]:
         expire_time = str(item.get("expire_time") or "").strip() or None
         if not serial or not pem:
             continue
-        out[serial] = WeChatPayPlatformCert(serial_no=serial, pem=pem, expire_time=expire_time)
+        out[serial] = WeChatPayPlatformCert(
+            serial_no=serial, pem=pem, expire_time=expire_time)
     return out

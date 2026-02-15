@@ -92,6 +92,23 @@ class SqlSlowAgg:
     max_seconds: float = 0.0
 
 
+@dataclass(frozen=True)
+class DbPoolKey:
+    """数据库连接池指标键"""
+    pool_name: str = "default"
+
+
+@dataclass
+class DbPoolAgg:
+    """数据库连接池聚合数据"""
+    active_connections: int = 0
+    idle_connections: int = 0
+    total_connections: int = 0
+    max_connections: int = 0
+    checked_out: int = 0
+    overflow: int = 0
+
+
 class PrometheusMetrics:
     def __init__(self) -> None:
         self.started_at: float = float(time.time())
@@ -100,23 +117,29 @@ class PrometheusMetrics:
         self._rate_limits: dict[RateLimitKey, RateLimitAgg] = {}
         self._user_actions: dict[UserActionKey, UserActionAgg] = {}
         self._payment_pay: dict[PaymentPayKey, PaymentPayAgg] = {}
-        self._payment_callbacks: dict[PaymentCallbackKey, PaymentCallbackAgg] = {}
+        self._payment_callbacks: dict[PaymentCallbackKey,
+                                      PaymentCallbackAgg] = {}
         self._sql_slow: SqlSlowAgg = SqlSlowAgg()
+        self._db_pools: dict[DbPoolKey, DbPoolAgg] = {}
         self._lock: threading.Lock = threading.Lock()
 
+        # HTTP请求持续时间桶（秒）
         self.http_duration_buckets: list[float] = [
-            0.01,
-            0.025,
-            0.05,
-            0.1,
-            0.25,
-            0.5,
-            1.0,
-            2.5,
-            5.0,
-            10.0,
+            0.001,  # 1ms
+            0.005,  # 5ms
+            0.01,   # 10ms
+            0.025,  # 25ms
+            0.05,   # 50ms
+            0.1,    # 100ms
+            0.25,   # 250ms
+            0.5,    # 500ms (P95目标)
+            1.0,    # 1s
+            2.5,    # 2.5s
+            5.0,    # 5s (P99目标)
+            10.0,   # 10s
         ]
 
+        # SQL慢查询持续时间桶（秒）
         self.sql_slow_duration_buckets: list[float] = [
             0.05,
             0.1,
@@ -128,12 +151,12 @@ class PrometheusMetrics:
             10.0,
         ]
 
-
     def record_sql_slow_query(self, *, duration_seconds: float) -> None:
         d = max(0.0, float(duration_seconds))
         with self._lock:
             self._sql_slow.count = int(self._sql_slow.count) + 1
-            self._sql_slow.sum_seconds = float(self._sql_slow.sum_seconds) + float(d)
+            self._sql_slow.sum_seconds = float(
+                self._sql_slow.sum_seconds) + float(d)
             if float(d) > float(self._sql_slow.max_seconds or 0.0):
                 self._sql_slow.max_seconds = float(d)
 
@@ -141,15 +164,17 @@ class PrometheusMetrics:
                 self._sql_slow.bucket_le_counts = {}
             for le in self.sql_slow_duration_buckets:
                 if d <= float(le):
-                    self._sql_slow.bucket_le_counts[float(le)] = int(self._sql_slow.bucket_le_counts.get(float(le), 0)) + 1
-            self._sql_slow.bucket_le_counts[float("inf")] = int(self._sql_slow.bucket_le_counts.get(float("inf"), 0)) + 1
-
+                    self._sql_slow.bucket_le_counts[float(le)] = int(
+                        self._sql_slow.bucket_le_counts.get(float(le), 0)) + 1
+            self._sql_slow.bucket_le_counts[float("inf")] = int(
+                self._sql_slow.bucket_le_counts.get(float("inf"), 0)) + 1
 
     def snapshot_sql_slow(self) -> SqlSlowAgg:
         with self._lock:
             buckets: dict[float, int] | None = None
             if isinstance(self._sql_slow.bucket_le_counts, dict):
-                buckets = {float(bk): int(bv) for bk, bv in self._sql_slow.bucket_le_counts.items()}
+                buckets = {float(bk): int(bv) for bk,
+                           bv in self._sql_slow.bucket_le_counts.items()}
             return SqlSlowAgg(
                 count=int(self._sql_slow.count),
                 sum_seconds=float(self._sql_slow.sum_seconds),
@@ -157,7 +182,42 @@ class PrometheusMetrics:
                 max_seconds=float(self._sql_slow.max_seconds or 0.0),
             )
 
-    def record_http(self, *, method: str, route: str, status_code: int, duration_seconds: float) -> None:
+    def record_db_pool(
+        self,
+        *,
+        pool_name: str = "default",
+        active_connections: int = 0,
+        idle_connections: int = 0,
+        total_connections: int = 0,
+        max_connections: int = 0,
+        checked_out: int = 0,
+        overflow: int = 0,
+    ) -> None:
+        """记录数据库连接池状态"""
+        key = DbPoolKey(pool_name=pool_name)
+        with self._lock:
+            self._db_pools[key] = DbPoolAgg(
+                active_connections=int(active_connections),
+                idle_connections=int(idle_connections),
+                total_connections=int(total_connections),
+                max_connections=int(max_connections),
+                checked_out=int(checked_out),
+                overflow=int(overflow),
+            )
+
+    def snapshot_db_pools(self) -> dict[DbPoolKey, DbPoolAgg]:
+        with self._lock:
+            return {k: DbPoolAgg(
+                active_connections=int(v.active_connections),
+                idle_connections=int(v.idle_connections),
+                total_connections=int(v.total_connections),
+                max_connections=int(v.max_connections),
+                checked_out=int(v.checked_out),
+                overflow=int(v.overflow),
+            ) for k, v in self._db_pools.items()}
+
+    def record_http(self, *, method: str, route: str,
+                    status_code: int, duration_seconds: float) -> None:
         m = str(method or "").upper() or "GET"
         r = str(route or "").strip() or "unknown"
         sc = int(status_code)
@@ -176,10 +236,13 @@ class PrometheusMetrics:
                 agg.bucket_le_counts = {}
             for le in self.http_duration_buckets:
                 if d <= float(le):
-                    agg.bucket_le_counts[float(le)] = int(agg.bucket_le_counts.get(float(le), 0)) + 1
-            agg.bucket_le_counts[float("inf")] = int(agg.bucket_le_counts.get(float("inf"), 0)) + 1
+                    agg.bucket_le_counts[float(le)] = int(
+                        agg.bucket_le_counts.get(float(le), 0)) + 1
+            agg.bucket_le_counts[float("inf")] = int(
+                agg.bucket_le_counts.get(float("inf"), 0)) + 1
 
-    def record_job(self, *, name: str, ok: bool, duration_seconds: float) -> None:
+    def record_job(self, *, name: str, ok: bool,
+                   duration_seconds: float) -> None:
         n = str(name or "").strip() or "job"
         with self._lock:
             agg = self._jobs.get(n)
@@ -214,7 +277,8 @@ class PrometheusMetrics:
                 for k, v in self._rate_limits.items()
             }
 
-    def record_user_action(self, *, action: str, ok: bool, status_code: int) -> None:
+    def record_user_action(self, *, action: str, ok: bool,
+                           status_code: int) -> None:
         a = str(action or "").strip() or "action"
         result = "success" if ok else "failure"
         st = str(int(status_code))
@@ -251,7 +315,8 @@ class PrometheusMetrics:
                 for k, v in self._payment_pay.items()
             }
 
-    def record_payment_callback(self, *, provider: str, verified: bool, ok: bool) -> None:
+    def record_payment_callback(
+            self, *, provider: str, verified: bool, ok: bool) -> None:
         p = str(provider or "").strip().lower() or "unknown"
         v = "true" if verified else "false"
         r = "ok" if ok else "error"
@@ -263,7 +328,8 @@ class PrometheusMetrics:
                 self._payment_callbacks[key] = agg
             agg.count = int(agg.count) + 1
 
-    def snapshot_payment_callbacks(self) -> dict[PaymentCallbackKey, PaymentCallbackAgg]:
+    def snapshot_payment_callbacks(
+            self) -> dict[PaymentCallbackKey, PaymentCallbackAgg]:
         with self._lock:
             return {
                 k: PaymentCallbackAgg(count=int(v.count))
@@ -276,8 +342,12 @@ class PrometheusMetrics:
             for k, v in self._http.items():
                 buckets: dict[float, int] | None = None
                 if isinstance(v.bucket_le_counts, dict):
-                    buckets = {float(bk): int(bv) for bk, bv in v.bucket_le_counts.items()}
-                out[k] = HttpAgg(count=int(v.count), sum_seconds=float(v.sum_seconds), bucket_le_counts=buckets)
+                    buckets = {float(bk): int(bv)
+                               for bk, bv in v.bucket_le_counts.items()}
+                out[k] = HttpAgg(
+                    count=int(
+                        v.count), sum_seconds=float(
+                        v.sum_seconds), bucket_le_counts=buckets)
             return out
 
     def snapshot_jobs(self) -> dict[str, JobAgg]:
@@ -287,16 +357,20 @@ class PrometheusMetrics:
                     runs_total=int(v.runs_total),
                     successes_total=int(v.successes_total),
                     failures_total=int(v.failures_total),
-                    last_run_ts=(float(v.last_run_ts) if v.last_run_ts is not None else None),
+                    last_run_ts=(float(v.last_run_ts)
+                                 if v.last_run_ts is not None else None),
                     last_duration_seconds=(
-                        float(v.last_duration_seconds) if v.last_duration_seconds is not None else None
+                        float(
+                            v.last_duration_seconds) if v.last_duration_seconds is not None else None
                     ),
-                    last_success=(bool(v.last_success) if v.last_success is not None else None),
+                    last_success=(bool(v.last_success)
+                                  if v.last_success is not None else None),
                 )
                 for k, v in self._jobs.items()
             }
 
-    def render_prometheus(self, *, extra_lines: Iterable[str] | None = None) -> str:
+    def render_prometheus(
+            self, *, extra_lines: Iterable[str] | None = None) -> str:
         http_snap = self.snapshot_http()
         jobs_snap = self.snapshot_jobs()
         rate_limit_snap = self.snapshot_rate_limits()
@@ -306,13 +380,17 @@ class PrometheusMetrics:
         sql_slow_snap = self.snapshot_sql_slow()
 
         lines: list[str] = []
-        lines.append("# HELP baixing_process_started_at_seconds Unix timestamp when process started")
+        lines.append(
+            "# HELP baixing_process_started_at_seconds Unix timestamp when process started")
         lines.append("# TYPE baixing_process_started_at_seconds gauge")
-        lines.append(f"baixing_process_started_at_seconds {float(self.started_at)}")
+        lines.append(
+            f"baixing_process_started_at_seconds {float(self.started_at)}"
+        )
 
         lines.append("# HELP baixing_http_requests_total Total HTTP requests")
         lines.append("# TYPE baixing_http_requests_total counter")
-        for key in sorted(http_snap.keys(), key=lambda x: (x.route, x.method, x.status)):
+        for key in sorted(http_snap.keys(), key=lambda x: (
+                x.route, x.method, x.status)):
             agg = http_snap[key]
             if int(agg.count) <= 0:
                 continue
@@ -323,9 +401,12 @@ class PrometheusMetrics:
                 + f"status=\"{_prom_escape_label_value(key.status)}\"}} {int(agg.count)}"
             )
 
-        lines.append("# HELP baixing_http_request_duration_seconds_sum Total seconds spent handling requests")
-        lines.append("# TYPE baixing_http_request_duration_seconds_sum counter")
-        for key in sorted(http_snap.keys(), key=lambda x: (x.route, x.method, x.status)):
+        lines.append(
+            "# HELP baixing_http_request_duration_seconds_sum Total seconds spent handling requests")
+        lines.append(
+            "# TYPE baixing_http_request_duration_seconds_sum counter")
+        for key in sorted(http_snap.keys(), key=lambda x: (
+                x.route, x.method, x.status)):
             agg = http_snap[key]
             if float(agg.sum_seconds) <= 0:
                 continue
@@ -336,9 +417,12 @@ class PrometheusMetrics:
                 + f"status=\"{_prom_escape_label_value(key.status)}\"}} {float(agg.sum_seconds)}"
             )
 
-        lines.append("# HELP baixing_http_request_duration_seconds_count Total requests observed for duration histogram")
-        lines.append("# TYPE baixing_http_request_duration_seconds_count counter")
-        for key in sorted(http_snap.keys(), key=lambda x: (x.route, x.method, x.status)):
+        lines.append(
+            "# HELP baixing_http_request_duration_seconds_count Total requests observed for duration histogram")
+        lines.append(
+            "# TYPE baixing_http_request_duration_seconds_count counter")
+        for key in sorted(http_snap.keys(), key=lambda x: (
+                x.route, x.method, x.status)):
             agg = http_snap[key]
             if int(agg.count) <= 0:
                 continue
@@ -349,11 +433,15 @@ class PrometheusMetrics:
                 + f"status=\"{_prom_escape_label_value(key.status)}\"}} {int(agg.count)}"
             )
 
-        lines.append("# HELP baixing_http_request_duration_seconds_bucket Request duration histogram buckets")
-        lines.append("# TYPE baixing_http_request_duration_seconds_bucket counter")
-        for key in sorted(http_snap.keys(), key=lambda x: (x.route, x.method, x.status)):
+        lines.append(
+            "# HELP baixing_http_request_duration_seconds_bucket Request duration histogram buckets")
+        lines.append(
+            "# TYPE baixing_http_request_duration_seconds_bucket counter")
+        for key in sorted(http_snap.keys(), key=lambda x: (
+                x.route, x.method, x.status)):
             agg = http_snap[key]
-            buckets = agg.bucket_le_counts if isinstance(agg.bucket_le_counts, dict) else None
+            buckets = agg.bucket_le_counts if isinstance(
+                agg.bucket_le_counts, dict) else None
             if not buckets:
                 continue
 
@@ -377,7 +465,8 @@ class PrometheusMetrics:
                     f"baixing_job_runs_total{{job=\"{_prom_escape_label_value(name)}\"}} {int(agg.runs_total)}"
                 )
 
-        lines.append("# HELP baixing_job_success_total Total scheduled job successes")
+        lines.append(
+            "# HELP baixing_job_success_total Total scheduled job successes")
         lines.append("# TYPE baixing_job_success_total counter")
         for name in sorted(jobs_snap.keys()):
             agg = jobs_snap[name]
@@ -386,7 +475,8 @@ class PrometheusMetrics:
                     f"baixing_job_success_total{{job=\"{_prom_escape_label_value(name)}\"}} {int(agg.successes_total)}"
                 )
 
-        lines.append("# HELP baixing_job_failure_total Total scheduled job failures")
+        lines.append(
+            "# HELP baixing_job_failure_total Total scheduled job failures")
         lines.append("# TYPE baixing_job_failure_total counter")
         for name in sorted(jobs_snap.keys()):
             agg = jobs_snap[name]
@@ -395,7 +485,8 @@ class PrometheusMetrics:
                     f"baixing_job_failure_total{{job=\"{_prom_escape_label_value(name)}\"}} {int(agg.failures_total)}"
                 )
 
-        lines.append("# HELP baixing_job_last_run_timestamp_seconds Last scheduled job run unix timestamp")
+        lines.append(
+            "# HELP baixing_job_last_run_timestamp_seconds Last scheduled job run unix timestamp")
         lines.append("# TYPE baixing_job_last_run_timestamp_seconds gauge")
         for name in sorted(jobs_snap.keys()):
             agg = jobs_snap[name]
@@ -405,7 +496,8 @@ class PrometheusMetrics:
                 f"baixing_job_last_run_timestamp_seconds{{job=\"{_prom_escape_label_value(name)}\"}} {float(agg.last_run_ts)}"
             )
 
-        lines.append("# HELP baixing_job_last_duration_seconds Last scheduled job duration seconds")
+        lines.append(
+            "# HELP baixing_job_last_duration_seconds Last scheduled job duration seconds")
         lines.append("# TYPE baixing_job_last_duration_seconds gauge")
         for name in sorted(jobs_snap.keys()):
             agg = jobs_snap[name]
@@ -415,7 +507,8 @@ class PrometheusMetrics:
                 f"baixing_job_last_duration_seconds{{job=\"{_prom_escape_label_value(name)}\"}} {float(agg.last_duration_seconds)}"
             )
 
-        lines.append("# HELP baixing_job_last_success Whether last job run succeeded")
+        lines.append(
+            "# HELP baixing_job_last_success Whether last job run succeeded")
         lines.append("# TYPE baixing_job_last_success gauge")
         for name in sorted(jobs_snap.keys()):
             agg = jobs_snap[name]
@@ -426,9 +519,11 @@ class PrometheusMetrics:
             )
 
         # Rate limit metrics
-        lines.append("# HELP baixing_rate_limit_checks_total Total rate limit checks")
+        lines.append(
+            "# HELP baixing_rate_limit_checks_total Total rate limit checks")
         lines.append("# TYPE baixing_rate_limit_checks_total counter")
-        for key in sorted(rate_limit_snap.keys(), key=lambda x: (x.endpoint, x.result)):
+        for key in sorted(rate_limit_snap.keys(),
+                          key=lambda x: (x.endpoint, x.result)):
             agg = rate_limit_snap[key]
             if int(agg.count) <= 0:
                 continue
@@ -441,7 +536,8 @@ class PrometheusMetrics:
         # User action metrics
         lines.append("# HELP baixing_user_actions_total Total user actions")
         lines.append("# TYPE baixing_user_actions_total counter")
-        for key in sorted(user_action_snap.keys(), key=lambda x: (x.action, x.result, x.status)):
+        for key in sorted(user_action_snap.keys(),
+                          key=lambda x: (x.action, x.result, x.status)):
             agg = user_action_snap[key]
             if int(agg.count) <= 0:
                 continue
@@ -453,9 +549,11 @@ class PrometheusMetrics:
             )
 
         # Payment metrics
-        lines.append("# HELP baixing_payment_pay_requests_total Total payment pay requests")
+        lines.append(
+            "# HELP baixing_payment_pay_requests_total Total payment pay requests")
         lines.append("# TYPE baixing_payment_pay_requests_total counter")
-        for key in sorted(payment_pay_snap.keys(), key=lambda x: (x.method, x.result)):
+        for key in sorted(payment_pay_snap.keys(),
+                          key=lambda x: (x.method, x.result)):
             agg = payment_pay_snap[key]
             if int(agg.count) <= 0:
                 continue
@@ -465,9 +563,11 @@ class PrometheusMetrics:
                 + f"result=\"{_prom_escape_label_value(key.result)}\"}} {int(agg.count)}"
             )
 
-        lines.append("# HELP baixing_payment_callback_events_total Total payment callback events")
+        lines.append(
+            "# HELP baixing_payment_callback_events_total Total payment callback events")
         lines.append("# TYPE baixing_payment_callback_events_total counter")
-        for key in sorted(payment_cb_snap.keys(), key=lambda x: (x.provider, x.verified, x.result)):
+        for key in sorted(payment_cb_snap.keys(), key=lambda x: (
+                x.provider, x.verified, x.result)):
             agg = payment_cb_snap[key]
             if int(agg.count) <= 0:
                 continue
@@ -478,21 +578,33 @@ class PrometheusMetrics:
                 + f"result=\"{_prom_escape_label_value(key.result)}\"}} {int(agg.count)}"
             )
 
-        lines.append("# HELP baixing_sql_slow_queries_total Total SQL slow queries observed")
+        lines.append(
+            "# HELP baixing_sql_slow_queries_total Total SQL slow queries observed")
         lines.append("# TYPE baixing_sql_slow_queries_total counter")
-        lines.append(f"baixing_sql_slow_queries_total {int(sql_slow_snap.count)}")
+        lines.append(
+            f"baixing_sql_slow_queries_total {int(sql_slow_snap.count)}")
 
-        lines.append("# HELP baixing_sql_slow_query_duration_seconds_sum Total seconds of SQL slow queries")
-        lines.append("# TYPE baixing_sql_slow_query_duration_seconds_sum counter")
-        lines.append(f"baixing_sql_slow_query_duration_seconds_sum {float(sql_slow_snap.sum_seconds)}")
+        lines.append(
+            "# HELP baixing_sql_slow_query_duration_seconds_sum Total seconds of SQL slow queries")
+        lines.append(
+            "# TYPE baixing_sql_slow_query_duration_seconds_sum counter")
+        lines.append(
+            f"baixing_sql_slow_query_duration_seconds_sum {float(sql_slow_snap.sum_seconds)}"
+        )
 
-        lines.append("# HELP baixing_sql_slow_query_duration_seconds_count Total slow queries observed for duration histogram")
-        lines.append("# TYPE baixing_sql_slow_query_duration_seconds_count counter")
-        lines.append(f"baixing_sql_slow_query_duration_seconds_count {int(sql_slow_snap.count)}")
+        lines.append(
+            "# HELP baixing_sql_slow_query_duration_seconds_count Total slow queries observed for duration histogram")
+        lines.append(
+            "# TYPE baixing_sql_slow_query_duration_seconds_count counter")
+        lines.append(
+            f"baixing_sql_slow_query_duration_seconds_count {int(sql_slow_snap.count)}")
 
-        lines.append("# HELP baixing_sql_slow_query_duration_seconds_bucket SQL slow query duration histogram buckets")
-        lines.append("# TYPE baixing_sql_slow_query_duration_seconds_bucket counter")
-        buckets = sql_slow_snap.bucket_le_counts if isinstance(sql_slow_snap.bucket_le_counts, dict) else {}
+        lines.append(
+            "# HELP baixing_sql_slow_query_duration_seconds_bucket SQL slow query duration histogram buckets")
+        lines.append(
+            "# TYPE baixing_sql_slow_query_duration_seconds_bucket counter")
+        buckets = sql_slow_snap.bucket_le_counts if isinstance(
+            sql_slow_snap.bucket_le_counts, dict) else {}
         for le in list(self.sql_slow_duration_buckets) + [float("inf")]:
             c = int(buckets.get(float(le), 0))
             le_label = "+Inf" if le == float("inf") else str(le)
@@ -501,9 +613,63 @@ class PrometheusMetrics:
                 + f"{{le=\"{_prom_escape_label_value(le_label)}\"}} {c}"
             )
 
-        lines.append("# HELP baixing_sql_slow_query_max_duration_seconds Max observed SQL slow query duration")
-        lines.append("# TYPE baixing_sql_slow_query_max_duration_seconds gauge")
-        lines.append(f"baixing_sql_slow_query_max_duration_seconds {float(sql_slow_snap.max_seconds)}")
+        lines.append(
+            "# HELP baixing_sql_slow_query_max_duration_seconds Max observed SQL slow query duration")
+        lines.append(
+            "# TYPE baixing_sql_slow_query_max_duration_seconds gauge")
+        lines.append(
+            f"baixing_sql_slow_query_max_duration_seconds {float(sql_slow_snap.max_seconds)}"
+        )
+
+        # 数据库连接池指标
+        db_pool_snap = self.snapshot_db_pools()
+        lines.append(
+            "# HELP baixing_db_pool_active_connections Active database connections")
+        lines.append(
+            "# TYPE baixing_db_pool_active_connections gauge")
+        for key, agg in db_pool_snap.items():
+            lines.append(
+                f"baixing_db_pool_active_connections{{pool_name=\"{_prom_escape_label_value(key.pool_name)}\"}} {int(agg.active_connections)}")
+
+        lines.append(
+            "# HELP baixing_db_pool_idle_connections Idle database connections")
+        lines.append(
+            "# TYPE baixing_db_pool_idle_connections gauge")
+        for key, agg in db_pool_snap.items():
+            lines.append(
+                f"baixing_db_pool_idle_connections{{pool_name=\"{_prom_escape_label_value(key.pool_name)}\"}} {int(agg.idle_connections)}")
+
+        lines.append(
+            "# HELP baixing_db_pool_total_connections Total database connections")
+        lines.append(
+            "# TYPE baixing_db_pool_total_connections gauge")
+        for key, agg in db_pool_snap.items():
+            lines.append(
+                f"baixing_db_pool_total_connections{{pool_name=\"{_prom_escape_label_value(key.pool_name)}\"}} {int(agg.total_connections)}")
+
+        lines.append(
+            "# HELP baixing_db_pool_max_connections Max database connections")
+        lines.append(
+            "# TYPE baixing_db_pool_max_connections gauge")
+        for key, agg in db_pool_snap.items():
+            lines.append(
+                f"baixing_db_pool_max_connections{{pool_name=\"{_prom_escape_label_value(key.pool_name)}\"}} {int(agg.max_connections)}")
+
+        lines.append(
+            "# HELP baixing_db_pool_checked_out Checked out connections")
+        lines.append(
+            "# TYPE baixing_db_pool_checked_out gauge")
+        for key, agg in db_pool_snap.items():
+            lines.append(
+                f"baixing_db_pool_checked_out{{pool_name=\"{_prom_escape_label_value(key.pool_name)}\"}} {int(agg.checked_out)}")
+
+        lines.append(
+            "# HELP baixing_db_pool_overflow Overflow connections")
+        lines.append(
+            "# TYPE baixing_db_pool_overflow gauge")
+        for key, agg in db_pool_snap.items():
+            lines.append(
+                f"baixing_db_pool_overflow{{pool_name=\"{_prom_escape_label_value(key.pool_name)}\"}} {int(agg.overflow)}")
 
         if extra_lines:
             lines.extend([str(x) for x in list(extra_lines) if str(x).strip()])

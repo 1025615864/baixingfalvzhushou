@@ -119,3 +119,89 @@ def test_input_validator_validate(value: str, validator, expected: bool) -> None
     v = InputValidator()
     v.validate(value, validator, "bad")
     assert v.is_valid() is expected
+
+
+class TestInputValidatorEdgeCases:
+    """测试 InputValidator 边缘情况"""
+
+    def test_validate_with_custom_message(self):
+        """测试自定义验证消息"""
+        v = InputValidator()
+        v.validate("test", validate_email, "custom error message")
+        errors = v.get_errors()
+        assert len(errors) == 1
+        assert "custom error message" in errors[0]
+
+    def test_multiple_validations_same_field(self):
+        """测试同一字段多次验证"""
+        v = InputValidator()
+        v.required("", "name")
+        v.min_length("ab", 3, "name")
+        v.max_length("abcd", 3, "name")
+        assert v.is_valid() is False
+        assert len(v.get_errors()) == 3
+
+    def test_empty_validator_passes(self):
+        """测试空验证器通过"""
+        v = InputValidator()
+        assert v.is_valid() is True
+
+
+class TestValidatePhoneEdgeCases:
+    """测试手机号验证边缘情况"""
+
+    def test_phone_prefix_13(self):
+        """测试13开头手机号"""
+        assert validate_phone("13012345678") is True
+        assert validate_phone("13912345678") is True
+
+    def test_phone_prefix_15(self):
+        """测试15开头手机号"""
+        assert validate_phone("15012345678") is True
+        assert validate_phone("15912345678") is True
+
+    def test_phone_prefix_18(self):
+        """测试18开头手机号"""
+        assert validate_phone("18012345678") is True
+        assert validate_phone("18912345678") is True
+
+    def test_phone_too_short(self):
+        """测试手机号太短"""
+        assert validate_phone("1381234567") is False
+
+    def test_phone_too_long(self):
+        """测试手机号太长"""
+        assert validate_phone("138123456789") is False
+
+    def test_phone_with_special_chars(self):
+        """测试包含特殊字符的手机号"""
+        assert validate_phone("138-1234-5678") is False
+        assert validate_phone("138 1234 5678") is False
+
+
+class TestValidateEmailEdgeCases:
+    """测试邮箱验证边缘情况"""
+
+    def test_email_with_plus(self):
+        """测试带加号邮箱"""
+        assert validate_email("user+tag@example.com") is True
+
+    def test_email_with_dot(self):
+        """测试带点邮箱"""
+        assert validate_email("first.last@example.com") is True
+
+    def test_email_subdomain(self):
+        """测试子域名邮箱"""
+        assert validate_email("user@mail.example.com") is True
+
+    def test_email_missing_at(self):
+        """测试缺少@符号"""
+        assert validate_email("userexample.com") is False
+
+    def test_email_missing_domain(self):
+        """测试缺少域名"""
+        assert validate_email("user@") is False
+
+    def test_email_missing_local(self):
+        """测试缺少本地部分"""
+        assert validate_email("@example.com") is False

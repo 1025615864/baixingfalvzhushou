@@ -1,18 +1,22 @@
-from datetime import datetime, timezone
-from typing import Annotated, cast
+from datetime import datetime
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models.calendar import CalendarReminder
 from ..models.user import User
 from ..schemas.calendar import (
     CalendarReminderCreate,
     CalendarReminderListResponse,
     CalendarReminderResponse,
     CalendarReminderUpdate,
+)
+from ..services.calendar import (
+    create_reminder as create_reminder_service,
+    delete_reminder as delete_reminder_service,
+    list_reminders as list_reminders_service,
+    update_reminder as update_reminder_service,
 )
 from ..utils.deps import get_current_user
 
@@ -25,19 +29,11 @@ async def create_reminder(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    reminder = CalendarReminder(
-        user_id=current_user.id,
-        title=str(payload.title),
-        note=payload.note,
-        due_at=payload.due_at,
-        remind_at=payload.remind_at,
-        is_done=False,
-        done_at=None,
+    return await create_reminder_service(
+        payload=payload,
+        current_user=current_user,
+        db=db,
     )
-    db.add(reminder)
-    await db.commit()
-    await db.refresh(reminder)
-    return CalendarReminderResponse.model_validate(reminder)
 
 
 @router.get("/reminders", response_model=CalendarReminderListResponse)
@@ -50,71 +46,33 @@ async def list_reminders(
     from_at: datetime | None = None,
     to_at: datetime | None = None,
 ):
-    query = select(CalendarReminder).where(CalendarReminder.user_id == current_user.id)
-    if done is not None:
-        query = query.where(CalendarReminder.is_done == bool(done))
-    if from_at is not None:
-        query = query.where(CalendarReminder.due_at >= from_at)
-    if to_at is not None:
-        query = query.where(CalendarReminder.due_at <= to_at)
-
-    count_query = select(func.count()).select_from(query.subquery())
-    total_result = await db.execute(count_query)
-    total = int(total_result.scalar() or 0)
-
-    query = query.order_by(CalendarReminder.due_at.asc(), CalendarReminder.id.asc())
-    query = query.offset((page - 1) * page_size).limit(page_size)
-    res = await db.execute(query)
-    items = cast(list[CalendarReminder], res.scalars().all())
-
-    return CalendarReminderListResponse(
-        items=[CalendarReminderResponse.model_validate(x) for x in items],
-        total=total,
+    return await list_reminders_service(
+        current_user=current_user,
+        db=db,
+        page=page,
+        page_size=page_size,
+        done=done,
+        from_at=from_at,
+        to_at=to_at,
     )
 
 
-async def _get_owned_reminder(db: AsyncSession, reminder_id: int, user_id: int) -> CalendarReminder | None:
-    res = await db.execute(
-        select(CalendarReminder).where(
-            CalendarReminder.id == int(reminder_id),
-            CalendarReminder.user_id == int(user_id),
-        )
-    )
-    return res.scalar_one_or_none()
-
-
-@router.put("/reminders/{reminder_id}", response_model=CalendarReminderResponse)
+@router.put("/reminders/{reminder_id}",
+            response_model=CalendarReminderResponse)
 async def update_reminder(
     reminder_id: int,
     payload: CalendarReminderUpdate,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    _now: datetime | None = None,
 ):
-    reminder = await _get_owned_reminder(db, reminder_id, current_user.id)
-    if reminder is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="提醒不存在")
-
-    if payload.title is not None:
-        reminder.title = str(payload.title)
-    if payload.note is not None:
-        reminder.note = payload.note
-    if payload.due_at is not None:
-        reminder.due_at = payload.due_at
-    if payload.remind_at is not None:
-        reminder.remind_at = payload.remind_at
-
-    if payload.is_done is not None:
-        next_done = bool(payload.is_done)
-        reminder.is_done = next_done
-        if next_done:
-            if reminder.done_at is None:
-                reminder.done_at = datetime.now(timezone.utc)
-        else:
-            reminder.done_at = None
-
-    await db.commit()
-    await db.refresh(reminder)
-    return CalendarReminderResponse.model_validate(reminder)
+    return await update_reminder_service(
+        reminder_id=reminder_id,
+        payload=payload,
+        current_user=current_user,
+        db=db,
+        _now=_now,
+    )
 
 
 @router.delete("/reminders/{reminder_id}")
@@ -123,10 +81,8 @@ async def delete_reminder(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    reminder = await _get_owned_reminder(db, reminder_id, current_user.id)
-    if reminder is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="提醒不存在")
-
-    await db.delete(reminder)
-    await db.commit()
-    return {"message": "删除成功"}
+    return await delete_reminder_service(
+        reminder_id=reminder_id,
+        current_user=current_user,
+        db=db,
+    )

@@ -59,12 +59,14 @@ class CriticalEventReporter:
                 return
 
             severity_obj = kwargs.get("severity")
-            severity = str(severity_obj).strip() if severity_obj is not None else "error"
+            severity = str(severity_obj).strip(
+            ) if severity_obj is not None else "error"
             if not severity:
                 severity = "error"
 
             request_id_obj = kwargs.get("request_id")
-            request_id = str(request_id_obj).strip() if request_id_obj is not None else None
+            request_id = str(request_id_obj).strip(
+            ) if request_id_obj is not None else None
             if request_id == "":
                 request_id = None
 
@@ -77,7 +79,8 @@ class CriticalEventReporter:
             data = _sanitize_data(kwargs.get("data"))
 
             dedup_key_obj = kwargs.get("dedup_key")
-            dedup_key = str(dedup_key_obj).strip() if dedup_key_obj is not None else None
+            dedup_key = str(dedup_key_obj).strip(
+            ) if dedup_key_obj is not None else None
             if dedup_key == "":
                 dedup_key = None
 
@@ -114,7 +117,8 @@ class CriticalEventReporter:
             return
 
         now = float(time.time())
-        min_interval_seconds = _float_env("CRITICAL_EVENTS_MIN_INTERVAL_SECONDS", 30.0)
+        min_interval_seconds = _float_env(
+            "CRITICAL_EVENTS_MIN_INTERVAL_SECONDS", 30.0)
 
         key = str(dedup_key or "").strip()
         if not key:
@@ -122,7 +126,8 @@ class CriticalEventReporter:
 
         async with self._lock:
             last = self._last_sent_at_by_key.get(key)
-            if last is not None and (now - float(last)) < float(min_interval_seconds):
+            if last is not None and (
+                    now - float(last)) < float(min_interval_seconds):
                 return
             self._last_sent_at_by_key[key] = now
 
@@ -139,12 +144,21 @@ class CriticalEventReporter:
         }
 
         headers: dict[str, str] = {"Content-Type": "application/json"}
-        bearer = str(os.getenv("CRITICAL_EVENTS_WEBHOOK_BEARER", "") or "").strip()
+        bearer = str(
+            os.getenv(
+                "CRITICAL_EVENTS_WEBHOOK_BEARER",
+                "") or "").strip()
         if bearer:
             headers["Authorization"] = f"Bearer {bearer}"
 
-        header_name = str(os.getenv("CRITICAL_EVENTS_WEBHOOK_HEADER_NAME", "") or "").strip()
-        header_value = str(os.getenv("CRITICAL_EVENTS_WEBHOOK_HEADER_VALUE", "") or "").strip()
+        header_name = str(
+            os.getenv(
+                "CRITICAL_EVENTS_WEBHOOK_HEADER_NAME",
+                "") or "").strip()
+        header_value = str(
+            os.getenv(
+                "CRITICAL_EVENTS_WEBHOOK_HEADER_VALUE",
+                "") or "").strip()
         if header_name and header_value:
             headers[header_name] = header_value
 
@@ -154,7 +168,9 @@ class CriticalEventReporter:
             async with httpx.AsyncClient(timeout=float(timeout_seconds)) as client:
                 _ = await client.post(url, json=payload, headers=headers)
         except Exception:
-            logger.exception("critical_event_report_failed event=%s", str(event))
+            logger.exception(
+                "critical_event_report_failed event=%s",
+                str(event))
 
 
 critical_event_reporter = CriticalEventReporter()

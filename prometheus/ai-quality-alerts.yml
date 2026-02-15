@@ -1,0 +1,21 @@
+# AI Quality Monitoring Alerts
+groups:
+  - name: ai_quality
+    rules:
+      - alert: AIQualityLowScore
+        expr: ai_quality_score < 0.7
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI quality score is low"
+          description: "AI quality score has been below 0.7 for more than 5 minutes"
+
+      - alert: AIQualityHighLatency
+        expr: ai_quality_latency_seconds > 10
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI response latency is high"
+          description: "AI response latency has been above 10 seconds for more than 3 minutes"

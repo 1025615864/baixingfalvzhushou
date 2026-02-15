@@ -27,7 +27,8 @@ class StorageProvider(Protocol):
         content_type: str | None,
     ) -> StoredObject: ...
 
-    async def get_download_url(self, *, category: str, filename: str) -> str: ...
+    async def get_download_url(
+        self, *, category: str, filename: str) -> str: ...
 
 
 def _norm_provider(value: str | None) -> str:
@@ -41,7 +42,8 @@ def _norm_provider(value: str | None) -> str:
 
 def _join_url(base: str, *parts: str) -> str:
     b = str(base or "").strip().rstrip("/")
-    cleaned = [str(p).strip().strip("/") for p in parts if str(p).strip().strip("/")]
+    cleaned = [str(p).strip().strip("/")
+               for p in parts if str(p).strip().strip("/")]
     if not cleaned:
         return b
     return b + "/" + "/".join(cleaned)
@@ -81,12 +83,14 @@ class LocalStorageProvider:
         await asyncio.to_thread(_write)
 
         url = f"{self.api_prefix}/{str(category).strip().strip('/')}/{str(filename)}"
-        return StoredObject(category=category, filename=filename, key=dst_path, url=url)
+        return StoredObject(category=category,
+                            filename=filename, key=dst_path, url=url)
 
     async def get_download_url(self, *, category: str, filename: str) -> str:
         _ = category
         _ = filename
-        raise RuntimeError("local provider does not support external download url")
+        raise RuntimeError(
+            "local provider does not support external download url")
 
     def get_local_path(self, *, category: str, filename: str) -> str:
         return self._path_for(category, filename)
@@ -162,7 +166,8 @@ class S3CompatibleStorageProvider:
         await asyncio.to_thread(_upload)
 
         url = _join_url(self.public_base_url, key)
-        return StoredObject(category=category, filename=filename, key=key, url=url)
+        return StoredObject(category=category,
+                            filename=filename, key=key, url=url)
 
     async def get_download_url(self, *, category: str, filename: str) -> str:
         key = self._key_for(category, filename)
@@ -176,13 +181,26 @@ def get_storage_provider() -> StorageProvider:
 
     if provider == "s3":
         return S3CompatibleStorageProvider(
-            bucket=str(getattr(settings, "storage_s3_bucket", "") or "").strip(),
+            bucket=str(
+                getattr(
+                    settings,
+                    "storage_s3_bucket",
+                    "") or "").strip(),
             endpoint_url=getattr(settings, "storage_s3_endpoint_url", None),
             region_name=getattr(settings, "storage_s3_region", None),
             access_key_id=getattr(settings, "storage_s3_access_key_id", None),
-            secret_access_key=getattr(settings, "storage_s3_secret_access_key", None),
-            public_base_url=str(getattr(settings, "storage_public_base_url", "") or "").strip(),
-            prefix=str(getattr(settings, "storage_s3_prefix", "uploads") or "uploads"),
+            secret_access_key=getattr(
+                settings, "storage_s3_secret_access_key", None),
+            public_base_url=str(
+                getattr(
+                    settings,
+                    "storage_public_base_url",
+                    "") or "").strip(),
+            prefix=str(
+                getattr(
+                    settings,
+                    "storage_s3_prefix",
+                    "uploads") or "uploads"),
         )
 
     here = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))

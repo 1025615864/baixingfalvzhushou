@@ -161,6 +161,11 @@ function mapBackendToUser(data: BackendUserResponse): User {
     isVerified: data.email_verified || false,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
+    bio: (data as BackendUserResponse & { bio?: string }).bio,
+    location: (data as BackendUserResponse & { location?: string }).location,
+    company: (data as BackendUserResponse & { company?: string }).company,
+    title: (data as BackendUserResponse & { title?: string }).title,
+    website: (data as BackendUserResponse & { website?: string }).website,
   };
 }
 
@@ -245,6 +250,11 @@ export async function apiUpdateCurrentUser(
   const response = await apiClient.put<BackendUserResponse>(`${API_BASE}/me`, {
     nickname: data.nickname,
     phone: data.phone,
+    bio: data.bio,
+    location: data.location,
+    company: data.company,
+    title: data.title,
+    website: data.website,
   });
 
   return mapBackendToUser(response.data);

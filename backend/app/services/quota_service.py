@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+import asyncio
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
@@ -11,23 +11,25 @@ from sqlalchemy.exc import IntegrityError
 from ..models.system import SystemConfig
 from ..models.user import User
 from ..models.user_quota import UserQuotaDaily, UserQuotaPackBalance
-
-
-def _get_int_env(key: str, default: int) -> int:
-    raw = os.getenv(key, "").strip()
-    if not raw:
-        return int(default)
-    try:
-        return int(raw)
-    except Exception:
-        return int(default)
+from ..utils.helpers import _get_int_env
 
 
 FREE_AI_CHAT_DAILY_LIMIT = _get_int_env("FREE_AI_CHAT_DAILY_LIMIT", 5)
 VIP_AI_CHAT_DAILY_LIMIT = _get_int_env("VIP_AI_CHAT_DAILY_LIMIT", 10**9)
 
-FREE_DOCUMENT_GENERATE_DAILY_LIMIT = _get_int_env("FREE_DOCUMENT_GENERATE_DAILY_LIMIT", 10)
-VIP_DOCUMENT_GENERATE_DAILY_LIMIT = _get_int_env("VIP_DOCUMENT_GENERATE_DAILY_LIMIT", 50)
+FREE_DOCUMENT_GENERATE_DAILY_LIMIT = _get_int_env(
+    "FREE_DOCUMENT_GENERATE_DAILY_LIMIT", 10)
+VIP_DOCUMENT_GENERATE_DAILY_LIMIT = _get_int_env(
+    "VIP_DOCUMENT_GENERATE_DAILY_LIMIT", 50)
+
+
+def _get_session_lock(db: AsyncSession) -> asyncio.Lock:
+    """获取会话级锁，避免同一会话并发提交"""
+    lock = getattr(db, "_quota_lock", None)
+    if lock is None:
+        lock = asyncio.Lock()
+        setattr(db, "_quota_lock", lock)
+    return lock
 
 
 async def _get_system_config_value(db: AsyncSession, key: str) -> str | None:
@@ -67,89 +69,103 @@ def _is_vip_active_on_day(user: User | None, day: date) -> bool:
     expires_at = raw
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
-    day_start = datetime.combine(day, datetime.min.time()).replace(tzinfo=timezone.utc)
+    day_start = datetime.combine(
+        day, datetime.min.time()).replace(
+        tzinfo=timezone.utc)
     return expires_at > day_start
 
 
 class QuotaService:
-    async def _get_or_create_today(self, db: AsyncSession, user_id: int) -> UserQuotaDaily:
-        today = date.today()
-        res = await db.execute(
-            select(UserQuotaDaily).where(
-                UserQuotaDaily.user_id == int(user_id),
-                UserQuotaDaily.day == today,
-            )
-        )
-        row = res.scalar_one_or_none()
-        if row is not None:
-            return row
-
-        row = UserQuotaDaily(user_id=int(user_id), day=today, ai_chat_count=0, document_generate_count=0)
-        db.add(row)
-        try:
-            await db.commit()
-            await db.refresh(row)
-            return row
-        except IntegrityError:
-            await db.rollback()
-            res2 = await db.execute(
+    async def _get_or_create_today(
+            self, db: AsyncSession, user_id: int) -> UserQuotaDaily:
+        async with _get_session_lock(db):
+            today = date.today()
+            res = await db.execute(
                 select(UserQuotaDaily).where(
                     UserQuotaDaily.user_id == int(user_id),
                     UserQuotaDaily.day == today,
                 )
             )
-            row2 = res2.scalar_one_or_none()
-            if row2 is None:
-                raise
-            return row2
+            row = res.scalar_one_or_none()
+            if row is not None:
+                return row
+
+            row = UserQuotaDaily(
+                user_id=int(user_id),
+                day=today,
+                ai_chat_count=0,
+                document_generate_count=0)
+            db.add(row)
+            try:
+                await db.commit()
+                await db.refresh(row)
+                return row
+            except IntegrityError:
+                await db.rollback()
+                res2 = await db.execute(
+                    select(UserQuotaDaily).where(
+                        UserQuotaDaily.user_id == int(user_id),
+                        UserQuotaDaily.day == today,
+                    )
+                )
+                row2 = res2.scalar_one_or_none()
+                if row2 is None:
+                    raise
+                return row2
 
     async def _get_or_create_pack_balance(
         self, db: AsyncSession, user_id: int
     ) -> UserQuotaPackBalance:
-        res = await db.execute(
-            select(UserQuotaPackBalance).where(UserQuotaPackBalance.user_id == int(user_id))
-        )
-        row = res.scalar_one_or_none()
-        if row is not None:
-            return row
-
-        row = UserQuotaPackBalance(
-            user_id=int(user_id),
-            ai_chat_credits=0,
-            document_generate_credits=0,
-        )
-        db.add(row)
-        try:
-            await db.commit()
-            await db.refresh(row)
-            return row
-        except IntegrityError:
-            await db.rollback()
-            res2 = await db.execute(
+        async with _get_session_lock(db):
+            res = await db.execute(
                 select(UserQuotaPackBalance).where(
-                    UserQuotaPackBalance.user_id == int(user_id)
-                )
+                    UserQuotaPackBalance.user_id == int(user_id))
             )
-            row2 = res2.scalar_one_or_none()
-            if row2 is None:
-                raise
-            return row2
+            row = res.scalar_one_or_none()
+            if row is not None:
+                return row
 
-    async def _ai_chat_limit_for_user(self, db: AsyncSession, user: User) -> int:
+            row = UserQuotaPackBalance(
+                user_id=int(user_id),
+                ai_chat_credits=0,
+                document_generate_credits=0,
+            )
+            db.add(row)
+            try:
+                await db.commit()
+                await db.refresh(row)
+                return row
+            except IntegrityError:
+                await db.rollback()
+                res2 = await db.execute(
+                    select(UserQuotaPackBalance).where(
+                        UserQuotaPackBalance.user_id == int(user_id)
+                    )
+                )
+                row2 = res2.scalar_one_or_none()
+                if row2 is None:
+                    raise
+                return row2
+
+    async def _ai_chat_limit_for_user(
+            self, db: AsyncSession, user: User) -> int:
         if str(getattr(user, "role", "")).lower() in {"admin", "super_admin"}:
             return 10**9
         free_limit = await _get_int_config(db, "FREE_AI_CHAT_DAILY_LIMIT", FREE_AI_CHAT_DAILY_LIMIT)
         vip_limit = await _get_int_config(db, "VIP_AI_CHAT_DAILY_LIMIT", VIP_AI_CHAT_DAILY_LIMIT)
         return int(vip_limit) if _is_vip_active(user) else int(free_limit)
 
-    async def _ai_chat_limit_for_user_on_day(self, db: AsyncSession, user: User, day: date) -> int:
+    async def _ai_chat_limit_for_user_on_day(
+            self, db: AsyncSession, user: User, day: date) -> int:
         if str(getattr(user, "role", "")).lower() in {"admin", "super_admin"}:
             return 10**9
         free_limit = await _get_int_config(db, "FREE_AI_CHAT_DAILY_LIMIT", FREE_AI_CHAT_DAILY_LIMIT)
         vip_limit = await _get_int_config(db, "VIP_AI_CHAT_DAILY_LIMIT", VIP_AI_CHAT_DAILY_LIMIT)
-        return int(vip_limit) if _is_vip_active_on_day(user, day) else int(free_limit)
+        return int(vip_limit) if _is_vip_active_on_day(
+            user, day) else int(free_limit)
 
-    async def _doc_limit_for_user_on_day(self, db: AsyncSession, user: User, day: date) -> int:
+    async def _doc_limit_for_user_on_day(
+            self, db: AsyncSession, user: User, day: date) -> int:
         if str(getattr(user, "role", "")).lower() in {"admin", "super_admin"}:
             return 10**9
         free_limit = await _get_int_config(
@@ -158,7 +174,8 @@ class QuotaService:
         vip_limit = await _get_int_config(
             db, "VIP_DOCUMENT_GENERATE_DAILY_LIMIT", VIP_DOCUMENT_GENERATE_DAILY_LIMIT
         )
-        return int(vip_limit) if _is_vip_active_on_day(user, day) else int(free_limit)
+        return int(vip_limit) if _is_vip_active_on_day(
+            user, day) else int(free_limit)
 
     async def _doc_limit_for_user(self, db: AsyncSession, user: User) -> int:
         if str(getattr(user, "role", "")).lower() in {"admin", "super_admin"}:
@@ -171,7 +188,8 @@ class QuotaService:
         )
         return int(vip_limit) if _is_vip_active(user) else int(free_limit)
 
-    async def enforce_ai_chat_quota(self, db: AsyncSession, user: User) -> None:
+    async def enforce_ai_chat_quota(
+            self, db: AsyncSession, user: User) -> None:
         row = await self._get_or_create_today(db, int(user.id))
         limit = await self._ai_chat_limit_for_user(db, user)
         if int(row.ai_chat_count) >= int(limit):
@@ -207,7 +225,8 @@ class QuotaService:
         await self.enforce_ai_chat_quota(db, user)
         await self.record_ai_chat_usage(db, user)
 
-    async def enforce_document_generate_quota(self, db: AsyncSession, user: User) -> None:
+    async def enforce_document_generate_quota(
+            self, db: AsyncSession, user: User) -> None:
         row = await self._get_or_create_today(db, int(user.id))
         limit = await self._doc_limit_for_user(db, user)
         if int(row.document_generate_count) >= int(limit):
@@ -219,7 +238,8 @@ class QuotaService:
                 detail="今日文书生成次数已用尽，请开通 VIP 或明日再试",
             )
 
-    async def record_document_generate_usage(self, db: AsyncSession, user: User) -> None:
+    async def record_document_generate_usage(
+            self, db: AsyncSession, user: User) -> None:
         row = await self._get_or_create_today(db, int(user.id))
         limit = await self._doc_limit_for_user(db, user)
         if int(row.document_generate_count) < int(limit):
@@ -239,11 +259,13 @@ class QuotaService:
         db.add(pack)
         await db.commit()
 
-    async def consume_document_generate(self, db: AsyncSession, user: User) -> None:
+    async def consume_document_generate(
+            self, db: AsyncSession, user: User) -> None:
         await self.enforce_document_generate_quota(db, user)
         await self.record_document_generate_usage(db, user)
 
-    async def get_today_quota(self, db: AsyncSession, user: User) -> dict[str, object]:
+    async def get_today_quota(self, db: AsyncSession,
+                              user: User) -> dict[str, object]:
         row = await self._get_or_create_today(db, int(user.id))
         pack = await self._get_or_create_pack_balance(db, int(user.id))
         ai_limit = await self._ai_chat_limit_for_user(db, user)
@@ -309,11 +331,18 @@ class QuotaService:
                 {
                     "day": d,
                     "ai_chat_limit": int(ai_limit),
-                    "ai_chat_used": int(getattr(r, "ai_chat_count", 0) or 0),
+                    "ai_chat_used": int(
+                        getattr(
+                            r,
+                            "ai_chat_count",
+                            0) or 0),
                     "document_generate_limit": int(doc_limit),
-                    "document_generate_used": int(getattr(r, "document_generate_count", 0) or 0),
-                }
-            )
+                    "document_generate_used": int(
+                        getattr(
+                            r,
+                            "document_generate_count",
+                            0) or 0),
+                })
 
         return {
             "items": items,

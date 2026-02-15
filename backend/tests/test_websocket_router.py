@@ -37,7 +37,7 @@ async def test_get_active_user_id_happy_path_and_inactive_user(test_session, mon
     await test_session.refresh(user)
 
     monkeypatch.setattr(ws_router, "AsyncSessionLocal", lambda: _SessionCtx(test_session), raising=True)
-    monkeypatch.setattr(ws_router, "decode_token", lambda _t: {"sub": str(user.id)}, raising=True)
+    monkeypatch.setattr(ws_router, "decode_access_token", lambda _t: {"sub": str(user.id)}, raising=True)
 
     assert await ws_router._get_active_user_id("t") == user.id
 
@@ -46,7 +46,7 @@ async def test_get_active_user_id_happy_path_and_inactive_user(test_session, mon
     await test_session.commit()
     await test_session.refresh(user2)
 
-    monkeypatch.setattr(ws_router, "decode_token", lambda _t: {"sub": user2.id}, raising=True)
+    monkeypatch.setattr(ws_router, "decode_access_token", lambda _t: {"sub": user2.id}, raising=True)
     assert await ws_router._get_active_user_id("t") is None
 
 
@@ -56,13 +56,13 @@ async def test_get_active_user_id_invalid_payloads_return_none(test_session, mon
 
     assert await ws_router._get_active_user_id(None) is None
 
-    monkeypatch.setattr(ws_router, "decode_token", lambda _t: None, raising=True)
+    monkeypatch.setattr(ws_router, "decode_access_token", lambda _t: None, raising=True)
     assert await ws_router._get_active_user_id("t") is None
 
-    monkeypatch.setattr(ws_router, "decode_token", lambda _t: {"sub": "abc"}, raising=True)
+    monkeypatch.setattr(ws_router, "decode_access_token", lambda _t: {"sub": "abc"}, raising=True)
     assert await ws_router._get_active_user_id("t") is None
 
-    monkeypatch.setattr(ws_router, "decode_token", lambda _t: {"sub": "999"}, raising=True)
+    monkeypatch.setattr(ws_router, "decode_access_token", lambda _t: {"sub": "999"}, raising=True)
     assert await ws_router._get_active_user_id("t") is None
 
 

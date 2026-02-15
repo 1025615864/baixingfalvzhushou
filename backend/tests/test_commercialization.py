@@ -109,15 +109,15 @@ async def test_guest_document_generate_quota_optional_toggle(
     client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    from app.routers import document as doc_router
+    from app.services.document import core as doc_core
     from app.utils import rate_limiter as rl
 
     # Reset global in-memory limiter to avoid interference.
     rl.rate_limiter._requests.clear()  # type: ignore[attr-defined]
     rl.rate_limiter._last_seen.clear()  # type: ignore[attr-defined]
 
-    monkeypatch.setattr(doc_router, "GUEST_DOCUMENT_GENERATE_LIMIT", 1, raising=True)
-    monkeypatch.setattr(doc_router, "GUEST_DOCUMENT_GENERATE_WINDOW_SECONDS", 60 * 60 * 24, raising=True)
+    monkeypatch.setattr(doc_core, "GUEST_DOCUMENT_GENERATE_LIMIT", 1, raising=True)
+    monkeypatch.setattr(doc_core, "GUEST_DOCUMENT_GENERATE_WINDOW_SECONDS", 60 * 60 * 24, raising=True)
 
     payload = {
         "document_type": "complaint",
@@ -152,14 +152,7 @@ async def test_ai_pack_order_pricing_uses_system_config(
     await test_session.commit()
     await test_session.refresh(user)
 
-    test_session.add(
-        SystemConfig(
-            key="AI_CHAT_PACK_OPTIONS_JSON",
-            value='{"10": 1.23, "50": 4.56}',
-            category="commercial",
-            description="",
-        )
-    )
+    test_session.add(SystemConfig(key="ai_chat_pack_10_price", value="1.23", category="commercial"))
     await test_session.commit()
 
     res = await client.post(

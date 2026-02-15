@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Awaitable, Callable
 
@@ -8,14 +9,18 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from ..services.prometheus_metrics import prometheus_metrics
 
+logger = logging.getLogger(__name__)
+
 
 class MetricsMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[
+                       Request], Awaitable[Response]]) -> Response:
         start = time.perf_counter()
         response: Response | None = None
         try:
             response = await call_next(request)
         except Exception:
+            logger.exception("Request processing failed in metrics middleware")
             duration = max(0.0, float(time.perf_counter() - start))
             path = request.url.path
             if not (

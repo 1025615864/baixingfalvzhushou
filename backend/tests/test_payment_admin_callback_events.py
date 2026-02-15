@@ -6,14 +6,13 @@ from app.main import app
 from app.models.payment import PaymentCallbackEvent
 from app.models.user import User
 from app.utils.deps import require_admin
+from tests.helpers.test_data_factory import UserFactory
+from tests.helpers.assertion_helpers import assert_response_success, assert_response_error
 
 
 @pytest.mark.asyncio
 async def test_payment_admin_callback_events_list_filters(client, test_session):
-    admin = User(username="cb_admin", email="cb_admin@example.com", nickname="cb_admin", hashed_password="x", role="admin")
-    test_session.add(admin)
-    await test_session.commit()
-    await test_session.refresh(admin)
+    admin = await UserFactory.create_user(test_session, username="cb_admin", role="admin")
 
     e1 = PaymentCallbackEvent(
         provider="wechat",
@@ -140,10 +139,7 @@ async def test_payment_admin_callback_events_list_filters(client, test_session):
 
 @pytest.mark.asyncio
 async def test_payment_admin_callback_events_stats_and_detail(client, test_session):
-    admin = User(username="cb_admin2", email="cb_admin2@example.com", nickname="cb_admin2", hashed_password="x", role="admin")
-    test_session.add(admin)
-    await test_session.commit()
-    await test_session.refresh(admin)
+    admin = await UserFactory.create_user(test_session, username="cb_admin2", role="admin")
 
     e1 = PaymentCallbackEvent(provider="wechat", order_no="o1", trade_no="s1", amount=1.0, verified=True, error_message=None)
     e2 = PaymentCallbackEvent(provider="wechat", order_no="o2", trade_no="s2", amount=2.0, verified=False, error_message="bad")

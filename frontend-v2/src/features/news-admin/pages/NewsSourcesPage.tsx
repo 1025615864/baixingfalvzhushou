@@ -342,7 +342,7 @@ function SourceModal({
             </label>
             <input
               type="url"
-              value={formData.site}
+              value={formData.site ?? ''}
               onChange={(e) => setFormData({ ...formData, site: e.target.value })}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="https://example.com"
@@ -353,7 +353,7 @@ function SourceModal({
               分类
             </label>
             <select
-              value={formData.category}
+              value={formData.category ?? ''}
               onChange={(e) => setFormData({ ...formData, category: e.target.value })}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >

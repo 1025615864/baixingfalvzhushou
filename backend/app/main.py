@@ -508,8 +508,9 @@ Authorization: Bearer <your_token>
 """,
     version="1.0.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    # 生产环境禁用API文档，开发环境启用
+    docs_url="/docs" if settings.debug else None,
+    redoc_url="/redoc" if settings.debug else None,
     openapi_tags=[
         {"name": "用户管理", "description": "用户注册、登录、个人信息管理"},
         {"name": "AI法律助手", "description": "AI智能法律咨询"},

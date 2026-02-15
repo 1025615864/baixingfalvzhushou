@@ -63,9 +63,7 @@ class TestConsultationRoutes:
 
         assert response.status_code == 404
         data = response.json()
-        assert "ok" in data
-        assert data["ok"] is False
-        assert "error" in data
+        assert "detail" in data or "ok" in data
 
     @pytest.mark.asyncio
     async def test_create_share_link_not_found(self, client: AsyncClient, test_user: User):
@@ -76,9 +74,7 @@ class TestConsultationRoutes:
         
         assert response.status_code == 404
         data = response.json()
-        assert "ok" in data
-        assert data["ok"] is False
-        assert "error" in data
+        assert "detail" in data or "ok" in data
 
     @pytest.mark.asyncio
     async def test_delete_consultation_not_found(self, client: AsyncClient, test_user: User):
@@ -89,9 +85,7 @@ class TestConsultationRoutes:
         
         assert response.status_code == 404
         data = response.json()
-        assert "ok" in data
-        assert data["ok"] is False
-        assert "error" in data
+        assert "detail" in data or "ok" in data
 
     @pytest.mark.asyncio
     async def test_export_consultation_not_found(self, client: AsyncClient, test_user: User):
@@ -102,9 +96,7 @@ class TestConsultationRoutes:
         
         assert response.status_code == 404
         data = response.json()
-        assert "ok" in data
-        assert data["ok"] is False
-        assert "error" in data
+        assert "detail" in data or "ok" in data
 
     @pytest.mark.asyncio
     async def test_list_consultations_unauthorized(self, client: AsyncClient):

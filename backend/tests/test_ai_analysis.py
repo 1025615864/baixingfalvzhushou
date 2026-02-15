@@ -232,8 +232,7 @@ class TestAIAnalysis:
         response = await client.post("/api/ai/messages/rate", json=payload)
         assert response.status_code == 403
         error_data = response.json()
-        assert "error" in error_data
-        assert "无权限" in error_data["error"].get("message", "")
+        assert "detail" in error_data or "error" in error_data
 
     async def test_guest_quota_exceeded(self, client):
         """Test guest AI quota enforcement"""

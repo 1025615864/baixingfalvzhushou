@@ -87,16 +87,20 @@ async def session_engine():
     """会话级数据库引擎（整个测试会话只创建一次）"""
     _ensure_models_loaded()
 
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    engine = create_async_engine(
+        TEST_DATABASE_URL,
+        echo=False,
+        pool_pre_ping=True,
+    )
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    yield engine
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await engine.dispose()
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        yield engine
+    finally:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+        await engine.dispose()
 
 
 @pytest_asyncio.fixture
@@ -113,11 +117,14 @@ async def test_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
     )
 
     async with async_session() as session:
-        # 清理所有表数据
-        for table in reversed(Base.metadata.sorted_tables):
-            await session.execute(table.delete())
-        await session.commit()
-        yield session
+        try:
+            for table in reversed(Base.metadata.sorted_tables):
+                await session.execute(table.delete())
+            await session.commit()
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
 
 
 @pytest_asyncio.fixture
@@ -461,6 +468,27 @@ def mock_external_dependencies():
 def _cleanup_services():
     """自动重置服务单例状态"""
     yield
+
+
+@pytest.fixture(autouse=True)
+def _test_timeout():
+    """测试超时保护 - 防止测试卡住 (Windows兼容)"""
+    import threading
+    import time
+
+    timeout_seconds = 60
+    timeout_occurred = [False]
+
+    def timeout_check():
+        time.sleep(timeout_seconds)
+        timeout_occurred[0] = True
+        raise TimeoutError(f"Test timed out after {timeout_seconds} seconds")
+
+    timer = threading.Thread(target=timeout_check, daemon=True)
+    timer.start()
+    yield
+    if timeout_occurred[0]:
+        raise TimeoutError(f"Test timed out after {timeout_seconds} seconds")
 
 
 @pytest.fixture(autouse=True)

@@ -93,6 +93,18 @@ frontend/data/
 
 # 临时文档
 frontend/*.md
+
+# 临时测试文件
+backend/test_*.py
+backend/test_*.txt
+backend/2.9.0
+backend/temp/
+backend/.cache/
+scripts/temp/
+
+# 工具目录（保留结构但不追踪内容）
+.kilocode/
+.windsurf/plans/
 frontend/E2E_FIX_PLAN.md
 frontend/e2e-test-report.md
 frontend/PAGE_FLICK_BUG_DIAGNOSIS.md

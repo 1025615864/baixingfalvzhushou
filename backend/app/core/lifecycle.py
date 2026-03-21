@@ -119,17 +119,9 @@ class AppLifecycle:
         )
 
     async def start_points_scheduler(self) -> None:
-        """启动积分定时任务"""
-        if not self.config.enable_points_scheduler or not cache_service.is_connected:
-            return
-
-        try:
-            from ..services.points.scheduled_tasks import get_points_scheduled_tasks
-            self.points_scheduled_tasks = get_points_scheduled_tasks()
-            self.points_scheduled_tasks.start_scheduler(check_interval=60)
-            logger.info("积分系统定时任务已启动")
-        except Exception as e:
-            logger.warning(f"积分系统定时任务启动失败: {e}")
+        """启动积分定时任务（已迁移到points-service）"""
+        # 积分定时任务已由 points-service 独立处理
+        pass
 
     async def initialize_ai(self) -> None:
         """初始化AI模块"""

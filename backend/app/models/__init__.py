@@ -21,6 +21,7 @@ from .user_profile import UserProfile, UserInterestHistory, UserTagInteraction, 
 from .periodic_task import PeriodicTaskRun, TaskStatus
 from .membership import Membership
 from .video_consultation import VideoConsultation, VideoConsultationUsage, VideoSchedule
+from .payment import PaymentOrder, PaymentStatus, RefundStatus, PaymentMethod, OrderType, UserBalance, BalanceTransaction
 
 __all__ = [
     "User",
@@ -70,4 +71,11 @@ __all__ = [
     "VideoConsultation",
     "VideoConsultationUsage",
     "VideoSchedule",
+    "PaymentOrder",
+    "PaymentStatus",
+    "RefundStatus",
+    "PaymentMethod",
+    "OrderType",
+    "UserBalance",
+    "BalanceTransaction",
 ]

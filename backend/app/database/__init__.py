@@ -101,6 +101,7 @@ def _import_all_models() -> None:
         "app.models.cross_domain",
         "app.models.moderation",
         "app.models.faq",
+        "app.models.payment",
     ]
     for module_name in module_names:
         _ = importlib.import_module(module_name)

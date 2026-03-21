@@ -7,8 +7,6 @@ from sqlalchemy import select, func, desc, or_, and_, update
 from sqlalchemy.orm import selectinload
 
 from app.models.lawfirm import LawyerConsultation, LawyerConsultationMessage
-from app.models.payment import PaymentOrder, PaymentStatus
-from app.services.payment_service import payment_service
 
 
 class ConsultationStatus(str, Enum):
@@ -253,24 +251,7 @@ class LawyerConsultationService:
         consultation = result.scalar_one_or_none()
 
         if consultation:
-            # 处理取消时的退款逻辑
-            if status == "cancelled":
-                # 查找关联的支付订单
-                order_result = await db.execute(
-                    select(PaymentOrder).where(
-                        PaymentOrder.related_id == consultation_id,
-                        PaymentOrder.related_type == "lawyer_consultation"
-                    )
-                )
-                order = order_result.scalar_one_or_none()
-                if order and order.status == PaymentStatus.PAID:
-                    # 执行退款
-                    try:
-                        await payment_service.refund_payment(db, order_no=order.order_no)
-                    except ValueError:
-                        # 退款失败，继续取消
-                        pass
-
+            # 处理取消状态（退款逻辑已迁移到payment-channel-service）
             consultation.status = status
             if status == "cancelled":
                 consultation.cancelled_at = datetime.now(timezone.utc)

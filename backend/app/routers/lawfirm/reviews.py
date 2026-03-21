@@ -13,7 +13,6 @@ from ...schemas.lawfirm import (
     ReviewCreate, ReviewResponse, ReviewListResponse, ReviewSummaryResponse,
 )
 from ...services.lawfirm_service import lawyer_service, review_service
-from ...services.lawyer_points_service import lawyer_points_service
 from ...utils.deps import get_current_user
 
 router = APIRouter(prefix="/reviews", tags=["评价系统"])
@@ -101,11 +100,6 @@ async def create_review(
     db.add(review)
     await db.commit()
     await db.refresh(review)
-
-    # 奖励积分
-    points = await lawyer_points_service.award_review_points(
-        db, int(data.lawyer_id), review
-    )
 
     # 解析标签
     tags_list = json.loads(review.tags) if review.tags else []

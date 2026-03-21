@@ -82,16 +82,8 @@ async def lifespan(app: FastAPI):
     task_scheduler = get_task_scheduler(runner)
     tasks = await task_scheduler.start_all(redis_connected, settings.debug, settings)
 
-    # 启动积分系统定时任务
-    points_scheduled_tasks = None
-    if redis_connected:
-        try:
-            from ..services.points.scheduled_tasks import get_points_scheduled_tasks
-            points_scheduled_tasks = get_points_scheduled_tasks()
-            points_scheduled_tasks.start_scheduler(check_interval=60)
-            logger.info("积分系统定时任务已启动")
-        except Exception as e:
-            logger.warning(f"积分系统定时任务启动失败: {e}")
+    # 启动积分系统定时任务（已迁移到points-service）
+    # 积分任务现在由 points-service 独立处理
 
     logger.info("数据库初始化完成")
     if ai is not None:

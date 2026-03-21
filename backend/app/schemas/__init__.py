@@ -1,11 +1,4 @@
 """Pydantic模式"""
-from .ai import (
-    ChatRequest,
-    ChatResponse,
-    ConsultationCreate,
-    ConsultationResponse,
-    MessageResponse
-)
 from .calendar import (
     CalendarReminderCreate,
     CalendarReminderUpdate,
@@ -61,11 +54,6 @@ from .video_consultation import (
 )
 
 __all__ = [
-    "ChatRequest",
-    "ChatResponse",
-    "ConsultationCreate",
-    "ConsultationResponse",
-    "MessageResponse",
     "CalendarReminderCreate",
     "CalendarReminderUpdate",
     "CalendarReminderResponse",

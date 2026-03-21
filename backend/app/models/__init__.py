@@ -8,28 +8,17 @@ from .consultation_review import ConsultationReviewTask, ConsultationReviewVersi
 from .contracts import ContractReviewHistory
 from .cross_domain import Domain
 from .channel import Channel
-from .forum import Post, Comment, PostLike, CommentLike, PostFavorite, PostReaction
-from .news import News, NewsFavorite, NewsViewHistory, NewsSubscription
-from .news_ai import NewsAIAnnotation
-from .news_workbench import NewsVersion, NewsAIGeneration, NewsLinkCheck
 from .lawfirm import LawFirm, Lawyer, LawyerConsultation, LawyerConsultationMessage, LawyerReview
 from .knowledge import LegalKnowledge, ConsultationTemplate
 from .document import GeneratedDocument
 from .document_template import DocumentTemplate, DocumentTemplateVersion
-from .notification import Notification
 from .system import SystemConfig, SystemSecret, AdminLog
 from .calendar import CalendarReminder
 from .feedback import FeedbackTicket
 from .settlement import LawyerWallet, LawyerIncomeRecord, LawyerBankAccount, WithdrawalRequest
-from .payment import (
-    PaymentOrder, UserBalance, BalanceTransaction, PaymentCallbackEvent,
-    PaymentStatus, RefundStatus, PaymentRefund, BankCard
-)
 from .user_profile import UserProfile, UserInterestHistory, UserTagInteraction, UserOnboarding
-from .points import PointsUser, PointsHistory, PointsDailyCount, PointsProduct, PointsExchangeOrder
 from .periodic_task import PeriodicTaskRun, TaskStatus
 from .membership import Membership
-from .legal_document import LegalDocument, LegalDocumentOrder, LegalDocumentFavorite
 from .video_consultation import VideoConsultation, VideoConsultationUsage, VideoSchedule
 
 __all__ = [
@@ -46,19 +35,6 @@ __all__ = [
     "ContractReviewHistory",
     "Domain",
     "Channel",
-    "Post",
-    "Comment",
-    "PostLike",
-    "CommentLike",
-    "PostFavorite",
-    "News",
-    "NewsFavorite",
-    "NewsViewHistory",
-    "NewsSubscription",
-    "NewsAIAnnotation",
-    "NewsVersion",
-    "NewsAIGeneration",
-    "NewsLinkCheck",
     "LawFirm",
     "Lawyer",
     "LawyerConsultation",
@@ -69,8 +45,6 @@ __all__ = [
     "GeneratedDocument",
     "DocumentTemplate",
     "DocumentTemplateVersion",
-    "PostReaction",
-    "Notification",
     "SystemConfig",
     "SystemSecret",
     "AdminLog",
@@ -80,32 +54,16 @@ __all__ = [
     "LawyerIncomeRecord",
     "LawyerBankAccount",
     "WithdrawalRequest",
-    "PaymentOrder",
-    "UserBalance",
-    "BalanceTransaction",
-    "PaymentCallbackEvent",
-    "PaymentStatus",
-    "RefundStatus",
-    "PaymentRefund",
-    "BankCard",
     "UserProfile",
     "UserInterestHistory",
     "UserTagInteraction",
     "UserOnboarding",
-    "PointsUser",
-    "PointsHistory",
-    "PointsDailyCount",
-    "PointsProduct",
-    "PointsExchangeOrder",
     "PeriodicTaskRun",
     "TaskStatus",
     "UserSecuritySettings",
     "UserDevice",
     "LoginAudit",
     "Membership",
-    "LegalDocument",
-    "LegalDocumentOrder",
-    "LegalDocumentFavorite",
     "VideoConsultation",
     "VideoConsultationUsage",
     "VideoSchedule",

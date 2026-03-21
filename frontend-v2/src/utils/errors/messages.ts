@@ -1,0 +1,66 @@
+import { BusinessErrorCode } from './types';
+import type { ExtendedErrorMessage } from './types';
+
+export const EXTENDED_ERROR_MESSAGES: Record<number, ExtendedErrorMessage> = {
+  [BusinessErrorCode.SUCCESS]: { title: '操作成功', icon: 'success' },
+  [BusinessErrorCode.INVALID_PARAMS]: { title: '请求参数无效', action: '请检查输入内容后重试' },
+  [BusinessErrorCode.UNAUTHORIZED]: { title: '未登录', action: '请先登录后再继续操作', icon: 'warning' },
+  [BusinessErrorCode.FORBIDDEN]: { title: '禁止访问', action: '您没有权限执行此操作', icon: 'warning' },
+  [BusinessErrorCode.NOT_FOUND]: { title: '资源不存在', action: '请检查请求的资源是否正确' },
+  [BusinessErrorCode.INTERNAL_ERROR]: { title: '服务器错误', action: '请稍后重试，如问题持续请联系客服', icon: 'error' },
+  [BusinessErrorCode.CONFLICT]: { title: '资源冲突', action: '该资源已被其他用户修改，请刷新后重试' },
+  [BusinessErrorCode.VALIDATION_ERROR]: { title: '数据验证失败', action: '请检查输入内容是否符合要求' },
+  [BusinessErrorCode.RATE_LIMIT_EXCEEDED]: { title: '请求过于频繁', action: '请稍后再试', icon: 'warning' },
+  [BusinessErrorCode.SERVICE_UNAVAILABLE]: { title: '服务暂时不可用', action: '系统正在维护中，请稍后再试', icon: 'warning' },
+  [BusinessErrorCode.USER_NOT_FOUND]: { title: '用户不存在', action: '请检查用户信息或联系客服' },
+  [BusinessErrorCode.USER_ALREADY_EXISTS]: { title: '用户已存在', action: '该账号已被注册，请直接登录或使用其他账号' },
+  [BusinessErrorCode.INVALID_CREDENTIALS]: { title: '登录失败', action: '用户名或密码错误，请检查后重试', icon: 'warning' },
+  [BusinessErrorCode.TOKEN_EXPIRED]: { title: '登录已过期', action: '请重新登录', icon: 'warning' },
+  [BusinessErrorCode.TOKEN_INVALID]: { title: '无效的登录状态', action: '请重新登录', icon: 'warning' },
+  [BusinessErrorCode.EMAIL_VERIFICATION_REQUIRED]: { title: '需要验证邮箱', action: '请前往邮箱完成验证', icon: 'info' },
+  [BusinessErrorCode.PHONE_VERIFICATION_REQUIRED]: { title: '需要验证手机号', action: '请完成手机号验证', icon: 'info' },
+  [BusinessErrorCode.PAYMENT_FAILED]: { title: '支付失败', action: '请检查支付信息后重试', icon: 'error' },
+  [BusinessErrorCode.PAYMENT_AMOUNT_MISMATCH]: { title: '支付金额不匹配', action: '订单金额已变更，请刷新页面后重试', icon: 'warning' },
+  [BusinessErrorCode.PAYMENT_ORDER_NOT_FOUND]: { title: '订单不存在', action: '请检查订单号是否正确' },
+  [BusinessErrorCode.PAYMENT_ORDER_ALREADY_PAID]: { title: '订单已支付', action: '无需重复支付', icon: 'info' },
+  [BusinessErrorCode.PAYMENT_ORDER_CANCELLED]: { title: '订单已取消', action: '如需购买请重新下单', icon: 'warning' },
+  [BusinessErrorCode.PAYMENT_CALLBACK_INVALID]: { title: '支付回调无效', action: '请联系客服处理', icon: 'error' },
+  [BusinessErrorCode.PAYMENT_CALLBACK_DUPLICATE]: { title: '重复的支付回调', action: '订单已处理，请勿重复操作', icon: 'warning' },
+  [BusinessErrorCode.PAYMENT_METHOD_NOT_SUPPORTED]: { title: '不支持的支付方式', action: '请选择其他支付方式' },
+  [BusinessErrorCode.PAYMENT_PROCESSING_ERROR]: { title: '支付处理错误', action: '请稍后重试或联系客服', icon: 'error' },
+  [BusinessErrorCode.PAYMENT_TIMEOUT]: { title: '支付超时', action: '请重新发起支付', icon: 'warning' },
+  [BusinessErrorCode.INSUFFICIENT_BALANCE]: { title: '余额不足', action: '请先充值或选择其他支付方式', icon: 'warning' },
+  [BusinessErrorCode.AI_SERVICE_UNAVAILABLE]: { title: 'AI 服务暂时不可用', action: '请稍后重试', icon: 'warning' },
+  [BusinessErrorCode.AI_QUOTA_EXCEEDED]: { title: 'AI 配额已用完', action: '请升级会员或等待配额重置', icon: 'warning' },
+  [BusinessErrorCode.AI_REQUEST_TOO_LONG]: { title: '请求内容过长', action: '请精简内容后重试' },
+  [BusinessErrorCode.AI_RESPONSE_INVALID]: { title: 'AI 响应异常', action: '请重新提问', icon: 'warning' },
+  [BusinessErrorCode.AI_TIMEOUT]: { title: 'AI 服务响应超时', action: '请稍后重试', icon: 'warning' },
+  [BusinessErrorCode.AI_RATE_LIMIT_EXCEEDED]: { title: 'AI 请求过于频繁', action: '请稍后再试', icon: 'warning' },
+  [BusinessErrorCode.INVALID_ORDER_TYPE]: { title: '无效的订单类型', action: '请选择正确的订单类型' },
+  [BusinessErrorCode.ORDER_EXPIRED]: { title: '订单已过期', action: '请重新下单', icon: 'warning' },
+  [BusinessErrorCode.RESOURCE_NOT_FOUND]: { title: '资源不存在', action: '请检查资源是否已被删除' },
+  [BusinessErrorCode.RESOURCE_ALREADY_EXISTS]: { title: '资源已存在', action: '请勿重复创建', icon: 'info' },
+  [BusinessErrorCode.OPERATION_NOT_ALLOWED]: { title: '操作不被允许', action: '您没有权限执行此操作', icon: 'warning' },
+  [BusinessErrorCode.CONTENT_NOT_FOUND]: { title: '内容不存在', action: '该内容可能已被删除' },
+  [BusinessErrorCode.CONTENT_ALREADY_PUBLISHED]: { title: '内容已发布', action: '请勿重复发布', icon: 'info' },
+  [BusinessErrorCode.CONTENT_MODIFICATION_NOT_ALLOWED]: { title: '不允许修改内容', action: '该内容已锁定或无权限修改', icon: 'warning' },
+  [BusinessErrorCode.CONTENT_VALIDATION_FAILED]: { title: '内容验证失败', action: '请检查内容是否符合规范' },
+  [BusinessErrorCode.FORUM_POST_NOT_FOUND]: { title: '帖子不存在', action: '该帖子可能已被删除或下架' },
+  [BusinessErrorCode.FORUM_COMMENT_NOT_FOUND]: { title: '评论不存在', action: '该评论可能已被删除' },
+  [BusinessErrorCode.FORUM_POST_LOCKED]: { title: '帖子已锁定', action: '该帖子无法回复', icon: 'warning' },
+  [BusinessErrorCode.FORUM_COMMENT_NOT_ALLOWED]: { title: '不允许评论', action: '您没有权限在此帖子下评论', icon: 'warning' },
+  [BusinessErrorCode.SYSTEM_MAINTENANCE]: { title: '系统维护中', action: '系统正在进行维护，请稍后再试', icon: 'warning' },
+  [BusinessErrorCode.SYSTEM_OVERLOADED]: { title: '系统繁忙', action: '当前访问量较大，请稍后再试', icon: 'warning' },
+  [BusinessErrorCode.DATABASE_ERROR]: { title: '数据库错误', action: '请稍后重试，如问题持续请联系客服', icon: 'error' },
+  [BusinessErrorCode.CACHE_ERROR]: { title: '缓存服务异常', action: '请稍后重试', icon: 'warning' },
+  [BusinessErrorCode.EXTERNAL_SERVICE_ERROR]: { title: '外部服务异常', action: '请稍后重试', icon: 'warning' },
+};
+
+export function getExtendedErrorMessage(code: number): ExtendedErrorMessage {
+  return (
+    EXTENDED_ERROR_MESSAGES[code] || {
+      title: getErrorMessage(code),
+      action: '请稍后重试',
+    }
+  );
+}

@@ -173,3 +173,13 @@ export type {
 // ==================== 页面骨架屏组件 ====================
 export { PageSkeleton } from './PageSkeleton';
 export type { PageSkeletonProps } from './PageSkeleton';
+
+// ==================== 布局组件 ====================
+export { Accordion } from './Accordion';
+export type { AccordionProps, AccordionItem } from './Accordion';
+
+export { Alert } from './Alert';
+export type { AlertProps } from './Alert';
+
+export { Breadcrumb } from './Breadcrumb';
+export type { BreadcrumbProps, BreadcrumbItem } from './Breadcrumb';

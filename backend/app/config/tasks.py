@@ -17,27 +17,6 @@ class PeriodicTaskConfig:
 
 # 定时任务配置列表
 PERIODIC_TASKS = [
-    # 新闻发布任务
-    PeriodicTaskConfig(
-        func=lambda: None,  # 实际函数在运行时注入
-        interval_hours=1,
-        lock_key="news_publish",
-        name="news_publish"
-    ),
-    # RSS采集任务
-    PeriodicTaskConfig(
-        func=lambda: None,
-        interval_hours=2,
-        lock_key="rss_ingest",
-        name="rss_ingest"
-    ),
-    # News AI任务
-    PeriodicTaskConfig(
-        func=lambda: None,
-        interval_hours=3,
-        lock_key="news_ai",
-        name="news_ai"
-    ),
     # 结算任务
     PeriodicTaskConfig(
         func=lambda: None,

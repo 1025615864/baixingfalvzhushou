@@ -132,22 +132,7 @@ async def _apply_sqlite_migrations(conn: AsyncConnection) -> None:
         if "phone_verified_at" not in users_cols:
             await conn.execute(text("ALTER TABLE users ADD COLUMN phone_verified_at DATETIME"))
     
-    # News AI annotations 表修复
-    if "news_ai_annotations" in tables:
-        ann_cols_result = await conn.execute(text("PRAGMA table_info(news_ai_annotations)"))
-        ann_cols = {row[1] for row in ann_cols_result.fetchall()}
-        if "highlights" not in ann_cols:
-            await conn.execute(text("ALTER TABLE news_ai_annotations ADD COLUMN highlights TEXT"))
-        if "keywords" not in ann_cols:
-            await conn.execute(text("ALTER TABLE news_ai_annotations ADD COLUMN keywords TEXT"))
-        if "retry_count" not in ann_cols:
-            await conn.execute(text("ALTER TABLE news_ai_annotations ADD COLUMN retry_count INTEGER DEFAULT 0"))
-        if "last_error" not in ann_cols:
-            await conn.execute(text("ALTER TABLE news_ai_annotations ADD COLUMN last_error TEXT"))
-        if "last_error_at" not in ann_cols:
-            await conn.execute(text("ALTER TABLE news_ai_annotations ADD COLUMN last_error_at DATETIME"))
-    
-    # News comments 表修复
+    # Notifications 表修复
     if "news_comments" not in tables:
         await conn.execute(
             text(

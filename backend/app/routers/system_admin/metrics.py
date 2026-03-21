@@ -313,9 +313,6 @@ async def get_periodic_tasks_overview(
     from sqlalchemy import select, func
 
     task_keys = [
-        "locks:scheduled_news",
-        "locks:rss_ingest",
-        "locks:news_ai_pipeline",
         "locks:settlement",
         "locks:wechatpay_platform_certs",
         "locks:review_task_sla",

@@ -337,27 +337,6 @@ class PreloadPresets:
         ("firm", "joinedload"),
         ("user", "joinedload"),  # 关联用户（一对一）
     ]
-    
-    # 新闻相关预加载配置
-    NEWS_BASIC = [
-        ("ai_annotation", "selectinload"),  # AI 标注（一对零或一）
-    ]
-    
-    # 论坛帖子相关预加载配置
-    POST_BASIC = [
-        ("author", "joinedload"),  # 作者（一对一）
-    ]
-    
-    POST_FULL = [
-        ("author", "joinedload"),
-        ("comments", "selectinload"),  # 评论（一对多）
-    ]
-    
-    # 评论相关预加载配置
-    COMMENT_BASIC = [
-        ("author", "joinedload"),  # 作者（一对一）
-        ("parent", "joinedload"),  # 父评论（一对一）
-    ]
 
 
 def apply_lawyer_preload(
@@ -378,62 +357,6 @@ def apply_lawyer_preload(
     if level == "full":
         return query_optimizer.apply_preload(query, Lawyer, PreloadPresets.LAWYER_FULL)
     return query_optimizer.apply_preload(query, Lawyer, PreloadPresets.LAWYER_BASIC)
-
-
-def apply_news_preload(
-    query: Select,
-    level: str = "basic"
-) -> Select:
-    """应用新闻预加载配置
-    
-    Args:
-        query: 原始查询
-        level: 预加载级别 ("basic" 或 "full")
-        
-    Returns:
-        优化后的查询
-    """
-    from ..models.news import News
-    
-    return query_optimizer.apply_preload(query, News, PreloadPresets.NEWS_BASIC)
-
-
-def apply_post_preload(
-    query: Select,
-    level: str = "basic"
-) -> Select:
-    """应用论坛帖子预加载配置
-    
-    Args:
-        query: 原始查询
-        level: 预加载级别 ("basic" 或 "full")
-        
-    Returns:
-        优化后的查询
-    """
-    from ..models.forum import Post
-    
-    if level == "full":
-        return query_optimizer.apply_preload(query, Post, PreloadPresets.POST_FULL)
-    return query_optimizer.apply_preload(query, Post, PreloadPresets.POST_BASIC)
-
-
-def apply_comment_preload(
-    query: Select,
-    level: str = "basic"
-) -> Select:
-    """应用评论预加载配置
-    
-    Args:
-        query: 原始查询
-        level: 预加载级别
-        
-    Returns:
-        优化后的查询
-    """
-    from ..models.forum import Comment
-    
-    return query_optimizer.apply_preload(query, Comment, PreloadPresets.COMMENT_BASIC)
 
 
 # N+1 查询检测工具

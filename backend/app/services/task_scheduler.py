@@ -176,9 +176,6 @@ class TaskScheduler:
         Returns:
             任务列表（可能包含None）
         """
-        from app.services.news_service import news_service
-        from app.services.rss_ingest_service import rss_ingest_service
-        from app.services.news_ai_pipeline_service import news_ai_pipeline_service
         from app.services.settlement_service import settlement_service
         from app.services.review_task_sla_service import scan_and_notify_review_task_sla
         from app.utils.wechatpay_v3 import (
@@ -187,21 +184,6 @@ class TaskScheduler:
         )
         from app.models import SystemConfig
         from sqlalchemy import select
-
-        # RSS订阅任务 (已迁移到news-service)
-        rss_feeds_raw = os.getenv("RSS_FEEDS", "").strip()
-        rss_ingest_enabled_raw = os.getenv("RSS_INGEST_ENABLED", "").strip().lower()
-        rss_enabled = bool(rss_feeds_raw) or bool(rss_ingest_enabled_raw in {"1", "true", "yes", "on"}) or debug
-        if rss_enabled and (debug or redis_connected):
-            rss_interval = float(os.getenv("RSS_INGEST_INTERVAL_SECONDS", "300").strip() or "300")
-            self.add_task(
-                TaskConfig(
-                    name="rss_ingest",
-                    lock_key="locks:rss_ingest",
-                    interval_seconds=rss_interval,
-                ),
-                lambda session: rss_ingest_service.run_once(session),
-            )
 
         # 结算任务
         settlement_enabled_raw = os.getenv("SETTLEMENT_JOB_ENABLED", "").strip().lower()

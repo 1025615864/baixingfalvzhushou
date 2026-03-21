@@ -13,6 +13,7 @@ from .knowledge import LegalKnowledge, ConsultationTemplate
 from .document import GeneratedDocument
 from .document_template import DocumentTemplate, DocumentTemplateVersion
 from .system import SystemConfig, SystemSecret, AdminLog
+from .notification import Notification, NotificationType
 from .calendar import CalendarReminder
 from .feedback import FeedbackTicket
 from .settlement import LawyerWallet, LawyerIncomeRecord, LawyerBankAccount, WithdrawalRequest
@@ -48,6 +49,8 @@ __all__ = [
     "SystemConfig",
     "SystemSecret",
     "AdminLog",
+    "Notification",
+    "NotificationType",
     "CalendarReminder",
     "FeedbackTicket",
     "LawyerWallet",

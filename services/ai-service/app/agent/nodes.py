@@ -159,7 +159,7 @@ def draft_generator(state: AgentState) -> AgentState:
 
     law_citations = []
     for doc in retrieved_docs:
-        citation = f"《{doc['law_name']}》第{doc['article_num']}条：{doc['text']}"
+        citation = f"《{doc['law_name']}》{doc['article_num']}：{doc['text']}"
         law_citations.append(citation)
 
     draft = f"""根据您的问题“{user_query}”，我为您提供了以下法律分析：

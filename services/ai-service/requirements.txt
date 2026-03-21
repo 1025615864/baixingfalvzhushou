@@ -1,0 +1,12 @@
+# AI服务依赖
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+sqlalchemy[asyncio]>=2.0.25
+asyncpg>=0.29.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+aiokafka>=0.10.0
+httpx>=0.26.0
+openai>=1.0.0
+chromadb>=0.4.0
+redis>=5.0.0

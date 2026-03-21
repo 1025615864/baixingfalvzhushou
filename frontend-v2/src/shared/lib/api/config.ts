@@ -1,19 +1,34 @@
 // ============================================
-// API 配置 - 修复与后端接口匹配
+// API 配置 - 适配微服务架构 v2
 // ============================================
+
+import { ServiceDiscovery } from './serviceDiscovery';
+
+// API 版本
+export const API_VERSION = 'v1';
+export const API_BASE = `/api/${API_VERSION}`;
+
+// 服务发现
+export const services = new ServiceDiscovery({
+  auth: 'http://localhost:8001',
+  user: 'http://localhost:8001',
+  payment: 'http://localhost:8002',
+  accounting: 'http://localhost:8003',
+  legal: 'http://localhost:8004',
+  ai: 'http://localhost:8005',
+  news: 'http://localhost:8006',
+  community: 'http://localhost:8007',
+  points: 'http://localhost:8008',
+  notification: 'http://localhost:8009',
+  recommendation: 'http://localhost:8010',
+  search: 'http://localhost:8011',
+});
 
 // API 基础配置
 export const API_CONFIG = {
-  // 基础 URL - 修复为与后端一致 (/api)
-  baseURL: (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8000/api',
-  
-  // 请求超时时间（毫秒）
+  baseURL: API_BASE,
   timeout: 30000,
-  
-  // 重试次数
   retry: 3,
-  
-  // 重试延迟（毫秒）
   retryDelay: 1000,
 };
 
@@ -24,148 +39,211 @@ export const DEFAULT_HEADERS = {
 };
 
 // ============================================
-// API 端点配置 - 与 backend/app/routers/user.py 匹配
+// API 端点配置 - 与后端 services 匹配
 // ============================================
 export const ENDPOINTS = {
-  // 认证相关 - 使用 /user 前缀
+  // ==================== 认证服务 (8001) ====================
   auth: {
-    login: '/user/login',           // POST /user/login
-    register: '/user/register',     // POST /user/register
-    logout: '/user/logout',         // POST /user/logout
-    refresh: '/user/auth/refresh',  // POST /user/auth/refresh
-    me: '/user/me',                 // GET /user/me
-    profile: '/user/me',            // PUT /user/me
-    password: '/user/me/password',  // PUT /user/me/password
-    avatar: '/user/avatar',         // POST /user/avatar (假设)
-    csrf: '/user/me/csrf-token',    // GET /user/me/csrf-token - FR-001 修正
+    login: `${API_BASE}/auth/login`,
+    register: `${API_BASE}/auth/register`,
+    refresh: `${API_BASE}/auth/refresh`,
+    logout: `${API_BASE}/auth/logout`,
+    me: `${API_BASE}/users/me`,
   },
-  
-  // 用户相关 - 使用 /user 前缀
+
+  // ==================== 用户服务 (8001) ====================
   user: {
-    profile: '/user/me',                    // GET /user/me
-    update: '/user/me',                     // PUT /user/me
-    password: '/user/me/password',          // PUT /user/me/password
-    avatar: '/user/avatar',                 // POST /user/avatar
-    quotas: '/user/me/quotas',              // GET /user/me/quotas
-    stats: '/user/me/stats',                // GET /user/me/stats
-    list: '/user/admin/list',               // GET /user/admin/list (管理员)
-    toggleActive: (id: number) => `/user/admin/${id}/toggle-active`,
-    updateRole: (id: number) => `/user/admin/${id}/role`,
+    profile: `${API_BASE}/users/me`,
+    updateProfile: `${API_BASE}/users/me`,
+    changePassword: `${API_BASE}/users/me/password`,
+    quotas: `${API_BASE}/users/me/quotas`,
+    avatar: `${API_BASE}/users/me/avatar`,
+    stats: `${API_BASE}/users/me/stats`,
+    membership: `${API_BASE}/membership/current`,
+    list: `${API_BASE}/users`,
+    admin: {
+      list: `${API_BASE}/users`,
+      toggleActive: (id: number) => `${API_BASE}/users/${id}/toggle-active`,
+      updateRole: (id: number) => `${API_BASE}/users/${id}/role`,
+    },
   },
-  
-  // AI 对话相关 - 与 backend/app/routers/ai/consultations.py 匹配 - FR-002 修正
-  ai: {
-    chat: '/ai/chat',                       // POST /ai/chat
-    history: '/ai/history',                 // GET /ai/history
-    consultations: '/ai/consultations',     // GET/POST /ai/consultations
-    consultation: (id: string) => `/ai/consultations/${id}`,
-    messages: (id: string) => `/ai/consultations/${id}/messages`,
-    analysis: '/ai/analysis',               // POST /ai/analysis
-    transcribe: '/ai/transcribe',           // POST /ai/transcribe
-    share: '/ai/share',                     // POST /ai/share
-  },
-  
-  // 咨询相关 - 需要检查 backend/app/routers/lawfirm/consultations.py
-  consultation: {
-    list: '/lawfirm/consultations',           // GET /lawfirm/consultations
-    detail: (id: string) => `/lawfirm/consultations/${id}`,
-    create: '/lawfirm/consultations',         // POST /lawfirm/consultations
-    messages: (id: string) => `/lawfirm/consultations/${id}/messages`,
-  },
-  
-  // 律师相关 - 需要检查 backend/app/routers/lawfirm/lawyers.py
-  lawyer: {
-    list: '/lawfirm/lawyers',                 // GET /lawfirm/lawyers
-    detail: (id: string) => `/lawfirm/lawyers/${id}`,
-    reviews: (id: string) => `/lawfirm/lawyers/${id}/reviews`,
-  },
-  
-  // 知识库相关 - 检查 backend/app/routers/knowledge.py
-  knowledge: {
-    list: '/knowledge',               // GET /knowledge
-    detail: (id: string) => `/knowledge/${id}`,
-    categories: '/knowledge/categories',
-    search: '/knowledge/search',
-  },
-  
-  // 资讯相关 - 检查 backend/app/routers/news.py
-  news: {
-    list: '/news',                    // GET /news
-    detail: (id: string) => `/news/${id}`,
-    categories: '/news/categories',
-  },
-  
-  // 论坛相关 - 检查 backend/app/routers/forum/posts.py
-  forum: {
-    posts: '/forum/posts',            // GET /forum/posts
-    post: (id: string) => `/forum/posts/${id}`,
-    comments: (id: string) => `/forum/posts/${id}/comments`,
-    categories: '/forum/categories',
-  },
-  
-  // 支付相关 - 检查 backend/app/routers/payment/
+
+  // ==================== 支付通道服务 (8002) ====================
   payment: {
-    orders: '/payments/orders',       // GET /payments/orders
-    create: '/payments/orders',       // POST /payments/orders
-    pay: '/payments/pay',             // POST /payments/pay
-    history: '/payments/history',     // GET /payments/history
-    methods: '/payments/methods',     // GET /payments/methods
+    orders: `${API_BASE}/payment/orders`,
+    order: (id: string) => `${API_BASE}/payment/orders/${id}`,
+    pay: (id: string) => `${API_BASE}/payment/orders/${id}/pay`,
+    createOrder: `${API_BASE}/payment/orders`,
+    refund: `${API_BASE}/payment/refunds`,
+    refundStatus: (id: string) => `${API_BASE}/payment/refunds/${id}`,
+    balance: `${API_BASE}/balance`,
+    balanceHistory: `${API_BASE}/balance/history`,
+    wallet: `${API_BASE}/settlement/wallet`,
+    withdraw: `${API_BASE}/settlement/withdraw`,
+    settlementRecords: `${API_BASE}/settlement/records`,
   },
-  
-  // 结算相关 - 检查 backend/app/routers/settlement/
-  settlement: {
-    wallet: '/settlement/wallet',           // GET /settlement/wallet
-    income: '/settlement/income',           // GET /settlement/income
-    withdrawals: '/settlement/withdrawals', // GET /settlement/withdrawals
-    bankAccounts: '/settlement/bank-accounts',
+
+  // ==================== 法律服务 (8004) ====================
+  legal: {
+    consultations: `${API_BASE}/legal/consultations`,
+    consultation: (id: string) => `${API_BASE}/legal/consultations/${id}`,
+    consultationMessages: (id: string) => `${API_BASE}/legal/consultations/${id}/messages`,
+    lawyers: `${API_BASE}/legal/lawyers`,
+    lawyer: (id: string) => `${API_BASE}/legal/lawyers/${id}`,
+    lawyerVerify: (id: string) => `${API_BASE}/legal/lawyers/${id}/verify`,
+    firms: `${API_BASE}/legal/firms`,
+    firm: (id: string) => `${API_BASE}/legal/firms/${id}`,
+    appointments: `${API_BASE}/legal/appointments`,
+    contracts: {
+      review: `${API_BASE}/legal/contracts/review`,
+    },
+    documents: {
+      templates: `${API_BASE}/legal/documents/templates`,
+      generate: `${API_BASE}/legal/documents/generate`,
+    },
+    knowledge: `${API_BASE}/legal/knowledge`,
+    knowledgeDetail: (id: string) => `${API_BASE}/legal/knowledge/${id}`,
   },
-  
-  // 日历相关 - 检查 backend/app/routers/calendar.py
-  calendar: {
-    events: '/calendar/events',       // GET/POST /calendar/events
-    event: (id: string) => `/calendar/events/${id}`,
+
+  // ==================== AI服务 (8005) ====================
+  ai: {
+    chat: `${API_BASE}/ai/chat`,
+    sessions: `${API_BASE}/ai/sessions`,
+    session: (id: string) => `${API_BASE}/ai/sessions/${id}`,
+    sessionHistory: (id: string) => `${API_BASE}/ai/sessions/${id}/history`,
+    feedback: (id: string) => `${API_BASE}/ai/sessions/${id}/feedback`,
+    admin: {
+      config: `${API_BASE}/ai/admin/config`,
+      prompts: `${API_BASE}/ai/admin/prompts`,
+      prompt: (id: string) => `${API_BASE}/ai/admin/prompts/${id}`,
+      metrics: `${API_BASE}/ai/admin/metrics`,
+      agents: `${API_BASE}/ai/admin/agents`,
+      agent: (id: string) => `${API_BASE}/ai/admin/agents/${id}`,
+    },
   },
-  
-  // 通知相关 - 检查 backend/app/routers/notification.py
+
+  // ==================== 新闻服务 (8006) ====================
+  news: {
+    list: `${API_BASE}/news`,
+    detail: (id: string) => `${API_BASE}/news/${id}`,
+    comments: (id: string) => `${API_BASE}/news/${id}/comments`,
+    createComment: (id: string) => `${API_BASE}/news/${id}/comments`,
+    subscriptions: `${API_BASE}/news/subscriptions`,
+    topics: `${API_BASE}/news/topics`,
+    topic: (id: string) => `${API_BASE}/news/topics/${id}`,
+    admin: {
+      create: `${API_BASE}/news`,
+      update: (id: string) => `${API_BASE}/news/${id}`,
+      delete: (id: string) => `${API_BASE}/news/${id}`,
+      publish: (id: string) => `${API_BASE}/news/${id}/publish`,
+      recall: (id: string) => `${API_BASE}/news/${id}/recall`,
+      drafts: `${API_BASE}/news/drafts`,
+      review: `${API_BASE}/news/review`,
+      approve: (id: string) => `${API_BASE}/news/review/${id}/approve`,
+      reject: (id: string) => `${API_BASE}/news/review/${id}/reject`,
+      stats: `${API_BASE}/news/stats`,
+    },
+  },
+
+  // ==================== 社区服务 (8007) ====================
+  community: {
+    posts: `${API_BASE}/community/posts`,
+    post: (id: string) => `${API_BASE}/community/posts/${id}`,
+    postComments: (id: string) => `${API_BASE}/community/posts/${id}/comments`,
+    createPost: `${API_BASE}/community/posts`,
+    createComment: (id: string) => `${API_BASE}/community/posts/${id}/comments`,
+    favorite: (id: string) => `${API_BASE}/community/posts/${id}/favorite`,
+    react: (id: string) => `${API_BASE}/community/posts/${id}/react`,
+    userPosts: (userId: string) => `${API_BASE}/community/users/${userId}/posts`,
+    lawyers: {
+      invitations: `${API_BASE}/community/lawyers/invitations`,
+      verify: `${API_BASE}/community/lawyers/verify`,
+      profile: `${API_BASE}/community/lawyers/profile`,
+    },
+    moderation: {
+      tasks: `${API_BASE}/community/moderation/tasks`,
+      deletePost: (id: string) => `${API_BASE}/community/moderation/posts/${id}/delete`,
+      hidePost: (id: string) => `${API_BASE}/community/moderation/posts/${id}/hide`,
+      pinPost: (id: string) => `${API_BASE}/community/moderation/posts/${id}/pin`,
+      essencePost: (id: string) => `${API_BASE}/community/moderation/posts/${id}/essence`,
+      banUser: (id: string) => `${API_BASE}/community/moderation/users/${id}/ban`,
+      unbanUser: (id: string) => `${API_BASE}/community/moderation/users/${id}/unban`,
+      appeal: (id: string) => `${API_BASE}/community/moderation/appeals/${id}`,
+      stats: `${API_BASE}/community/stats`,
+    },
+    sections: `${API_BASE}/community/sections`,
+    section: (id: string) => `${API_BASE}/community/sections/${id}`,
+  },
+
+  // ==================== 积分服务 (8008) ====================
+  points: {
+    balance: (userId: string) => `${API_BASE}/points/${userId}`,
+    history: (userId: string) => `${API_BASE}/points/${userId}/history`,
+    exchange: `${API_BASE}/points/exchange`,
+    products: `${API_BASE}/points/products`,
+    orders: `${API_BASE}/points/orders`,
+  },
+
+  // ==================== 通知服务 (8009) ====================
   notification: {
-    list: '/notifications',           // GET /notifications
-    markRead: '/notifications/read',  // POST /notifications/read
-    settings: '/notifications/settings',
+    list: `${API_BASE}/notifications`,
+    markRead: (id: string) => `${API_BASE}/notifications/${id}/read`,
+    settings: `${API_BASE}/notifications/settings`,
   },
-  
-  // 文档相关 - 检查 backend/app/routers/document.py
-  document: {
-    list: '/documents',               // GET /documents
-    detail: (id: string) => `/documents/${id}`,
-    upload: '/documents/upload',      // POST /documents/upload
-    templates: '/document-templates', // GET /document-templates
+
+  // ==================== 推荐服务 (8010) ====================
+  recommendation: {
+    lawyers: `${API_BASE}/recommendations/lawyers`,
+    news: `${API_BASE}/recommendations/news`,
+    posts: `${API_BASE}/recommendations/posts`,
   },
-  
-  // 合同审查相关 - 检查 backend/app/routers/contracts.py
-  contract: {
-    review: '/contracts/review',      // POST /contracts/review
-    history: '/contracts/history',    // GET /contracts/history
-    detail: (id: string) => `/contracts/${id}`,
-  },
-  
-  // 管理后台相关 - 检查 backend/app/routers/admin.py
-  admin: {
-    dashboard: '/admin/dashboard',    // GET /admin/dashboard
-    users: '/user/admin/list',        // GET /user/admin/list
-    stats: '/admin/stats',            // GET /admin/stats
-    moderation: '/moderation/pending', // GET /moderation/pending
-  },
-  
-  // 上传相关 - 检查 backend/app/routers/upload.py
-  upload: {
-    file: '/upload',                  // POST /upload
-    image: '/upload/image',           // POST /upload/image
-  },
-  
-  // 搜索相关 - 检查 backend/app/routers/search.py
+
+  // ==================== 搜索服务 (8011) ====================
   search: {
-    global: '/search',                // GET /search
-    suggestions: '/search/suggestions',
+    global: `${API_BASE}/search`,
+    suggestions: `${API_BASE}/search/suggestions`,
+    hot: `${API_BASE}/search/hot`,
+  },
+
+  // ==================== 知识库 (与法律服务共用 8004) ====================
+  knowledge: {
+    list: `${API_BASE}/knowledge`,
+    detail: (id: string) => `${API_BASE}/knowledge/${id}`,
+    categories: `${API_BASE}/knowledge/categories`,
+    search: `${API_BASE}/knowledge/search`,
+  },
+
+  // ==================== 文档相关 ====================
+  document: {
+    list: `${API_BASE}/documents`,
+    detail: (id: string) => `${API_BASE}/documents/${id}`,
+    upload: `${API_BASE}/documents/upload`,
+    templates: `${API_BASE}/document-templates`,
+  },
+
+  contract: {
+    review: `${API_BASE}/contracts/review`,
+    history: `${API_BASE}/contracts/history`,
+    detail: (id: string) => `${API_BASE}/contracts/${id}`,
+  },
+
+  // ==================== 日历 ====================
+  calendar: {
+    events: `${API_BASE}/calendar/events`,
+    event: (id: string) => `${API_BASE}/calendar/events/${id}`,
+  },
+
+  // ==================== 上传 ====================
+  upload: {
+    file: `${API_BASE}/upload`,
+    image: `${API_BASE}/upload/image`,
+  },
+
+  // ==================== 管理后台 ====================
+  admin: {
+    dashboard: `${API_BASE}/admin/dashboard`,
+    stats: `${API_BASE}/admin/stats`,
+    moderation: `${API_BASE}/moderation/pending`,
   },
 } as const;
 

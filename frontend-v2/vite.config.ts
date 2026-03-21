@@ -203,10 +203,112 @@ export default defineConfig({
     port: 5173,
     host: true,
     proxy: {
+      // API Gateway / Kong 入口（生产环境使用）
       '/api': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
+
+      // ==================== 微服务代理 ====================
+      // 开发环境直接代理到各服务端口
+
+      // 用户服务 (8001)
+      '/api/v1/auth': {
+        target: 'http://127.0.0.1:8001',
+        changeOrigin: true,
+      },
+      '/api/v1/users': {
+        target: 'http://127.0.0.1:8001',
+        changeOrigin: true,
+      },
+      '/api/v1/profiles': {
+        target: 'http://127.0.0.1:8001',
+        changeOrigin: true,
+      },
+      '/api/v1/membership': {
+        target: 'http://127.0.0.1:8001',
+        changeOrigin: true,
+      },
+
+      // 支付通道服务 (8002)
+      '/api/v1/payment': {
+        target: 'http://127.0.0.1:8002',
+        changeOrigin: true,
+      },
+
+      // 账务服务 (8003)
+      '/api/v1/balance': {
+        target: 'http://127.0.0.1:8003',
+        changeOrigin: true,
+      },
+      '/api/v1/settlement': {
+        target: 'http://127.0.0.1:8003',
+        changeOrigin: true,
+      },
+
+      // 法律服务 (8004)
+      '/api/v1/legal': {
+        target: 'http://127.0.0.1:8004',
+        changeOrigin: true,
+      },
+      '/api/v1/lawyers': {
+        target: 'http://127.0.0.1:8004',
+        changeOrigin: true,
+      },
+      '/api/v1/firms': {
+        target: 'http://127.0.0.1:8004',
+        changeOrigin: true,
+      },
+
+      // AI服务 (8005)
+      '/api/v1/ai': {
+        target: 'http://127.0.0.1:8005',
+        changeOrigin: true,
+      },
+
+      // 新闻服务 (8006)
+      '/api/v1/news': {
+        target: 'http://127.0.0.1:8006',
+        changeOrigin: true,
+      },
+
+      // 社区服务 (8007)
+      '/api/v1/community': {
+        target: 'http://127.0.0.1:8007',
+        changeOrigin: true,
+      },
+
+      // 积分服务 (8008)
+      '/api/v1/points': {
+        target: 'http://127.0.0.1:8008',
+        changeOrigin: true,
+      },
+
+      // 通知服务 (8009)
+      '/api/v1/notifications': {
+        target: 'http://127.0.0.1:8009',
+        changeOrigin: true,
+      },
+
+      // 推荐服务 (8010)
+      '/api/v1/recommendations': {
+        target: 'http://127.0.0.1:8010',
+        changeOrigin: true,
+      },
+
+      // 搜索服务 (8011)
+      '/api/v1/search': {
+        target: 'http://127.0.0.1:8011',
+        changeOrigin: true,
+      },
+
+      // 知识库服务
+      '/api/v1/knowledge': {
+        target: 'http://127.0.0.1:8004',
+        changeOrigin: true,
+      },
+
+      // ==================== WebSocket代理 ====================
       '/ws': {
         target: 'ws://127.0.0.1:8000',
         changeOrigin: true,

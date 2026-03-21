@@ -401,4 +401,362 @@ spec:
   ports:
   - port: 80
     targetPort: 8005
+---
+
+## news-service Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: news-service
+  namespace: bxzs-prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: news-service
+  template:
+    metadata:
+      labels:
+        app: news-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8006"
+    spec:
+      containers:
+      - name: news-service
+        image: registry.cn-hangzhou.aliyuncs.com/bxzs/news-service:v1
+        ports:
+        - containerPort: 8006
+        
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+        
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: news-db-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: redis-url
+```
+
+## community-service Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: community-service
+  namespace: bxzs-prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: community-service
+  template:
+    metadata:
+      labels:
+        app: community-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8007"
+    spec:
+      containers:
+      - name: community-service
+        image: registry.cn-hangzhou.aliyuncs.com/bxzs/community-service:v1
+        ports:
+        - containerPort: 8007
+        
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+        
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: community-db-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: redis-url
+```
+
+## points-service Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: points-service
+  namespace: bxzs-prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: points-service
+  template:
+    metadata:
+      labels:
+        app: points-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8008"
+    spec:
+      containers:
+      - name: points-service
+        image: registry.cn-hangzhou.aliyuncs.com/bxzs/points-service:v1
+        ports:
+        - containerPort: 8008
+        
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+        
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: points-db-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: redis-url
+```
+
+## notification-service Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: bxzs-prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8009"
+    spec:
+      containers:
+      - name: notification-service
+        image: registry.cn-hangzhou.aliyuncs.com/bxzs/notification-service:v1
+        ports:
+        - containerPort: 8009
+        
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+        
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: notification-db-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: redis-url
+```
+
+## recommendation-service Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recommendation-service
+  namespace: bxzs-prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: recommendation-service
+  template:
+    metadata:
+      labels:
+        app: recommendation-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8010"
+    spec:
+      containers:
+      - name: recommendation-service
+        image: registry.cn-hangzhou.aliyuncs.com/bxzs/recommendation-service:v1
+        ports:
+        - containerPort: 8010
+        
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "2000m"
+            memory: "2Gi"
+        
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: recommendation-db-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: redis-url
+```
+
+## search-service Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search-service
+  namespace: bxzs-prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: search-service
+  template:
+    metadata:
+      labels:
+        app: search-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8011"
+    spec:
+      containers:
+      - name: search-service
+        image: registry.cn-hangzhou.aliyuncs.com/bxzs/search-service:v1
+        ports:
+        - containerPort: 8011
+        
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "2000m"
+            memory: "2Gi"
+        
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: search-db-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: redis-url
+```
+
+## Services for remaining microservices
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: news-service
+  namespace: bxzs-prod
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8006
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: community-service
+  namespace: bxzs-prod
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8007
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: points-service
+  namespace: bxzs-prod
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8008
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: bxzs-prod
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8009
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: recommendation-service
+  namespace: bxzs-prod
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8010
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: search-service
+  namespace: bxzs-prod
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8011
 ```

@@ -1,81 +1,91 @@
 # 百姓助手
 
-百姓助手是一个面向法律服务场景的全栈 Web 项目，当前仓库包含前端、后端、监控、容器编排和配套文档。为了避免入口信息分散，这份 README 只承担两件事：快速说明项目是什么，以及告诉你应该先看哪些文档。
+面向法律服务场景的全栈 Web 项目，采用微服务架构。
 
-## 项目概览
+## 技术栈
 
-- 用户侧能力覆盖 AI 法律咨询、律师/律所服务、合同审查、法律文书、支付、会员、积分、通知、论坛、新闻和企业服务。
-- 后端位于 `backend/`，以 FastAPI 为核心，配合 SQLAlchemy、Alembic、PostgreSQL、Redis 和 LangChain/OpenAI。
-- 前端位于 `frontend-v2/`，使用 React 18、TypeScript、Vite、React Router、TanStack Query 和 Ant Design。
-- 运维与观测能力位于根目录和 `prometheus/`、`grafana/`、`alertmanager/`、`helm/`、`nginx/` 等目录。
-
-## 快速定位
-
-- 项目现状快照：[`docs/PROJECT_SNAPSHOT.md`](./docs/PROJECT_SNAPSHOT.md)
-- 文档维护方法：[`docs/DOCUMENTATION_WORKFLOW.md`](./docs/DOCUMENTATION_WORKFLOW.md)
-- 文档总览：[`docs/README.md`](./docs/README.md)
-- 技术架构：[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
-- 功能清单：[`docs/FEATURES.md`](./docs/FEATURES.md)
-- 开发规范：[`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md)
-- API 文档：[`docs/API.md`](./docs/API.md)
-- 运维说明：[`docs/OPERATIONS.md`](./docs/OPERATIONS.md)
+- **后端**: FastAPI + SQLAlchemy + PostgreSQL + Redis
+- **前端**: React 18 + TypeScript + Vite + Ant Design
+- **微服务**: 11 个独立服务（用户、支付、法律、AI、新闻、社区等）
+- **部署**: Docker + Kubernetes
 
 ## 目录结构
 
-```text
+```
 .
-├── backend/           FastAPI 后端
-├── frontend-v2/       React 前端
-├── docs/              项目文档
-├── scripts/           辅助脚本
-├── data/              数据与模型文件
-├── prometheus/        Prometheus 配置
-├── grafana/           Grafana 仪表盘与 provisioning
-├── alertmanager/      告警配置
-├── helm/              Kubernetes 部署配置
-└── nginx/             网关配置
+├── backend/              # FastAPI 后端 (单体保留部分)
+├── frontend-v2/         # React 前端
+├── services/            # 11 个微服务
+│   ├── user-service/    # 用户服务 (8001)
+│   ├── payment-channel-service/   # 支付通道 (8002)
+│   ├── payment-accounting-service/ # 账务服务 (8003)
+│   ├── legal-service/   # 法律服务 (8004)
+│   ├── ai-service/      # AI服务 (8005)
+│   ├── news-service/    # 新闻服务 (8006)
+│   ├── community-service/ # 社区服务 (8007)
+│   ├── points-service/  # 积分服务 (8008)
+│   ├── notification-service/ # 通知服务 (8009)
+│   ├── recommendation-service/ # 推荐服务 (8010)
+│   └── search-service/ # 搜索服务 (8011)
+├── docs/                # 项目文档
+├── scripts/             # 辅助脚本
+└── services/k8s/       # K8s 部署配置
 ```
 
-## 本地运行入口
+## 快速启动
 
-### Docker Compose
+### 后端 (单体)
 
-```powershell
-docker compose up -d
-```
-
-默认会启动这些核心服务：
-
-- 前端：`http://localhost:3000`
-- 后端 API：`http://localhost:8000`
-- Swagger：`http://localhost:8000/docs`
-- Prometheus：`http://localhost:19090`
-- Grafana：`http://localhost:3001`
-- Alertmanager：`http://localhost:9200`
-
-### 分别启动前后端
-
-后端：
-
-```powershell
+```bash
 cd backend
-python -m venv .venv
-.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-alembic upgrade head
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --port 8080
 ```
 
-前端：
+### 前端
 
-```powershell
+```bash
 cd frontend-v2
 npm install
 npm run dev
 ```
 
-## 维护说明
+### 微服务
 
-- 当前仓库处于活跃迭代中，根目录和各子目录下存在较多未提交改动。
-- 若你需要先判断“现在这个项目到底做到哪一步”，请优先阅读 [`docs/PROJECT_SNAPSHOT.md`](./docs/PROJECT_SNAPSHOT.md)。
-- 若你需要继续补文档，不建议直接扩写所有大文档，先按 [`docs/DOCUMENTATION_WORKFLOW.md`](./docs/DOCUMENTATION_WORKFLOW.md) 做一次源码核对，再决定更新范围。
+```bash
+# 每个服务需要单独启动
+cd services/user-service && uvicorn app.main:app --port 8001
+cd services/news-service && uvicorn app.main:app --port 8006
+# ... 其他服务
+```
+
+### 联调测试
+
+```bash
+bash scripts/test-microservices.sh
+```
+
+## 文档
+
+- [API 文档](docs/API.md)
+- [架构文档](docs/ARCHITECTURE.md)
+- [功能清单](docs/FEATURES.md)
+- [项目快照](docs/PROJECT_SNAPSHOT.md)
+- [开发规范](docs/DEVELOPMENT.md)
+
+## 微服务端口
+
+| 服务 | 端口 | 说明 |
+|------|------|------|
+| backend | 8080 | 核心业务 API |
+| user-service | 8001 | 用户、认证、会员 |
+| payment-channel | 8002 | 支付通道 |
+| payment-accounting | 8003 | 账务结算 |
+| legal-service | 8004 | 律师、法律知识 |
+| ai-service | 8005 | AI 对话 |
+| news-service | 8006 | 新闻资讯 |
+| community-service | 8007 | 社区论坛 |
+| points-service | 8008 | 积分系统 |
+| notification-service | 8009 | 通知推送 |
+| recommendation | 8010 | 推荐系统 |
+| search-service | 8011 | 搜索服务 |

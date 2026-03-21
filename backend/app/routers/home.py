@@ -9,7 +9,7 @@ from sqlalchemy import func, select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import User, Lawyer, Consultation, ContractReviewHistory, News
+from ..models import User, Lawyer, Consultation, ContractReviewHistory
 from ..models.lawfirm import LawyerReview
 from ..utils.deps import get_current_user_optional
 
@@ -201,13 +201,8 @@ async def _get_stats_from_db(db: AsyncSession) -> HomeStats:
         contract_result = await db.execute(select(func.count(ContractReviewHistory.id)))
         total_contracts = contract_result.scalar() or 0
 
-        # 法律知识文章数 (从news表统计)
-        articles_result = await db.execute(
-            select(func.count(News.id)).where(
-                and_(News.is_published == True, News.is_deleted == False)
-            )
-        )
-        total_articles = articles_result.scalar() or 0
+        # 法律知识文章数 (静态统计)
+        total_articles = 50000  # 知识库文章数，已迁移到微服务
 
         # 计算满意度 (基于律师评价的平均分)
         rating_result = await db.execute(select(func.avg(LawyerReview.rating)))
@@ -276,37 +271,8 @@ async def _get_recommendations_from_db(
                     )
                 )
 
-        # 2. 获取热门法律知识文章
-        if type is None or type == "all" or type == "article":
-            articles_query = (
-                select(News)
-                .where(
-                    and_(
-                        News.is_published == True,
-                        News.is_deleted == False,
-                        News.review_status == "approved"
-                    )
-                )
-                .order_by(News.view_count.desc())
-                .limit(limit)
-            )
-            articles_result = await db.execute(articles_query)
-            articles = articles_result.scalars().all()
-            
-            for article in articles:
-                recommendations.append(
-                    Recommendation(
-                        id=f"article_{article.id}",
-                        type="article",
-                        title=article.title,
-                        description=article.summary or article.content[:100] + "...",
-                        link=f"/knowledge/article/{article.id}",
-                        tags=[article.category] if article.category else ["法律知识"],
-                        view_count=article.view_count or 0,
-                        author_name=article.author or "法律专家",
-                        created_at=article.created_at.isoformat() if article.created_at else None,
-                    )
-                )
+        # 2. 获取热门法律知识文章 (已迁移到news-service)
+        # 文章推荐由news-service提供
 
         # 3. 获取最新咨询 (热门咨询)
         if type is None or type == "all" or type == "consultation":

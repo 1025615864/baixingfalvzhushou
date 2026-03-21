@@ -1,23 +1,16 @@
 """垂直频道路由 - 婚姻/劳动法律服务专属入口
 
 提供婚姻、劳动两个垂直领域的专属法律服务入口，
-包括专属咨询、文书生成、案例推荐等功能。
+包括专属咨询、文书生成等功能。
 """
 from __future__ import annotations
 
-from typing import Annotated
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException
 
-from ..database import get_db
-from ..models.user import User
-from ..schemas.news import NewsListResponse
-from ..services.news_service import news_service
 from ..utils.deps import get_current_user_optional
 
 router = APIRouter(prefix="/vertical", tags=["垂直频道"])
 
-# 垂直频道定义
 VERTICAL_CHANNELS = {
     "marriage": {
         "name": "婚姻家庭",
@@ -50,56 +43,6 @@ async def list_channels() -> dict:
     }
 
 
-@router.get("/channels/{channel_key}/news", response_model=NewsListResponse)
-async def get_channel_news(
-    channel_key: str,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User | None, Depends(get_current_user_optional)],
-    page: int = Query(ge=1, default=1),
-    page_size: int = Query(ge=1, le=100, default=20),
-):
-    """获取垂直频道专属新闻推荐
-
-    根据频道关键词过滤相关新闻，支持婚姻/劳动两个垂直领域
-    """
-    if channel_key not in VERTICAL_CHANNELS:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="频道不存在")
-
-    channel_info = VERTICAL_CHANNELS[channel_key]
-    keywords = channel_info["keywords"]
-
-    # 使用关键词搜索获取相关新闻
-    news_list, total = await news_service.get_news_list(
-        db,
-        page=page,
-        page_size=page_size,
-        keyword=" ".join(keywords[:3]),  # 使用前3个关键词
-        category=None,
-        from_dt=None,
-        to_dt=None,
-    )
-
-    from ..routers.news.core import _build_news_list_items, _get_ai_risk_levels, _get_ai_keywords
-    from ..services.news_service import news_service as ns
-
-    ids = [int(n.id) for n in news_list]
-    fav_stats = await ns.get_favorite_stats(db, ids, int(current_user.id) if current_user else None)
-    risk_levels = await _get_ai_risk_levels(db, ids)
-    keywords_map = await _get_ai_keywords(db, ids)
-
-    user_id = int(current_user.id) if current_user else None
-    items = _build_news_list_items(
-        news_list,
-        fav_stats,
-        risk_levels,
-        keywords_map,
-        user_id)
-
-    return NewsListResponse(items=items, total=total,
-                            page=page, page_size=page_size)
-
-
 @router.get("/channels/{channel_key}/consultation/types")
 async def get_consultation_types(channel_key: str) -> dict:
     """获取垂直频道专属咨询类型
@@ -107,7 +50,6 @@ async def get_consultation_types(channel_key: str) -> dict:
     返回该频道支持的法律咨询类型
     """
     if channel_key not in VERTICAL_CHANNELS:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="频道不存在")
 
     consultation_types = {
@@ -139,7 +81,6 @@ async def get_document_types(channel_key: str) -> dict:
     返回该频道支持的法律文书模板
     """
     if channel_key not in VERTICAL_CHANNELS:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="频道不存在")
 
     document_types = {
@@ -168,30 +109,15 @@ async def get_document_types(channel_key: str) -> dict:
 
 
 @router.get("/channels/{channel_key}/stats")
-async def get_channel_stats(channel_key: str,
-                            db: Annotated[AsyncSession,
-                                          Depends(get_db)]) -> dict:
+async def get_channel_stats(channel_key: str) -> dict:
     """获取垂直频道统计数据"""
     if channel_key not in VERTICAL_CHANNELS:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="频道不存在")
 
     channel_info = VERTICAL_CHANNELS[channel_key]
-    keywords = channel_info["keywords"]
-
-    # 统计相关新闻数量
-    from sqlalchemy import select, func
-    from ..models.news import News
-
-    keyword_pattern = f"%{keywords[0]}%"
-    count_res = await db.execute(
-        select(func.count(News.id)).where(News.content.ilike(keyword_pattern))
-    )
-    news_count = count_res.scalar() or 0
 
     return {
         "channel_key": channel_key,
         "channel_name": channel_info["name"],
-        "news_count": news_count,
-        "keywords": keywords,
+        "keywords": channel_info["keywords"],
     }

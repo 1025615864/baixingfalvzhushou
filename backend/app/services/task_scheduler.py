@@ -188,17 +188,7 @@ class TaskScheduler:
         from app.models import SystemConfig
         from sqlalchemy import select
 
-        # 新闻定时发布任务
-        self.add_task(
-            TaskConfig(
-                name="scheduled_news",
-                lock_key="locks:scheduled_news",
-                interval_seconds=30.0,
-            ),
-            lambda session: news_service.process_scheduled_news(session),
-        )
-
-        # RSS订阅任务
+        # RSS订阅任务 (已迁移到news-service)
         rss_feeds_raw = os.getenv("RSS_FEEDS", "").strip()
         rss_ingest_enabled_raw = os.getenv("RSS_INGEST_ENABLED", "").strip().lower()
         rss_enabled = bool(rss_feeds_raw) or bool(rss_ingest_enabled_raw in {"1", "true", "yes", "on"}) or debug
@@ -211,20 +201,6 @@ class TaskScheduler:
                     interval_seconds=rss_interval,
                 ),
                 lambda session: rss_ingest_service.run_once(session),
-            )
-
-        # AI新闻摘要任务
-        news_ai_enabled_raw = os.getenv("NEWS_AI_ENABLED", "").strip().lower()
-        news_ai_enabled = news_ai_enabled_raw in {"1", "true", "yes", "on"}
-        if news_ai_enabled and (debug or redis_connected):
-            news_ai_interval = float(os.getenv("NEWS_AI_INTERVAL_SECONDS", "120").strip() or "120")
-            self.add_task(
-                TaskConfig(
-                    name="news_ai_pipeline",
-                    lock_key="locks:news_ai_pipeline",
-                    interval_seconds=news_ai_interval,
-                ),
-                lambda session: news_ai_pipeline_service.run_once(session),
             )
 
         # 结算任务

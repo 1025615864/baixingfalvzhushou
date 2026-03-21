@@ -509,4 +509,126 @@ backend/
 
 ---
 
-*文档最后更新：2026-02-17*
+## 12. 微服务架构
+
+### 12.1 架构概览
+
+项目采用渐进式微服务拆分策略，11个微服务已从单体应用中拆分为独立服务。
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         前端 (5173)                              │
+│  vite.config.ts 配置了 11 个服务的代理                          │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    API Gateway / Nginx                           │
+│                      /api/v1/*                                   │
+└─────────────────────────────────────────────────────────────────┘
+    │           │           │           │           │
+    ▼           ▼           ▼           ▼           ▼
+┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐
+│ Backend│ │ User   │ │Payment │ │Legal   │ │  AI    │
+│ 8080   │ │Service │ │Channel │ │Service │ │Service │
+│        │ │ 8001   │ │ 8002   │ │ 8004   │ │ 8005   │
+└────────┘ └────────┘ └────────┘ └────────┘ └────────┘
+                                │
+              ┌─────────────────┼─────────────────┐
+              ▼                 ▼                 ▼
+        ┌────────┐       ┌────────┐         ┌────────┐
+        │Accounting│       │ News   │         │Community│
+        │ 8003   │       │Service │         │Service │
+        └────────┘       │ 8006   │         │ 8007   │
+                          └────────┘         └────────┘
+        ┌───────────────────────┼───────────────────────┐
+        ▼                       ▼                       ▼
+    ┌────────┐           ┌────────┐              ┌────────┐
+    │ Points │           │Notifi- │              │Search  │
+    │Service │           │ cation │              │Service │
+    │ 8008   │           │ 8009   │              │ 8011   │
+    └────────┘           └────────┘              └────────┘
+                                │
+                                ▼
+                          ┌────────┐
+                          │Recom- │
+                          │dation │
+                          │ 8010  │
+                          └────────┘
+```
+
+### 12.2 服务列表
+
+| 服务 | 端口 | 前缀 | 数据库 | 说明 |
+|------|------|------|--------|------|
+| Backend (Legacy) | 8080 | /api/v1 | 主数据库 | 核心业务API |
+| User Service | 8001 | /api/v1 | user_db | 用户、认证、会员 |
+| Payment Channel | 8002 | /api/v1 | payment_db | 支付通道 |
+| Accounting | 8003 | /api/v1 | accounting_db | 账务结算 |
+| Legal Service | 8004 | /api/v1 | legal_db | 律师、法律知识 |
+| AI Service | 8005 | /api/v1 | ai_db | AI对话 |
+| News Service | 8006 | /api/v1 | news_db | 新闻资讯 |
+| Community | 8007 | /api/v1 | community_db | 社区论坛 |
+| Points | 8008 | /api/v1 | points_db | 积分系统 |
+| Notification | 8009 | /api/v1 | notification_db | 通知推送 |
+| Recommendation | 8010 | /api/v1 | recommendation_db | 推荐系统 |
+| Search | 8011 | /api/v1 | search_db | 搜索服务 |
+
+### 12.3 前端代理配置
+
+前端通过 `vite.config.ts` 配置开发环境代理:
+
+```typescript
+proxy: {
+  '/api/v1/auth': { target: 'http://127.0.0.1:8001' },
+  '/api/v1/users': { target: 'http://127.0.0.1:8001' },
+  '/api/v1/payment': { target: 'http://127.0.0.1:8002' },
+  '/api/v1/balance': { target: 'http://127.0.0.1:8003' },
+  '/api/v1/legal': { target: 'http://127.0.0.1:8004' },
+  '/api/v1/ai': { target: 'http://127.0.0.1:8005' },
+  '/api/v1/news': { target: 'http://127.0.0.1:8006' },
+  '/api/v1/community': { target: 'http://127.0.0.1:8007' },
+  '/api/v1/points': { target: 'http://127.0.0.1:8008' },
+  '/api/v1/notifications': { target: 'http://127.0.0.1:8009' },
+  '/api/v1/recommendations': { target: 'http://127.0.0.1:8010' },
+  '/api/v1/search': { target: 'http://127.0.0.1:8011' },
+}
+```
+
+### 12.4 启动服务
+
+```bash
+# 启动后端
+cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8080
+
+# 启动所有微服务 (每个终端一个)
+cd services/user-service && uvicorn app.main:app --port 8001
+cd services/payment-channel-service && uvicorn app.main:app --port 8002
+cd services/payment-accounting-service && uvicorn app.main:app --port 8003
+cd services/legal-service && uvicorn app.main:app --port 8004
+cd services/ai-service && uvicorn app.main:app --port 8005
+cd services/news-service && uvicorn app.main:app --port 8006
+cd services/community-service && uvicorn app.main:app --port 8007
+cd services/points-service && uvicorn app.main:app --port 8008
+cd services/notification-service && uvicorn app.main:app --port 8009
+cd services/recommendation-service && uvicorn app.main:app --port 8010
+cd services/search-service && uvicorn app.main:app --port 8011
+
+# 运行联调测试
+bash scripts/test-microservices.sh
+```
+
+### 12.5 数据迁移
+
+使用迁移脚本将数据从主数据库同步到微服务数据库:
+
+```bash
+python -m scripts.migrations.migrate_to_microservices --service user
+python -m scripts.migrations.migrate_to_microservices --service news
+python -m scripts.migrations.migrate_to_microservices --service community
+python -m scripts.migrations.migrate_to_microservices --service notification
+```
+
+---
+
+*文档最后更新：2026-03-21*

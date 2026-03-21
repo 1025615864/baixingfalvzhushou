@@ -38,10 +38,11 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    from .routers import chat_router, agent_router, config_router
+    from .routers import chat_router, agent_router, config_router, legal_chat_router
     app.include_router(chat_router, prefix="/api/v1/ai", tags=["AI对话"])
     app.include_router(agent_router, prefix="/api/v1/ai/admin/agents", tags=["Agent管理"])
     app.include_router(config_router, prefix="/api/v1/ai/admin/config", tags=["配置管理"])
+    app.include_router(legal_chat_router, prefix="/api/v1/ai", tags=["法律助手"])
 
     @app.get("/health")
     async def health_check():

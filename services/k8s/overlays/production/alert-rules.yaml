@@ -1,0 +1,256 @@
+# Prometheus 告警规则
+
+## 1. 服务可用性告警
+
+```yaml
+groups:
+- name: service_availability
+  rules:
+  # 服务宕机告警
+  - alert: ServiceDown
+    expr: up{job=~".*-service"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "服务实例宕机"
+      description: "{{ $labels.job }} 服务实例 {{ $labels.instance }} 已宕机超过1分钟"
+
+  # 服务响应超时告警
+  - alert: ServiceHighLatency
+    expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "服务响应延迟过高"
+      description: "{{ $labels.job }} P95延迟超过2秒，当前值: {{ $value }}秒"
+```
+
+## 2. 数据库告警
+
+```yaml
+- name: database_alerts
+  rules:
+  # 数据库连接池耗尽
+  - alert: DatabaseConnectionPoolExhausted
+    expr: |
+      sum(bxzs_db_pool_connections{state="checked_out"}) 
+      / sum(bxzs_db_pool_size{pool_type="total"}) > 0.95
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "数据库连接池即将耗尽"
+      description: "连接池利用率超过95%，当前: {{ $value | humanizePercentage }}"
+
+  # 慢查询告警
+  - alert: DatabaseSlowQueries
+    expr: rate(bxzs_db_queries_total{status="slow"}[5m]) > 10
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "慢查询过多"
+      description: "每秒慢查询数超过10，当前: {{ $value }}"
+
+  # 数据库CPU使用率
+  - alert: DatabaseHighCPU
+    expr: rate(process_cpu_seconds_total{job=~".*-db"}[5m]) > 0.8
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "数据库CPU使用率过高"
+      description: "数据库CPU使用率超过80%"
+```
+
+## 3. Redis告警
+
+```yaml
+- name: redis_alerts
+  rules:
+  # Redis内存使用率
+  - alert: RedisHighMemoryUsage
+    expr: |
+      (redis_memory_used_bytes / redis_memory_max_bytes) > 0.8
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Redis内存使用率过高"
+      description: "Redis内存使用率超过80%"
+
+  # Redis连接数
+  - alert: RedisTooManyConnections
+    expr: redis_connected_clients > 10000
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Redis连接数过多"
+      description: "Redis连接数超过10000"
+```
+
+## 4. 支付服务告警
+
+```yaml
+- name: payment_alerts
+  rules:
+  # 支付失败率
+  - alert: PaymentFailureRate
+    expr: |
+      rate(bxzs_payments_total{status="failed"}[5m]) 
+      / rate(bxzs_payments_total[5m]) > 0.05
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "支付失败率过高"
+      description: "支付失败率超过5%，当前: {{ $value | humanizePercentage }}"
+
+  # 支付回调处理延迟
+  - alert: PaymentCallbackDelay
+    expr: histogram_quantile(0.95, rate(payment_callback_duration_seconds_bucket[5m])) > 5
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "支付回调处理延迟"
+      description: "P95处理延迟超过5秒"
+
+  # 余额不足告警
+  - alert: InsufficientBalance
+    expr: increase(balance_insufficient_total[1h]) > 10
+    for: 0m
+    labels:
+      severity: warning
+    annotations:
+      summary: "余额不足错误增多"
+      description: "过去1小时余额不足错误超过10次"
+```
+
+## 5. AI服务告警
+
+```yaml
+- name: ai_service_alerts
+  rules:
+  # AI响应超时
+  - alert: AIServiceTimeout
+    expr: |
+      histogram_quantile(0.95, rate(bxzs_ai_response_seconds_bucket[5m])) > 10
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "AI服务响应超时"
+      description: "P95响应时间超过10秒，当前: {{ $value }}秒"
+
+  # Token使用率
+  - alert: AIHighTokenUsage
+    expr: rate(bxzs_ai_tokens_total[1h]) > 1000000
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "AI Token使用量过高"
+      description: "过去1小时Token消耗超过100万"
+
+  # AI模型调用失败
+  - alert: AIModelFailure
+    expr: |
+      rate(bxzs_ai_responses_total{status="error"}[5m]) 
+      / rate(bxzs_ai_responses_total[5m]) > 0.1
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "AI模型调用失败率过高"
+      description: "AI模型调用失败率超过10%"
+```
+
+## 6. Kafka告警
+
+```yaml
+- name: kafka_alerts
+  rules:
+  # 消费者滞后
+  - alert: KafkaConsumerLag
+    expr: kafka_consumer_lag_sum > 10000
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Kafka消费者滞后严重"
+      description: "消费者滞后超过10000条消息"
+
+  # Topic消息积压
+  - alert: KafkaTopicBacklog
+    expr: kafka_topic_partition_leader_last_offsets > 1000000
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Kafka Topic消息积压"
+      description: "Topic {{ $labels.topic }} 消息积压超过100万"
+
+  # 分区不可用
+  - alert: KafkaPartitionUnavailable
+    expr: sum(kafka_topic_partitions{state="unavailable"}) > 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Kafka分区不可用"
+      description: "有 {{ $value }} 个分区不可用"
+```
+
+## 7. 资源使用告警
+
+```yaml
+- name: resource_alerts
+  rules:
+  # Pod CPU使用率
+  - alert: PodHighCPU
+    expr: |
+      rate(container_cpu_usage_seconds_total[5m]) 
+      / container_spec_cpu_quota/container_spec_cpu_period > 0.9
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Pod CPU使用率过高"
+      description: "{{ $labels.pod }} CPU使用率超过90%"
+
+  # Pod内存使用率
+  - alert: PodHighMemory
+    expr: |
+      container_memory_usage_bytes 
+      / container_spec_memory_limit_bytes > 0.9
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Pod内存使用率过高"
+      description: "{{ $labels.pod }} 内存使用率超过90%"
+
+  # HPA已达最大副本数
+  - alert: HPAAtMaxReplicas
+    expr: kube_hpa_status_replicas == kube_hpa_spec_max_replicas
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "HPA已达最大副本数"
+      description: "{{ $labels.hpa }} 已达最大副本数 {{ $value }}，服务压力较大"
+
+  # Pod重启过多
+  - alert: PodRestartingTooMuch
+    expr: rate(kube_pod_container_status_restarts[5m]) > 0.1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Pod重启次数过多"
+      description: "{{ $labels.pod }} 重启频率过高"
+```

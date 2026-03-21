@@ -1,0 +1,404 @@
+# K8s Deployment 配置模板
+
+## user-service Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  namespace: bxzs-prod
+  labels:
+    app: user-service
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+        prometheus.io/path: "/metrics"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values: [user-service]
+              topologyKey: kubernetes.io/hostname
+      
+      containers:
+      - name: user-service
+        image: registry.cn-hangzhou.aliyuncs.com/bxzs/user-service:v1
+        ports:
+        - containerPort: 8001
+        
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+        
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: user-db-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: redis-url
+        - name: JWT_RSA_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: jwt-private-key
+        - name: JWT_RSA_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: jwt-public-key
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 2
+        
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          failureThreshold: 12
+          periodSeconds: 5
+```
+
+## payment-channel-service Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-channel-service
+  namespace: bxzs-prod
+  labels:
+    app: payment-channel-service
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: payment-channel-service
+  template:
+    metadata:
+      labels:
+        app: payment-channel-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8002"
+    spec:
+      containers:
+      - name: payment-channel-service
+        image: registry.cn-hangzhou.aliyuncs.com/bxzs/payment-channel-service:v1
+        ports:
+        - containerPort: 8002
+        
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "2000m"
+            memory: "2Gi"
+        
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: payment-channel-db-url
+        - name: ALIPAY_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: alipay-app-id
+        - name: ALIPAY_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: alipay-private-key
+        - name: WECHATPAY_MCH_ID
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: wechatpay-mch-id
+```
+
+## payment-accounting-service Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-accounting-service
+  namespace: bxzs-prod
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: payment-accounting-service
+  template:
+    metadata:
+      labels:
+        app: payment-accounting-service
+    spec:
+      containers:
+      - name: payment-accounting-service
+        image: registry.cn-hangzhou.aliyuncs.com/bxzs/payment-accounting-service:v1
+        ports:
+        - containerPort: 8003
+        
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+        
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: accounting-db-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: redis-url
+```
+
+## legal-service Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: legal-service
+  namespace: bxzs-prod
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: legal-service
+  template:
+    metadata:
+      labels:
+        app: legal-service
+    spec:
+      containers:
+      - name: legal-service
+        image: registry.cn-hangzhou.aliyuncs.com/bxzs/legal-service:v1
+        ports:
+        - containerPort: 8004
+        
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "2000m"
+            memory: "2Gi"
+        
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: legal-db-url
+```
+
+## ai-service Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-service
+  namespace: bxzs-prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ai-service
+  template:
+    metadata:
+      labels:
+        app: ai-service
+    spec:
+      containers:
+      - name: ai-service
+        image: registry.cn-hangzhou.aliyuncs.com/bxzs/ai-service:v1
+        ports:
+        - containerPort: 8005
+        
+        resources:
+          requests:
+            cpu: "1000m"
+            memory: "1Gi"
+          limits:
+            cpu: "4000m"
+            memory: "4Gi"
+        
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: ai-db-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: redis-url
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: bxzs-secrets
+              key: openai-api-key
+        - name: CHROMA_PERSIST_DIR
+          value: "/data/chroma"
+        
+        volumeMounts:
+        - name: chroma-data
+          mountPath: /data
+```
+
+## HPA 自动伸缩配置
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: user-service-hpa
+  namespace: bxzs-prod
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: user-service
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+```
+
+## Service 配置
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  namespace: bxzs-prod
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8001
+    protocol: TCP
+  selector:
+    app: user-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-channel-service
+  namespace: bxzs-prod
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8002
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-accounting-service
+  namespace: bxzs-prod
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8003
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: legal-service
+  namespace: bxzs-prod
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8004
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-service
+  namespace: bxzs-prod
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8005
+```

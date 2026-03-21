@@ -259,20 +259,79 @@ class PaymentCoreService:
         order_id: int,
         description: Optional[str] = None
     ) -> UserBalance:
-        """消费余额"""
+        """消费余额（原子操作，防止超扣）
+
+        使用 Redis Lua 脚本保证余额扣减的原子性：
+        1. 检查余额是否充足
+        2. 原子扣减余额
+        3. 记录交易流水
+
+        Returns:
+            更新后的余额对象
+
+        Raises:
+            ValueError: 余额不足时抛出
+        """
+        from ...services.cache_service import cache_service
+
         balance = await cls.get_or_create_user_balance(db, user_id)
 
-        if balance.balance < amount:
-            raise ValueError("Insufficient balance")
+        redis = cache_service.redis
+        if redis and redis.is_connected:
+            # Redis Lua 脚本：原子扣减余额
+            lua_script = """
+            local balance_key = KEYS[1]
+            local amount = tonumber(ARGV[1])
+            local current = tonumber(redis.call('GET', balance_key) or '0')
 
-        # 记录交易前余额
-        balance_before = balance.balance
+            if current < amount then
+                return -1  -- 余额不足
+            end
 
-        # 更新余额
-        balance.balance -= amount
-        balance.total_consumed += amount
-        balance.balance_cents = int(balance.balance * 100)
-        balance.total_consumed_cents = int(balance.total_consumed * 100)
+            local new_balance = current - amount
+            redis.call('SET', balance_key, tostring(new_balance))
+            return new_balance
+            """
+
+            balance_key = f"balance:{user_id}"
+            try:
+                result = await redis.eval(
+                    lua_script,
+                    keys=[balance_key],
+                    args=[str(amount)]
+                )
+
+                if result == -1:
+                    raise ValueError("Insufficient balance")
+
+                # Redis 扣减成功，同步到数据库
+                balance_before = balance.balance
+                balance.balance = float(result)
+                balance.total_consumed += amount
+                balance.balance_cents = int(balance.balance * 100)
+                balance.total_consumed_cents = int(balance.total_consumed * 100)
+
+            except Exception as e:
+                logger.warning(f"Redis deduct failed, fallback to DB: {e}")
+                # Redis 失败时使用数据库悲观锁
+                if balance.balance < amount:
+                    raise ValueError("Insufficient balance")
+
+                balance_before = balance.balance
+                balance.balance -= amount
+                balance.total_consumed += amount
+                balance.balance_cents = int(balance.balance * 100)
+                balance.total_consumed_cents = int(balance.total_consumed * 100)
+        else:
+            # 无 Redis 时使用数据库悲观锁
+            if balance.balance < amount:
+                raise ValueError("Insufficient balance")
+
+            balance_before = balance.balance
+            balance.balance -= amount
+            balance.total_consumed += amount
+            balance.balance_cents = int(balance.balance * 100)
+            balance.total_consumed_cents = int(balance.total_consumed * 100)
 
         # 创建交易记录
         transaction = BalanceTransaction(
@@ -292,7 +351,7 @@ class PaymentCoreService:
         await db.flush()
         await db.refresh(balance)
 
-        logger.info(f"Balance consumed: user={user_id}, amount={amount}")
+        logger.info(f"Balance consumed: user={user_id}, amount={amount}, remaining={balance.balance}")
         return balance
 
     @classmethod

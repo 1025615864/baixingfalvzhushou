@@ -42,6 +42,7 @@ class JobAgg:
 class RateLimitKey:
     endpoint: str
     result: str  # "allowed" or "blocked"
+    dimension: str = "endpoint"  # "ip", "user", "endpoint", "global"
 
 
 @dataclass
@@ -258,11 +259,24 @@ class PrometheusMetrics:
             agg.last_duration_seconds = float(duration_seconds)
             agg.last_success = bool(ok)
 
-    def record_rate_limit(self, *, endpoint: str, allowed: bool) -> None:
-        """记录限流检查结果"""
+    def record_rate_limit(
+        self,
+        *,
+        endpoint: str,
+        allowed: bool,
+        dimension: str = "endpoint"
+    ) -> None:
+        """记录限流检查结果
+
+        Args:
+            endpoint: API端点路径
+            allowed: 是否允许请求
+            dimension: 限流维度 (ip/user/endpoint/global)
+        """
         e = str(endpoint or "").strip() or "unknown"
         result = "allowed" if allowed else "blocked"
-        key = RateLimitKey(endpoint=e, result=result)
+        dim = str(dimension or "endpoint").strip() or "endpoint"
+        key = RateLimitKey(endpoint=e, result=result, dimension=dim)
         with self._lock:
             agg = self._rate_limits.get(key)
             if agg is None:

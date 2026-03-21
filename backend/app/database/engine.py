@@ -46,16 +46,35 @@ if _is_sqlite:
     )
 else:
     # PostgreSQL/MySQL 配置（使用 QueuePool 连接池）
+    # 针对百万用户优化配置
     engine = create_async_engine(
         settings.database_url,
         echo=engine_echo,
         future=True,
         # 连接池配置优化（根据负载调整）
-        pool_size=int(os.getenv("DB_POOL_SIZE", "20")),  # 核心连接数：20（生产环境推荐值）
-        max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "30")),  # 最大溢出连接数：30（高峰期支持更多并发）
-        pool_recycle=int(os.getenv("DB_POOL_RECYCLE", "1800")),  # 连接回收时间：30分钟（更频繁回收，避免长时间空闲）
+        pool_size=int(os.getenv("DB_POOL_SIZE", "30")),  # 核心连接数：30（百万用户推荐值 20-50）
+        max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "40")),  # 最大溢出连接数：40（高峰期支持更多并发）
+        pool_recycle=int(os.getenv("DB_POOL_RECYCLE", "1800")),  # 连接回收时间：30分钟
         pool_pre_ping=True,  # 启用连接健康检查
         pool_timeout=int(os.getenv("DB_POOL_TIMEOUT", "30")),  # 连接获取超时：30秒
+        pool_size_map={
+            0: 5,      # 紧急：最小保留连接
+            -1: 10,    # 阻塞：中等连接数
+            -2: 20,    # 警戒：较高连接数
+        },
+        # PostgreSQL 特定优化
+        connect_args={
+            "server_settings": {
+                "statement_timeout": "30000",  # SQL 超时 30s
+                "idle_in_transaction_session_timeout": "60000",  # 事务空闲 60s 超时
+                "jit": "off",  # 关闭 JIT 编译，减少 CPU 消耗
+            },
+            "command_timeout": 30,
+            "keepalives": 1,
+            "keepalives_idle": 30,
+            "keepalives_interval": 10,
+            "keepalives_count": 5,
+        },
     )
 
 

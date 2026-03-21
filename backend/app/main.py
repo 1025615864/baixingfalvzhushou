@@ -195,43 +195,6 @@ async def lifespan(app: FastAPI):
     if (not settings.debug) and (not redis_connected):
         raise RuntimeError("Redis must be available when DEBUG is False. Please set REDIS_URL and ensure Redis is reachable.")
 
-    rss_feeds_raw = os.getenv("RSS_FEEDS", "").strip()
-    rss_ingest_enabled_raw = os.getenv("RSS_INGEST_ENABLED", "").strip().lower()
-    rss_ingest_enabled_flag = rss_ingest_enabled_raw in {"1", "true", "yes", "on"}
-    rss_enabled = bool(rss_feeds_raw) or bool(rss_ingest_enabled_flag) or bool(settings.debug)
-    if (not settings.debug) and (not redis_connected):
-        rss_enabled = False
-
-    async def _rss_ingest_job_wrapper() -> object:
-        start = time.perf_counter()
-        ok = True
-        try:
-            async with AsyncSessionLocal() as session:
-                from .services.rss_ingest_service import rss_ingest_service
-
-                return await rss_ingest_service.run_once(session)
-        except Exception:
-            ok = False
-            raise
-        finally:
-            prometheus_metrics.record_job(
-                name="rss_ingest",
-                ok=bool(ok),
-                duration_seconds=max(0.0, float(time.perf_counter() - start)),
-            )
-
-    rss_task: asyncio.Task[None] | None = None
-    if rss_enabled:
-        rss_interval_seconds = float(os.getenv("RSS_INGEST_INTERVAL_SECONDS", "300").strip() or "300")
-        rss_task = asyncio.create_task(
-            runner.run(
-                lock_key="locks:rss_ingest",
-                lock_ttl_seconds=60,
-                interval_seconds=rss_interval_seconds,
-                job=_rss_ingest_job_wrapper,
-            )
-        )
-
     settlement_enabled_raw = os.getenv("SETTLEMENT_JOB_ENABLED", "").strip().lower()
     settlement_enabled_flag = settlement_enabled_raw in {"1", "true", "yes", "on"}
     settlement_enabled = bool(settlement_enabled_flag) or bool(settings.debug)
@@ -388,7 +351,7 @@ async def lifespan(app: FastAPI):
     yield
 
     stop_event.set()
-    for t in (rss_task, wechatpay_task, settlement_task, review_sla_task):
+    for t in (wechatpay_task, settlement_task, review_sla_task):
         if t is None:
             continue
         _ = t.cancel()

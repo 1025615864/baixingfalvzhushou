@@ -2448,6 +2448,107 @@ GET /api/v1/points/exchanges?page=1&page_size=20
 | v1.3.0 | 2024-02-15 | 新增法律文书商城 API |
 | v1.4.0 | 2024-03-01 | 新增推荐系统 API |
 | v1.5.0 | 2024-03-15 | 通知 API 增强 |
+| v2.0.0 | 2026-03-21 | 微服务架构拆分，11个独立服务 |
+
+## 微服务架构
+
+### 架构概览
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         前端 (5173)                              │
+│  vite.config.ts 配置了 11 个服务的代理                          │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    API Gateway / Nginx                           │
+│                      /api/v1/*                                   │
+└─────────────────────────────────────────────────────────────────┘
+    │           │           │           │           │
+    ▼           ▼           ▼           ▼           ▼
+┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐
+│ Backend│ │ User   │ │Payment │ │Legal   │ │  AI    │
+│ 8080   │ │Service │ │Channel │ │Service │ │Service │
+│        │ │ 8001   │ │ 8002   │ │ 8004   │ │ 8005   │
+└────────┘ └────────┘ └────────┘ └────────┘ └────────┘
+                                │
+              ┌─────────────────┼─────────────────┐
+              ▼                 ▼                 ▼
+        ┌────────┐       ┌────────┐         ┌────────┐
+        │Accounting│       │ News   │         │Community│
+        │ 8003   │       │Service │         │Service │
+        └────────┘       │ 8006   │         │ 8007   │
+                        └────────┘         └────────┘
+                                │
+        ┌───────────────────────┼───────────────────────┐
+        ▼                       ▼                       ▼
+    ┌────────┐           ┌────────┐              ┌────────┐
+    │ Points │           │Notifi- │              │Search  │
+    │Service │           │ cation │              │Service │
+    │ 8008   │           │ 8009   │              │ 8011   │
+    └────────┘           └────────┘              └────────┘
+```
+
+### 服务端口映射
+
+| 服务 | 端口 | 前缀 | 说明 |
+|------|------|------|------|
+| Backend (Legacy) | 8080 | /api/v1 | 核心业务API |
+| User Service | 8001 | /api/v1 | 用户、认证、会员 |
+| Payment Channel | 8002 | /api/v1 | 支付通道 |
+| Accounting | 8003 | /api/v1 | 账务结算 |
+| Legal Service | 8004 | /api/v1 | 律师、法律知识 |
+| AI Service | 8005 | /api/v1 | AI对话 |
+| News Service | 8006 | /api/v1 | 新闻资讯 |
+| Community | 8007 | /api/v1 | 社区论坛 |
+| Points | 8008 | /api/v1 | 积分系统 |
+| Notification | 8009 | /api/v1 | 通知推送 |
+| Recommendation | 8010 | /api/v1 | 推荐系统 |
+| Search | 8011 | /api/v1 | 搜索服务 |
+
+### 前端代理配置
+
+前端通过 vite.config.ts 配置代理:
+
+```typescript
+// 微服务代理
+'/api/v1/auth': { target: 'http://127.0.0.1:8001' }
+'/api/v1/users': { target: 'http://127.0.0.1:8001' }
+'/api/v1/payment': { target: 'http://127.0.0.1:8002' }
+'/api/v1/balance': { target: 'http://127.0.0.1:8003' }
+'/api/v1/legal': { target: 'http://127.0.0.1:8004' }
+'/api/v1/ai': { target: 'http://127.0.0.1:8005' }
+'/api/v1/news': { target: 'http://127.0.0.1:8006' }
+'/api/v1/community': { target: 'http://127.0.0.1:8007' }
+'/api/v1/points': { target: 'http://127.0.0.1:8008' }
+'/api/v1/notifications': { target: 'http://127.0.0.1:8009' }
+'/api/v1/recommendations': { target: 'http://127.0.0.1:8010' }
+'/api/v1/search': { target: 'http://127.0.0.1:8011' }
+```
+
+### 启动服务
+
+```bash
+# 启动后端
+cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8080
+
+# 启动微服务
+cd services/user-service && uvicorn app.main:app --port 8001
+cd services/payment-channel-service && uvicorn app.main:app --port 8002
+cd services/payment-accounting-service && uvicorn app.main:app --port 8003
+cd services/legal-service && uvicorn app.main:app --port 8004
+cd services/ai-service && uvicorn app.main:app --port 8005
+cd services/news-service && uvicorn app.main:app --port 8006
+cd services/community-service && uvicorn app.main:app --port 8007
+cd services/points-service && uvicorn app.main:app --port 8008
+cd services/notification-service && uvicorn app.main:app --port 8009
+cd services/recommendation-service && uvicorn app.main:app --port 8010
+cd services/search-service && uvicorn app.main:app --port 8011
+
+# 运行联调测试
+bash scripts/test-microservices.sh
+```
 
 ---
 

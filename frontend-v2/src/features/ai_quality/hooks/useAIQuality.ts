@@ -55,35 +55,38 @@ const AI_QUALITY_QUERY_KEYS = {
 /**
  * 获取AI质量指标 Hook
  */
-export function useAIMetrics() {
+export function useAIMetrics(enabled: boolean = true) {
   return useQuery<AIMetrics>({
     queryKey: AI_QUALITY_QUERY_KEYS.metrics,
     queryFn: apiGetAIMetrics,
     staleTime: 30 * 1000, // 30秒缓存
-    refetchInterval: 60 * 1000, // 每分钟自动刷新
+    refetchInterval: enabled ? 60 * 1000 : false, // 每分钟自动刷新
+    enabled,
   });
 }
 
 /**
  * 获取仪表板数据 Hook
  */
-export function useDashboardData() {
+export function useDashboardData(enabled: boolean = true) {
   return useQuery<DashboardData>({
     queryKey: AI_QUALITY_QUERY_KEYS.dashboard,
     queryFn: apiGetDashboardData,
     staleTime: 30 * 1000,
-    refetchInterval: 60 * 1000,
+    refetchInterval: enabled ? 60 * 1000 : false,
+    enabled,
   });
 }
 
 /**
  * 获取质量趋势数据 Hook
  */
-export function useQualityTrend(days: number = 7) {
+export function useQualityTrend(days: number = 7, enabled: boolean = true) {
   return useQuery<QualityTrendData>({
     queryKey: AI_QUALITY_QUERY_KEYS.trend(days),
     queryFn: () => apiGetQualityTrend(days),
     staleTime: 5 * 60 * 1000, // 5分钟缓存
+    enabled,
   });
 }
 
@@ -92,11 +95,12 @@ export function useQualityTrend(days: number = 7) {
 /**
  * 获取会话质量列表 Hook
  */
-export function useSessionQuality(params: GetSessionQualityListRequest = {}) {
+export function useSessionQuality(params: GetSessionQualityListRequest = {}, enabled: boolean = true) {
   return useQuery<GetSessionQualityListResponse>({
     queryKey: AI_QUALITY_QUERY_KEYS.sessions(params),
     queryFn: () => apiGetSessionQuality(params),
     staleTime: 30 * 1000,
+    enabled,
   });
 }
 
@@ -155,19 +159,22 @@ export function useReviewStats() {
 /**
  * 获取质量告警列表 Hook
  */
-export function useQualityAlerts(params: GetQualityAlertsRequest = {}) {
+export function useQualityAlerts(params: GetQualityAlertsRequest = {}, enabled: boolean = true) {
   return useQuery<GetQualityAlertsResponse>({
     queryKey: AI_QUALITY_QUERY_KEYS.alerts(params),
     queryFn: () => apiGetQualityAlerts(params),
     staleTime: 30 * 1000,
-    refetchInterval: (query) => {
-      // 如果有活跃告警，每30秒刷新一次
-      const data = query.state.data;
-      if (data?.summary?.active && data.summary.active > 0) {
-        return 30 * 1000;
-      }
-      return 60 * 1000;
-    },
+    enabled,
+    refetchInterval: enabled
+      ? (query) => {
+          // 如果有活跃告警，每30秒刷新一次
+          const data = query.state.data;
+          if (data?.summary?.active && data.summary.active > 0) {
+            return 30 * 1000;
+          }
+          return 60 * 1000;
+        }
+      : false,
   });
 }
 
@@ -210,11 +217,12 @@ export function useResolveAlert() {
 /**
  * 获取AI日志列表 Hook
  */
-export function useAILogs(params: GetAILogsRequest = {}) {
+export function useAILogs(params: GetAILogsRequest = {}, enabled: boolean = true) {
   return useQuery<GetAILogsResponse>({
     queryKey: AI_QUALITY_QUERY_KEYS.logs(params),
     queryFn: () => apiGetAILogs(params),
     staleTime: 30 * 1000,
+    enabled,
   });
 }
 

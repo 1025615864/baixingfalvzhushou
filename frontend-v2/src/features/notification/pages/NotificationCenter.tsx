@@ -11,6 +11,16 @@ import {
   WebSocketConnectionState,
 } from '../types/websocket';
 import { ConnectionStatus } from '../components/ConnectionStatus';
+import { useNotificationStream } from '../hooks/useWebSocket';
+import {
+  getNotifications,
+  markAsRead as apiMarkAsRead,
+  markAllAsRead as apiMarkAllAsRead,
+  deleteNotification as apiDeleteNotification,
+  batchMarkAsRead as apiBatchMarkAsRead,
+  batchDeleteNotifications as apiBatchDeleteNotifications,
+} from '../api';
+import type { GetNotificationsParams } from '../types';
 
 /**
  * 筛选标签配置
@@ -21,58 +31,6 @@ const filterTabs = [
   { key: 'chat', label: '聊天', type: NotificationType.CHAT },
   { key: 'order', label: '订单', type: NotificationType.ORDER },
   { key: 'promotion', label: '推广', type: NotificationType.PROMOTION },
-];
-
-/**
- * 模拟通知数据
- */
-const MOCK_NOTIFICATIONS: NotificationData[] = [
-  {
-    id: 1,
-    type: NotificationType.SYSTEM,
-    title: '账户安全提醒',
-    content: '您的账户在新设备上登录，如非本人操作请及时修改密码',
-    isRead: false,
-    priority: MessagePriority.HIGH,
-    createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-  },
-  {
-    id: 2,
-    type: NotificationType.CHAT,
-    title: '张律师回复了您的咨询',
-    content: '关于劳动仲裁的问题，我已经给您详细解答了，请查看...',
-    isRead: false,
-    priority: MessagePriority.NORMAL,
-    senderName: '张律师',
-    createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-  },
-  {
-    id: 3,
-    type: NotificationType.ORDER,
-    title: '订单支付成功',
-    content: '您购买的法律咨询服务订单已支付成功，订单号：ORD20240201001',
-    isRead: true,
-    priority: MessagePriority.NORMAL,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-  },
-  {
-    id: 4,
-    type: NotificationType.PROMOTION,
-    title: '限时优惠',
-    content: '本周法律顾问服务限时8折优惠，立即查看',
-    isRead: false,
-    priority: MessagePriority.LOW,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-  },
-  {
-    id: 5,
-    type: NotificationType.FORUM,
-    title: '您的帖子收到回复',
-    content: '您的帖子《劳动合同纠纷求助》收到了新的回复',
-    isRead: true,
-    priority: MessagePriority.NORMAL,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-  },
 ];
 
 /**
@@ -110,18 +68,113 @@ function formatTime(createdAt: string): string {
 }
 
 /**
+ * 将后端通知数据转换为前端格式
+ */
+function mapNotificationData(data: {
+  id: number;
+  type?: string;
+  notification_type?: string;
+  title: string;
+  content?: string | null;
+  link?: string | null;
+  priority?: string;
+  is_read?: boolean;
+  isRead?: boolean;
+  related_user_id?: number | null;
+  related_user_name?: string | null;
+  created_at: string;
+}): NotificationData {
+  const notificationType = data.notification_type || data.type || 'system';
+  // 将后端类型映射到 WebSocket 类型
+  const typeMapping: Record<string, NotificationType> = {
+    'comment_reply': NotificationType.CHAT,
+    'post_like': NotificationType.ACTIVITY,
+    'post_favorite': NotificationType.ACTIVITY,
+    'post_comment': NotificationType.FORUM,
+    'system': NotificationType.SYSTEM,
+    'consultation': NotificationType.CONSULTATION,
+    'news': NotificationType.ACTIVITY,
+    'order': NotificationType.ORDER,
+    'chat': NotificationType.CHAT,
+    'forum': NotificationType.FORUM,
+    'payment': NotificationType.PAYMENT,
+    'promotion': NotificationType.PROMOTION,
+    'security': NotificationType.SECURITY,
+    'activity': NotificationType.ACTIVITY,
+  };
+  
+  return {
+    id: data.id,
+    type: typeMapping[notificationType] || NotificationType.SYSTEM,
+    title: data.title,
+    content: data.content ?? undefined,
+    link: data.link ?? undefined,
+    priority: (data.priority as MessagePriority) || MessagePriority.NORMAL,
+    isRead: data.is_read ?? data.isRead ?? false,
+    senderId: data.related_user_id ?? undefined,
+    senderName: data.related_user_name ?? undefined,
+    createdAt: data.created_at,
+  };
+}
+
+/**
+ * 获取 WebSocket URL
+ */
+function getWebSocketUrl(): string {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host;
+  return `${protocol}//${host}/api/v1/ws/notifications`;
+}
+
+/**
+ * 获取认证 Token
+ */
+function getAuthToken(): string | null {
+  // 尝试从 localStorage 获取 token
+  try {
+    const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+    return token;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 通知中心页面
  */
 export function NotificationCenter(): JSX.Element {
   // 状态
-  const [notifications, setNotifications] = useState<NotificationData[]>(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [activeTab, setActiveTab] = useState<string>('all');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [showBatchActions, setShowBatchActions] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  // WebSocket 连接
+  const wsUrl = getWebSocketUrl();
+  const authToken = getAuthToken();
+  
+  const {
+    isConnected,
+    latestNotification,
+  } = useNotificationStream(wsUrl, authToken, true);
+
+  // 当收到新通知时，添加到列表
+  useEffect(() => {
+    if (latestNotification) {
+      setNotifications((prev) => {
+        // 避免重复添加
+        if (prev.some((n) => n.id === latestNotification.id)) {
+          return prev;
+        }
+        return [latestNotification, ...prev];
+      });
+    }
+  }, [latestNotification]);
 
   // 统计数据
   const unreadCount = notifications.filter((n) => !n.isRead).length;
@@ -129,30 +182,53 @@ export function NotificationCenter(): JSX.Element {
     ? notifications
     : notifications.filter((n) => n.type === (activeTab as NotificationType));
 
-  // 加载更多（模拟无限滚动）
-  const loadMore = useCallback(() => {
-    if (isLoading || !hasMore) return;
+  // 初始加载通知
+  const loadNotifications = useCallback(async (page: number, append = false) => {
+    if (isLoading && append) return;
     
     setIsLoading(true);
-    // 模拟API调用
-    setTimeout(() => {
-      const newItems: NotificationData[] = Array.from({ length: 5 }, (_, i) => ({
-        id: Date.now() + i,
-        type: NotificationType.SYSTEM,
-        title: `历史通知 ${i + 1}`,
-        content: '这是一条历史通知消息内容...',
-        isRead: true,
-        priority: MessagePriority.NORMAL,
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * (i + 1)).toISOString(),
-      }));
+    try {
+      const params: GetNotificationsParams = {
+        page,
+        page_size: 20,
+        unread_only: false,
+      };
       
-      setNotifications((prev) => [...prev, ...newItems]);
-      setIsLoading(false);
-      if (newItems.length < 5) {
-        setHasMore(false);
+      const response = await getNotifications(params);
+      const mappedNotifications = (response.items || []).map(mapNotificationData);
+      
+      if (append) {
+        setNotifications((prev) => [...prev, ...mappedNotifications]);
+      } else {
+        setNotifications(mappedNotifications);
       }
-    }, 800);
-  }, [isLoading, hasMore]);
+      
+      setHasMore(mappedNotifications.length >= 20);
+    } catch (error) {
+      console.error('加载通知失败:', error);
+      // 如果 API 失败，使用空数组
+      if (!append) {
+        setNotifications([]);
+      }
+      setHasMore(false);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoading]);
+
+  // 初始加载 - 只在组件挂载时执行一次
+  useEffect(() => {
+    void loadNotifications(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 加载更多
+  const loadMore = useCallback(() => {
+    if (isLoading || !hasMore) return;
+    const nextPage = currentPage + 1;
+    setCurrentPage(nextPage);
+    void loadNotifications(nextPage, true);
+  }, [isLoading, hasMore, currentPage, loadNotifications]);
 
   // 无限滚动观察器
   useEffect(() => {
@@ -179,20 +255,41 @@ export function NotificationCenter(): JSX.Element {
   }, [loadMore]);
 
   // 标记已读
-  const markAsRead = useCallback((id: number) => {
+  const markAsRead = useCallback(async (id: number) => {
+    // 乐观更新
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
     );
+    
+    try {
+      await apiMarkAsRead(id);
+    } catch (error) {
+      console.error('标记已读失败:', error);
+    }
   }, []);
 
   // 标记全部已读
-  const markAllAsRead = useCallback(() => {
+  const markAllAsRead = useCallback(async () => {
+    // 乐观更新
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    
+    try {
+      await apiMarkAllAsRead();
+    } catch (error) {
+      console.error('标记全部已读失败:', error);
+    }
   }, []);
 
   // 删除通知
-  const deleteNotification = useCallback((id: number) => {
+  const deleteNotification = useCallback(async (id: number) => {
+    // 乐观更新
     setNotifications((prev) => prev.filter((n) => n.id !== id));
+    
+    try {
+      await apiDeleteNotification(id);
+    } catch (error) {
+      console.error('删除通知失败:', error);
+    }
   }, []);
 
   // 选择/取消选择
@@ -209,19 +306,35 @@ export function NotificationCenter(): JSX.Element {
   }, []);
 
   // 批量已读
-  const batchMarkAsRead = useCallback(() => {
+  const batchMarkAsRead = useCallback(async () => {
+    const ids = Array.from(selectedItems);
+    // 乐观更新
     setNotifications((prev) =>
       prev.map((n) => (selectedItems.has(n.id) ? { ...n, isRead: true } : n))
     );
     setSelectedItems(new Set());
     setShowBatchActions(false);
+    
+    try {
+      await apiBatchMarkAsRead({ ids });
+    } catch (error) {
+      console.error('批量标记已读失败:', error);
+    }
   }, [selectedItems]);
 
   // 批量删除
-  const batchDelete = useCallback(() => {
+  const batchDelete = useCallback(async () => {
+    const ids = Array.from(selectedItems);
+    // 乐观更新
     setNotifications((prev) => prev.filter((n) => !selectedItems.has(n.id)));
     setSelectedItems(new Set());
     setShowBatchActions(false);
+    
+    try {
+      await apiBatchDeleteNotifications({ ids });
+    } catch (error) {
+      console.error('批量删除失败:', error);
+    }
   }, [selectedItems]);
 
   // 切换批量选择模式
@@ -248,8 +361,8 @@ export function NotificationCenter(): JSX.Element {
             <div className="flex items-center gap-3">
               {/* 连接状态 */}
               <ConnectionStatus
-                state={WebSocketConnectionState.CONNECTED}
-                latency={45}
+                state={isConnected ? WebSocketConnectionState.CONNECTED : WebSocketConnectionState.DISCONNECTED}
+                latency={isConnected ? 45 : undefined}
                 showLabel={false}
                 size="sm"
               />
@@ -272,7 +385,7 @@ export function NotificationCenter(): JSX.Element {
               {!showBatchActions && unreadCount > 0 && (
                 <button
                   type="button"
-                  onClick={markAllAsRead}
+                  onClick={() => void markAllAsRead()}
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                 >
                   全部已读
@@ -294,14 +407,14 @@ export function NotificationCenter(): JSX.Element {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={batchMarkAsRead}
+                  onClick={() => void batchMarkAsRead()}
                   className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
                 >
                   标记已读
                 </button>
                 <button
                   type="button"
-                  onClick={batchDelete}
+                  onClick={() => void batchDelete()}
                   className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
                 >
                   删除
@@ -339,7 +452,26 @@ export function NotificationCenter(): JSX.Element {
 
         {/* 通知列表 */}
         <div className="space-y-3">
-          {filteredNotifications.length === 0 ? (
+          {isLoading && notifications.length === 0 ? (
+            // 首次加载骨架屏
+            <div className="space-y-3">
+              {Array.from({ length: 5 }, (_, index) => (
+                <div
+                  key={index}
+                  className="animate-pulse rounded-lg border border-gray-200 bg-white p-4"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="h-10 w-10 rounded-lg bg-gray-200" />
+                    <div className="flex-1">
+                      <div className="h-5 bg-gray-200 rounded w-1/3 mb-2" />
+                      <div className="h-4 bg-gray-200 rounded w-full mb-1" />
+                      <div className="h-4 bg-gray-200 rounded w-2/3" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredNotifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-lg bg-white py-16">
               <svg
                 className="h-16 w-16 text-gray-300"
@@ -424,7 +556,7 @@ export function NotificationCenter(): JSX.Element {
                           {!notification.isRead && (
                             <button
                               type="button"
-                              onClick={() => markAsRead(notification.id)}
+                              onClick={() => void markAsRead(notification.id)}
                               className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-600"
                               title="标记为已读"
                             >
@@ -435,7 +567,7 @@ export function NotificationCenter(): JSX.Element {
                           )}
                           <button
                             type="button"
-                            onClick={() => deleteNotification(notification.id)}
+                            onClick={() => void deleteNotification(notification.id)}
                             className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600"
                             title="删除"
                           >

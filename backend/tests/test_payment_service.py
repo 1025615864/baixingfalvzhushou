@@ -464,3 +464,334 @@ async def test_payment_service_singleton():
     # Act & Assert
     assert payment_service is not None
     assert isinstance(payment_service, PaymentService)
+
+
+class TestPaymentExceptionHandling:
+    """支付异常处理测试类"""
+
+    @pytest.mark.asyncio
+    async def test_process_payment_invalid_payment_method(self, db: AsyncSession):
+        """测试处理无效支付方式"""
+        # Arrange
+        service = PaymentService()
+        
+        # 创建用户余额记录
+        user_balance = UserBalance(user_id=1, balance=200.0)
+        db.add(user_balance)
+        await db.commit()
+        
+        # 创建待支付订单
+        order = PaymentOrder(
+            order_no="TEST_ORDER_EXCEPTION_001",
+            user_id=1,
+            order_type="consultation",
+            amount=100.0,
+            actual_amount=100.0,
+            status=PaymentStatus.PENDING,
+            title="测试订单",
+        )
+        db.add(order)
+        await db.commit()
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="不支持的支付方式"):
+            await service.process_payment(
+                db,
+                order_no="TEST_ORDER_EXCEPTION_001",
+                payment_method="invalid_method",
+            )
+
+    @pytest.mark.asyncio
+    async def test_process_payment_order_cancelled(self, db: AsyncSession):
+        """测试处理已取消的订单"""
+        # Arrange
+        service = PaymentService()
+        
+        # 创建已取消订单
+        order = PaymentOrder(
+            order_no="TEST_ORDER_EXCEPTION_002",
+            user_id=1,
+            order_type="consultation",
+            amount=100.0,
+            actual_amount=100.0,
+            status=PaymentStatus.CANCELLED,
+            title="已取消订单",
+        )
+        db.add(order)
+        await db.commit()
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="订单状态不允许支付"):
+            await service.process_payment(
+                db,
+                order_no="TEST_ORDER_EXCEPTION_002",
+                payment_method=PaymentMethod.BALANCE,
+            )
+
+    @pytest.mark.asyncio
+    async def test_process_payment_order_expired(self, db: AsyncSession):
+        """测试处理已过期的订单"""
+        # Arrange
+        service = PaymentService()
+        
+        from datetime import timedelta
+        
+        # 创建已过期订单
+        order = PaymentOrder(
+            order_no="TEST_ORDER_EXCEPTION_003",
+            user_id=1,
+            order_type="consultation",
+            amount=100.0,
+            actual_amount=100.0,
+            status=PaymentStatus.PENDING,
+            title="已过期订单",
+            expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        )
+        db.add(order)
+        await db.commit()
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="订单已过期"):
+            await service.process_payment(
+                db,
+                order_no="TEST_ORDER_EXCEPTION_003",
+                payment_method=PaymentMethod.BALANCE,
+            )
+
+    @pytest.mark.asyncio
+    async def test_refund_payment_insufficient_balance(self, db: AsyncSession):
+        """测试退款时用户余额不足"""
+        # Arrange
+        service = PaymentService()
+        
+        # 创建用户余额记录（余额不足）
+        user_balance = UserBalance(user_id=1, balance=50.0)  # 只有 50 元
+        db.add(user_balance)
+        
+        # 创建已支付订单（100 元）
+        order = PaymentOrder(
+            order_no="TEST_ORDER_EXCEPTION_004",
+            user_id=1,
+            order_type="consultation",
+            amount=100.0,
+            actual_amount=100.0,
+            status=PaymentStatus.PAID,
+            paid_at=datetime.now(timezone.utc),
+            title="待退款订单",
+        )
+        db.add(order)
+        await db.commit()
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="退款失败：用户余额不足"):
+            await service.refund_payment(
+                db,
+                order_no="TEST_ORDER_EXCEPTION_004",
+            )
+
+
+class TestPaymentErrorMessage:
+    """支付错误消息测试类"""
+
+    @pytest.mark.asyncio
+    async def test_create_order_invalid_amount(self, db: AsyncSession):
+        """测试创建订单时金额无效"""
+        # Arrange
+        service = PaymentService()
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="订单金额必须大于 0"):
+            await service.create_order(
+                db,
+                user_id=1,
+                amount=0,
+                order_type="consultation",
+                title="测试订单",
+            )
+
+    @pytest.mark.asyncio
+    async def test_create_order_negative_amount(self, db: AsyncSession):
+        """测试创建订单时金额为负数"""
+        # Arrange
+        service = PaymentService()
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="订单金额必须大于 0"):
+            await service.create_order(
+                db,
+                user_id=1,
+                amount=-100,
+                order_type="consultation",
+                title="测试订单",
+            )
+
+    @pytest.mark.asyncio
+    async def test_process_payment_user_not_found(self, db: AsyncSession):
+        """测试支付时用户不存在"""
+        # Arrange
+        service = PaymentService()
+        
+        # 创建待支付订单（用户不存在）
+        order = PaymentOrder(
+            order_no="TEST_ORDER_ERROR_001",
+            user_id=999999,  # 不存在的用户 ID
+            order_type="consultation",
+            amount=100.0,
+            actual_amount=100.0,
+            status=PaymentStatus.PENDING,
+            title="测试订单",
+        )
+        db.add(order)
+        await db.commit()
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="用户不存在"):
+            await service.process_payment(
+                db,
+                order_no="TEST_ORDER_ERROR_001",
+                payment_method=PaymentMethod.BALANCE,
+            )
+
+    @pytest.mark.asyncio
+    async def test_process_payment_balance_not_exist(self, db: AsyncSession):
+        """测试支付时用户余额账户不存在"""
+        # Arrange
+        service = PaymentService()
+        
+        # 创建测试用户
+        user = User(
+            username="testuser_balance",
+            email="balance@example.com",
+            phone="13800138001",
+            hashed_password="hashed_password",
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        
+        # 创建待支付订单
+        order = PaymentOrder(
+            order_no="TEST_ORDER_ERROR_002",
+            user_id=user.id,
+            order_type="consultation",
+            amount=100.0,
+            actual_amount=100.0,
+            status=PaymentStatus.PENDING,
+            title="测试订单",
+        )
+        db.add(order)
+        await db.commit()
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="用户余额账户不存在"):
+            await service.process_payment(
+                db,
+                order_no="TEST_ORDER_ERROR_002",
+                payment_method=PaymentMethod.BALANCE,
+            )
+
+
+class TestPaymentConcurrency:
+    """支付并发测试类"""
+
+    @pytest.mark.asyncio
+    async def test_process_payment_concurrent_requests(self, db: AsyncSession):
+        """测试并发支付请求处理"""
+        # Arrange
+        service = PaymentService()
+        
+        # 创建用户余额记录
+        user_balance = UserBalance(user_id=1, balance=500.0)
+        db.add(user_balance)
+        await db.commit()
+        
+        # 创建多个待支付订单
+        order_nos = []
+        for i in range(3):
+            order = PaymentOrder(
+                order_no=f"TEST_ORDER_CONCURRENT_{i:03d}",
+                user_id=1,
+                order_type="consultation",
+                amount=100.0,
+                actual_amount=100.0,
+                status=PaymentStatus.PENDING,
+                title=f"并发测试订单{i}",
+            )
+            db.add(order)
+            order_nos.append(order.order_no)
+        
+        await db.commit()
+
+        # Act - 并发执行支付
+        import asyncio
+        tasks = [
+            service.process_payment(db, order_no=no, payment_method=PaymentMethod.BALANCE)
+            for no in order_nos
+        ]
+        results = await asyncio.gather(*tasks)
+
+        # Assert
+        assert len(results) == 3
+        for result in results:
+            assert result.status == PaymentStatus.PAID
+        
+        # 验证最终余额
+        balance_result = await db.execute(
+            select(UserBalance).where(UserBalance.user_id == 1)
+        )
+        balance = balance_result.scalar_one()
+        assert balance.balance == 200.0  # 500 - 300
+
+    @pytest.mark.asyncio
+    async def test_process_payment_race_condition(self, db: AsyncSession):
+        """测试支付竞态条件处理"""
+        # Arrange
+        service = PaymentService()
+        
+        # 创建用户余额记录（刚好够支付一单）
+        user_balance = UserBalance(user_id=1, balance=100.0)
+        db.add(user_balance)
+        
+        # 创建两个待支付订单
+        order1 = PaymentOrder(
+            order_no="TEST_ORDER_RACE_001",
+            user_id=1,
+            order_type="consultation",
+            amount=100.0,
+            actual_amount=100.0,
+            status=PaymentStatus.PENDING,
+            title="竞态测试订单 1",
+        )
+        order2 = PaymentOrder(
+            order_no="TEST_ORDER_RACE_002",
+            user_id=1,
+            order_type="consultation",
+            amount=100.0,
+            actual_amount=100.0,
+            status=PaymentStatus.PENDING,
+            title="竞态测试订单 2",
+        )
+        db.add(order1)
+        db.add(order2)
+        await db.commit()
+
+        # Act - 尝试并发支付两个订单
+        import asyncio
+        
+        async def try_payment(order_no):
+            try:
+                return await service.process_payment(
+                    db, order_no=order_no, payment_method=PaymentMethod.BALANCE
+                )
+            except ValueError:
+                return None
+        
+        tasks = [
+            try_payment("TEST_ORDER_RACE_001"),
+            try_payment("TEST_ORDER_RACE_002"),
+        ]
+        results = await asyncio.gather(*tasks)
+
+        # Assert - 只有一个成功
+        successful = [r for r in results if r is not None]
+        assert len(successful) == 1

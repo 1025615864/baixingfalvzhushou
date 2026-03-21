@@ -128,22 +128,27 @@ export const PaymentStatus: React.FC<PaymentStatusProps> = ({
         <StatusIcon status={status} />
       </div>
       
-      <h3 className={`text-xl font-semibold mb-2 ${
-        status === 'success' ? 'text-green-600' : 
-        status === 'failed' ? 'text-red-600' : 
-        status === 'timeout' ? 'text-yellow-600' : 
-        'text-gray-900'
-      }`}>
+      <h3
+        className={`text-xl font-semibold mb-2 ${
+          status === 'success' ? 'text-green-600' :
+          status === 'failed' ? 'text-red-600' :
+          status === 'timeout' ? 'text-yellow-600' :
+          'text-gray-900'
+        }`}
+        data-testid={status === 'failed' ? 'payment-error-title' : undefined}
+      >
         {StatusTitle({ status })}
       </h3>
       
       <div className="text-sm">
-        <StatusDescription 
-          status={status} 
-          attempts={attempts} 
-          maxAttempts={maxAttempts}
-          errorMessage={errorMessage}
-        />
+        <div data-testid={status === 'failed' ? 'payment-error' : undefined}>
+          <StatusDescription
+            status={status}
+            attempts={attempts}
+            maxAttempts={maxAttempts}
+            errorMessage={errorMessage}
+          />
+        </div>
       </div>
     </div>
   );

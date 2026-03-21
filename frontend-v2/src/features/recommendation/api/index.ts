@@ -465,6 +465,150 @@ export async function apiRecordInteraction(
   return response.data;
 }
 
+// ==================== 增强推荐 API ====================
+
+/** 增强版个性化首页响应 */
+interface BackendEnhancedHomeResponse {
+  user_id: number;
+  is_cold_start: boolean;
+  profile: {
+    interests: string[];
+    history_count: number;
+  };
+  lawyers: Array<Record<string, unknown>>;
+  posts: Array<Record<string, unknown>>;
+  news: Array<Record<string, unknown>>;
+  knowledge: Array<Record<string, unknown>>;
+  hot_content: Array<Record<string, unknown>>;
+  reason: string;
+  recommendation_source: string;
+  generated_at: string;
+}
+
+/** 知识推荐项 */
+interface BackendKnowledgeRecommendationItem {
+  knowledge_id: number;
+  title: string;
+  category?: string;
+  summary?: string;
+  view_count: number;
+  score: number;
+}
+
+/** 知识推荐响应 */
+interface BackendKnowledgeRecommendationResponse {
+  knowledge: BackendKnowledgeRecommendationItem[];
+}
+
+/** 首页推荐响应 */
+interface BackendHomeRecommendationsResponse {
+  lawyers: Array<Record<string, unknown>>;
+  posts: Array<Record<string, unknown>>;
+  news: Array<Record<string, unknown>>;
+  knowledge: Array<Record<string, unknown>>;
+}
+
+/**
+ * 获取增强版个性化首页数据
+ */
+export async function apiGetEnhancedHome(
+  lawyerLimit: number = 5,
+  postLimit: number = 5,
+  newsLimit: number = 5,
+  knowledgeLimit: number = 5
+): Promise<BackendEnhancedHomeResponse> {
+  const response = await apiClient.get<BackendEnhancedHomeResponse>(
+    `${API_BASE}/enhanced/personalized-home`,
+    {
+      params: {
+        lawyer_limit: lawyerLimit,
+        post_limit: postLimit,
+        news_limit: newsLimit,
+        knowledge_limit: knowledgeLimit,
+      },
+    }
+  );
+  return response.data;
+}
+
+/**
+ * 基于咨询历史推荐律师
+ */
+export async function apiRecommendLawyersByConsultation(
+  limit: number = 10
+): Promise<LawyerRecommendation[]> {
+  const response = await apiClient.get<{ lawyers: BackendLawyerRecommendationItem[] }>(
+    `${API_BASE}/lawyers/by-consultation`,
+    {
+      params: { limit },
+    }
+  );
+
+  return response.data.lawyers.map(mapBackendToLawyerRecommendation);
+}
+
+/**
+ * 基于位置推荐律师
+ */
+export async function apiRecommendLawyersByLocation(
+  city?: string,
+  limit: number = 10
+): Promise<LawyerRecommendation[]> {
+  const response = await apiClient.get<{ lawyers: BackendLawyerRecommendationItem[] }>(
+    `${API_BASE}/lawyers/by-location`,
+    {
+      params: { city, limit },
+    }
+  );
+
+  return response.data.lawyers.map(mapBackendToLawyerRecommendation);
+}
+
+/**
+ * 基于兴趣推荐知识文章
+ */
+export async function apiRecommendKnowledgeByInterests(
+  limit: number = 10
+): Promise<Array<{
+  knowledgeId: number;
+  title: string;
+  category?: string;
+  summary?: string;
+  viewCount: number;
+  score: number;
+}>> {
+  const response = await apiClient.get<BackendKnowledgeRecommendationResponse>(
+    `${API_BASE}/knowledge/by-interests`,
+    {
+      params: { limit },
+    }
+  );
+
+  return response.data.knowledge.map((item) => ({
+    knowledgeId: item.knowledge_id,
+    title: item.title,
+    category: item.category,
+    summary: item.summary,
+    viewCount: item.view_count,
+    score: item.score,
+  }));
+}
+
+/**
+ * 获取首页推荐数据
+ */
+export async function apiGetHomeRecommendations(
+  recommendationLimit: number = 10
+): Promise<BackendHomeRecommendationsResponse> {
+  const response = await apiClient.get<BackendHomeRecommendationsResponse>(
+    `${API_BASE}/home`,
+    {
+      params: { recommendation_limit: recommendationLimit },
+    }
+  );
+  return response.data;
+}
+
 // ==================== 统一导出 ====================
 
 /**
@@ -474,6 +618,7 @@ export const recommendationApi = {
   // 个性化推荐
   getPersonalizedRecommendations: apiGetPersonalizedRecommendations,
   getEnhancedRecommendations: apiGetEnhancedRecommendations,
+  getEnhancedHome: apiGetEnhancedHome,
 
   // 引导问卷
   getOnboardingSurvey: apiGetOnboardingSurvey,
@@ -487,6 +632,12 @@ export const recommendationApi = {
   recommendLawyers: apiRecommendLawyers,
   recommendPosts: apiRecommendPosts,
   recommendNews: apiRecommendNews,
+
+  // 增强推荐
+  recommendLawyersByConsultation: apiRecommendLawyersByConsultation,
+  recommendLawyersByLocation: apiRecommendLawyersByLocation,
+  recommendKnowledgeByInterests: apiRecommendKnowledgeByInterests,
+  getHomeRecommendations: apiGetHomeRecommendations,
 
   // 用户交互
   recordInteraction: apiRecordInteraction,

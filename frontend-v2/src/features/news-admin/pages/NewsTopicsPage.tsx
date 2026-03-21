@@ -6,7 +6,9 @@
 import { useState } from 'react';
 import { Plus, Edit2, Trash2, FolderOpen } from 'lucide-react';
 
-import { Card, Button, Badge } from '@/components/ui';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 
 import { useTopics, useCreateTopic, useUpdateTopic, useDeleteTopic } from '../hooks/useNewsAdmin';
 import type { NewsTopic, CreateTopicRequest, UpdateTopicRequest } from '../types';

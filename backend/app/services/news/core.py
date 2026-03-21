@@ -11,6 +11,7 @@ from typing import Any, cast
 from sqlalchemy import select, func, and_, or_, desc, delete, case
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from ...models.news import (
     News,
@@ -26,6 +27,7 @@ from ...schemas.news import NewsCreate, NewsUpdate
 from .topics import news_topic_service
 from .comments import news_comment_service
 from .subscriptions import news_subscription_service
+from ...utils.query_optimizer import apply_news_preload, track_query, get_query_optimizer
 
 
 logger = logging.getLogger(__name__)
@@ -517,15 +519,16 @@ class NewsService:
 
     async def get_published(self, db: AsyncSession,
                             news_id: int) -> News | None:
-        """获取已发布的新闻"""
-        result = await db.execute(
-            select(News).where(
-                News.id == news_id,
-                News.is_published,
-                or_(News.review_status == "approved",
-                    News.review_status is None),
-            )
+        """获取已发布的新闻 - 使用预加载优化"""
+        query = select(News).where(
+            News.id == news_id,
+            News.is_published,
+            or_(News.review_status == "approved",
+                News.review_status is None),
         )
+        # 应用预加载优化 - 使用 selectinload 预加载 AI 标注信息
+        query = apply_news_preload(query, level="basic")
+        result = await db.execute(query)
         return result.scalar_one_or_none()
 
     async def get_list(
@@ -545,9 +548,10 @@ class NewsService:
         is_top: bool | None = None,
         topic_id: int | None = None,
     ) -> tuple[list[News], int]:
-        """获取新闻列表"""
-        query = select(News)
-        count_query = select(func.count(News.id))
+        """获取新闻列表 - 使用预加载优化"""
+        with track_query("news_get_list", get_query_optimizer()):
+            query = select(News)
+            count_query = select(func.count(News.id))
 
         if topic_id is not None:
             query = query.join(
@@ -620,17 +624,20 @@ class NewsService:
             query = query.where(News.is_top == is_top)
             count_query = count_query.where(News.is_top == is_top)
 
-        query = query.order_by(desc(News.published_at))
+            query = query.order_by(desc(News.published_at))
 
-        query = query.offset((page - 1) * page_size).limit(page_size)
+            query = query.offset((page - 1) * page_size).limit(page_size)
 
-        result = await db.execute(query)
-        items = list(result.scalars().all())
+            # 应用预加载优化 - 使用 selectinload 预加载 AI 标注信息
+            query = apply_news_preload(query, level="basic")
 
-        count_result = await db.execute(count_query)
-        total = count_result.scalar() or 0
+            result = await db.execute(query)
+            items = list(result.scalars().all())
 
-        return items, total
+            count_result = await db.execute(count_query)
+            total = count_result.scalar() or 0
+
+            return items, total
 
     async def update(
         self,

@@ -1,21 +1,17 @@
 import { Suspense, lazy } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 
-import { RootLayout } from '@/app/layouts/RootLayout';
 import { Loading } from '@/shared/components/Loading';
-// 立即加载的页面（首屏）
-import { HomePage } from '@/pages/Home';
 import { NotFoundPage } from '@/pages/NotFound';
+
 // 懒加载的页面 - 按功能模块分组
+const RootLayout = lazy(() => import('@/app/layouts/RootLayout').then(m => ({ default: m.RootLayout })));
+const HomePage = lazy(() => import('@/pages/Home').then(m => ({ default: m.HomePage })));
 const LoginPage = lazy(() => import('@/pages/auth/Login').then(m => ({ default: m.Login })));
 const RegisterPage = lazy(() => import('@/pages/auth/Register').then(m => ({ default: m.Register })));
 
 const ChatPage = lazy(() => import('@/pages/Chat').then(m => ({ default: m.ChatPage })));
 const ConsultationPage = lazy(() => import('@/pages/Consultation').then(m => ({ default: m.ConsultationPage })));
-const ConsultationTemplatesPage = lazy(() => import('@/features/consultation/pages/ConsultationTemplatesPage').then(m => ({ default: m.ConsultationTemplatesPage })));
-
-// Settings 模块 - 系统设置
-const SystemSettingsPage = lazy(() => import('@/features/settings/pages/SystemSettingsPage').then(m => ({ default: m.SystemSettingsPage })));
 
 const KnowledgePage = lazy(() => import('@/pages/Knowledge').then(m => ({ default: m.KnowledgePage })));
 const LawyerPage = lazy(() => import('@/pages/Lawyer').then(m => ({ default: m.LawyerPage })));
@@ -27,18 +23,35 @@ const NewsPage = lazy(() => import('@/pages/News').then(m => ({ default: m.NewsP
 const PaymentPage = lazy(() => import('@/pages/Payment').then(m => ({ default: m.PaymentPage })));
 const SettlementPage = lazy(() => import('@/pages/Settlement').then(m => ({ default: m.SettlementPage })));
 
+// Settlement 模块 - 结算管理（新版）
+const SettlementWalletPage = lazy(() => import('@/features/settlement/pages/WalletPage').then(m => ({ default: m.WalletPage })));
+const SettlementIncomePage = lazy(() => import('@/features/settlement/pages/IncomePage').then(m => ({ default: m.IncomePage })));
+const SettlementWithdrawalPage = lazy(() => import('@/features/settlement/pages/WithdrawalPage').then(m => ({ default: m.WithdrawalPage })));
+const SettlementBankAccountPage = lazy(() => import('@/features/settlement/pages/BankAccountPage').then(m => ({ default: m.BankAccountPage })));
+
+// User 模块 - 用户中心
+const UserProfilePage = lazy(() => import('@/features/user/pages/UserProfilePage').then(m => ({ default: m.UserProfilePage })));
+const UserSettingsPage = lazy(() => import('@/features/user/pages/UserSettingsPage').then(m => ({ default: m.UserSettingsPage })));
+
+// Forum 模块 - 论坛（新版）
+const ForumHomePage = lazy(() => import('@/features/forum/pages/ForumHomePage').then(m => ({ default: m.ForumHomePage })));
+const ForumPostDetailPage = lazy(() => import('@/features/forum/pages/PostDetailPage').then(m => ({ default: m.PostDetailPage })));
+
+// Chat 模块 - AI 聊天（新版）
+const AIChatPage = lazy(() => import('@/features/chat/pages/ChatPage').then(m => ({ default: m.ChatPage })));
+
+// Recommendation 模块 - 个性化推荐
+const RecommendationPage = lazy(() => import('@/features/recommendation/pages/RecommendationPage').then(m => ({ default: m.RecommendationPage })));
+const OnboardingPage = lazy(() => import('@/features/recommendation/pages/OnboardingPage').then(m => ({ default: m.OnboardingPage })));
+
 const ForumListPage = lazy(() => import('@/pages/ForumListPage').then(m => ({ default: m.ForumListPage })));
-const NotificationPage = lazy(() => import('@/pages/NotificationPage').then(m => ({ default: m.NotificationPage })));
 
 // Calendar 模块 - 法律日历
-const CalendarPage = lazy(() => import('@/features/calendar/pages/CalendarPage').then(m => ({ default: m.CalendarPage })));
+const CalendarPage = lazy(() => import('@/pages/CalendarPage').then(m => ({ default: m.CalendarPage })));
 
 // Contracts 模块 - 合同管理
 const ContractReviewPage = lazy(() => import('@/features/contracts/pages/ContractReviewPage').then(m => ({ default: m.ContractReviewPage })));
 const ContractHistoryPage = lazy(() => import('@/features/contracts/pages/ContractHistoryPage').then(m => ({ default: m.ContractHistoryPage })));
-
-// Document 模块 - 文档管理
-const DocumentTemplatesPage = lazy(() => import('@/features/document/pages/DocumentTemplatesPage').then(m => ({ default: m.DocumentTemplatesPage })));
 
 // Points 模块 - 积分系统
 const PointsHistoryPage = lazy(() => import('@/features/points/pages/PointsHistoryPage').then(m => ({ default: m.PointsHistoryPage })));
@@ -77,10 +90,6 @@ const ForumAdminPage = lazy(() => import('@/features/forum-admin/pages/ForumAdmi
 
 // News-Admin 模块 - 新闻管理
 const NewsAdminPage = lazy(() => import('@/features/news-admin/pages/NewsAdminPage').then(m => ({ default: m.NewsAdminPage })));
-const NewsIngestRunsPage = lazy(() => import('@/features/news-admin/pages/NewsIngestRunsPage').then(m => ({ default: m.NewsIngestRunsPage })));
-const NewsSourcesPage = lazy(() => import('@/features/news-admin/pages/NewsSourcesPage').then(m => ({ default: m.NewsSourcesPage })));
-const NewsTopicsPage = lazy(() => import('@/features/news-admin/pages/NewsTopicsPage').then(m => ({ default: m.NewsTopicsPage })));
-const NewsCommentsPage = lazy(() => import('@/features/news-admin/pages/NewsCommentsPage').then(m => ({ default: m.NewsCommentsPage })));
 
 // Membership 模块 - 会员系统
 const VipPage = lazy(() => import('@/features/membership/pages/VipPage').then(m => ({ default: m.VipPage })));
@@ -88,44 +97,41 @@ const VipPage = lazy(() => import('@/features/membership/pages/VipPage').then(m 
 // Lawyer-Matching 模块 - 律师匹配
 const LawyerMatchingPage = lazy(() => import('@/features/lawyer-matching/pages/LawyerMatchingPage').then(m => ({ default: m.LawyerMatchingPage })));
 
-// Lawyer 模块 - 律师管理
-const LawyerVerificationAdminPage = lazy(() => import('@/features/lawyer/pages/LawyerVerificationAdminPage').then(m => ({ default: m.LawyerVerificationAdminPage })));
-const LawFirmsPage = lazy(() => import('@/features/lawyer/pages/LawFirmsPage').then(m => ({ default: m.LawFirmsPage })));
-
 // AI-Consultation 模块 - AI 咨询
 const AIConsultationPage = lazy(() => import('@/features/ai-consultation/pages/AIConsultationPage').then(m => ({ default: m.AIConsultationPage })));
+const ConsultationFormPage = lazy(() => import('@/features/ai-consultation/pages/ConsultationFormPage').then(m => ({ default: m.ConsultationFormPage })));
+const ConsultationHistoryPage = lazy(() => import('@/features/ai-consultation/pages/ConsultationHistoryPage').then(m => ({ default: m.ConsultationHistoryPage })));
+const LawyerSelectionPage = lazy(() => import('@/features/ai-consultation/pages/LawyerSelectionPage').then(m => ({ default: m.LawyerSelectionPage })));
+const ConsultationChatPage = lazy(() => import('@/features/ai-consultation/pages/ConsultationChatPage').then(m => ({ default: m.ConsultationChatPage })));
+
+// Video Consultation 模块 - 视频咨询
+const VideoConsultationPage = lazy(() => import('@/features/video-consultation/pages').then(m => ({ default: m.VideoConsultationPage })));
 
 // Post 模块 - 帖子管理
 const PostListPage = lazy(() => import('@/features/post/pages/PostListPage').then(m => ({ default: m.PostListPage })));
 const PostDetailPage = lazy(() => import('@/features/post/pages/PostDetailPage').then(m => ({ default: m.PostDetailPage })));
 const NewPostPage = lazy(() => import('@/features/post/pages/NewPostPage').then(m => ({ default: m.NewPostPage })));
 const EditPostPage = lazy(() => import('@/features/post/pages/EditPostPage').then(m => ({ default: m.EditPostPage })));
-const PostsManagePage = lazy(() => import('@/features/post/pages/PostsManagePage').then(m => ({ default: m.PostsManagePage })));
-
 // Forum-Assistant 模块 - 论坛助手
 const ForumAssistantPage = lazy(() => import('@/features/forum-assistant/pages/ForumAssistantPage').then(m => ({ default: m.ForumAssistantPage })));
-
-// Search 模块 - 搜索系统
-const SearchPage = lazy(() => import('@/features/search/pages/SearchPage').then(m => ({ default: m.SearchPage })));
 
 // Feedback 模块 - 用户反馈系统
 const FeedbackPage = lazy(() => import('@/features/feedback/pages/FeedbackPage').then(m => ({ default: m.FeedbackPage })));
 
-// FAQ 模块 - 常见问题
-const FAQPage = lazy(() => import('@/features/faq/pages/FAQPage').then(m => ({ default: m.FAQPage })));
-const FAQAdminPage = lazy(() => import('@/features/faq/pages/FAQAdminPage').then(m => ({ default: m.FAQAdminPage })));
+// Static Pages 模块 - 静态页面
+const AboutPage = lazy(() => import('@/features/static-pages/pages/AboutPage').then(m => ({ default: m.AboutPage })));
+const ContactPage = lazy(() => import('@/features/static-pages/pages/ContactPage').then(m => ({ default: m.ContactPage })));
+const TermsPage = lazy(() => import('@/features/static-pages/pages/TermsPage').then(m => ({ default: m.TermsPage })));
+const PrivacyPage = lazy(() => import('@/features/static-pages/pages/PrivacyPage').then(m => ({ default: m.PrivacyPage })));
+const HelpPage = lazy(() => import('@/features/static-pages/pages/HelpPage').then(m => ({ default: m.HelpPage })));
+const FeeCalculatorPage = lazy(() => import('@/features/static-pages/pages/FeeCalculatorPage').then(m => ({ default: m.FeeCalculatorPage })));
 
 // Order 模块 - 订单管理
 const OrderListPage = lazy(() => import('@/features/order/pages/OrderListPage').then(m => ({ default: m.OrderListPage })));
 const OrderDetailPage = lazy(() => import('@/features/order/pages/OrderDetailPage').then(m => ({ default: m.OrderDetailPage })));
 
-// Payment 模块 - 支付回调管理（管理员用）
-const PaymentCallbacksPage = lazy(() => import('@/features/payment/pages/PaymentCallbacksPage').then(m => ({ default: m.PaymentCallbacksPage })));
-const SettlementStatsPage = lazy(() => import('@/features/payment/pages/SettlementStatsPage').then(m => ({ default: m.SettlementStatsPage })));
-
 // Notification 模块 - 通知中心
 const NotificationCenterPage = lazy(() => import('@/features/notification/pages/NotificationCenter').then(m => ({ default: m.NotificationCenter })));
-const SystemNotificationsPage = lazy(() => import('@/features/notification/pages/SystemNotificationsPage').then(m => ({ default: m.SystemNotificationsPage })));
 
 // Wechat 模块 - 微信生态
 const WechatPage = lazy(() => import('@/features/wechat/pages/WechatPage').then(m => ({ default: m.WechatPage })));
@@ -138,23 +144,11 @@ const TwoFactorSetupPage = lazy(() => import('@/features/security/pages/TwoFacto
 const LoginAuditPage = lazy(() => import('@/features/security/pages/LoginAuditPage').then(m => ({ default: m.LoginAuditPage })));
 const DeviceListPage = lazy(() => import('@/features/security/pages/DeviceListPage').then(m => ({ default: m.DeviceListPage })));
 
-// 管理后台 - 单独打包
-const AdminDashboardPage = lazy(() => import('@/features/admin/pages/AdminDashboardPage').then(m => ({ default: m.AdminDashboardPage })));
+// Admin 模块 - 聚合子路由入口（仅访问 /admin 时加载）
+const AdminRouteShell = lazy(() => import('@/pages/AdminDashboardPage').then(m => ({ default: m.AdminRouteShell })));
 
-// Admin Monitor 模块 - 系统监控
-const MonitorPage = lazy(() => import('@/features/admin_monitor/pages/MonitorPage').then(m => ({ default: m.MonitorPage })));
-
-// Promotion 模块 - 提现管理（管理员用）
-const WithdrawalsAdminPage = lazy(() => import('@/features/promotion/pages/WithdrawalsAdminPage').then(m => ({ default: m.WithdrawalsAdminPage })));
-
-// Knowledge-Admin 模块 - 知识库管理
-const KnowledgeAdminPage = lazy(() => import('@/features/knowledge_admin/pages/KnowledgeAdminPage').then(m => ({ default: m.KnowledgeAdminPage })));
-
-// AI Quality 模块 - AI质量监控
-const AIQualityPage = lazy(() => import('@/features/ai_quality/pages/AIQualityPage').then(m => ({ default: m.AIQualityPage })));
-
-// Moderation 模块 - 内容审核
-const ModerationPage = lazy(() => import('@/features/moderation/pages/ModerationPage').then(m => ({ default: m.ModerationPage })));
+// Legal Document Mall 模块 - 法律文书商城
+const LegalDocumentMallPage = lazy(() => import('@/features/legal-document-mall/pages/LegalDocumentMallPage').then(m => ({ default: m.default })));
 
 // 懒加载包装器
 const lazyLoad = (Component: React.LazyExoticComponent<React.ComponentType>) => (
@@ -168,7 +162,7 @@ const router = createBrowserRouter([
     path: '/',
     element: <RootLayout />,
     children: [
-      { index: true, element: <HomePage /> },
+      { index: true, element: lazyLoad(HomePage) },
       { path: 'login', element: lazyLoad(LoginPage) },
       { path: 'register', element: lazyLoad(RegisterPage) },
       { path: 'chat', element: lazyLoad(ChatPage) },
@@ -180,9 +174,24 @@ const router = createBrowserRouter([
       { path: 'news', element: lazyLoad(NewsPage) },
       { path: 'payment', element: lazyLoad(PaymentPage) },
       { path: 'settlement', element: lazyLoad(SettlementPage) },
+      { path: 'settlement/wallet', element: lazyLoad(SettlementWalletPage) },
+      { path: 'settlement/income', element: lazyLoad(SettlementIncomePage) },
+      { path: 'settlement/withdrawal', element: lazyLoad(SettlementWithdrawalPage) },
+      { path: 'settlement/bank-account', element: lazyLoad(SettlementBankAccountPage) },
+      // User 模块路由 - 用户中心
+      { path: 'user/profile', element: lazyLoad(UserProfilePage) },
+      { path: 'user/settings', element: lazyLoad(UserSettingsPage) },
+      // Forum 模块路由 - 论坛（新版）
+      { path: 'forum/home', element: lazyLoad(ForumHomePage) },
+      { path: 'forum/post/:id', element: lazyLoad(ForumPostDetailPage) },
+      // Chat 模块路由 - AI 聊天（新版）
+      { path: 'ai-chat', element: lazyLoad(AIChatPage) },
+      { path: 'ai-chat/:sessionId', element: lazyLoad(AIChatPage) },
+      // Recommendation 模块路由 - 个性化推荐
+      { path: 'recommendation', element: lazyLoad(RecommendationPage) },
+      { path: 'onboarding', element: lazyLoad(OnboardingPage) },
       { path: 'forum', element: lazyLoad(ForumListPage) },
       { path: 'calendar', element: lazyLoad(CalendarPage) },
-      { path: 'notifications', element: lazyLoad(NotificationPage) },
       { path: 'contracts', element: lazyLoad(ContractReviewPage) },
       { path: 'contracts/history', element: lazyLoad(ContractHistoryPage) },
       { path: 'points', element: lazyLoad(PointsMallPage) },
@@ -209,37 +218,23 @@ const router = createBrowserRouter([
       { path: 'orders', element: lazyLoad(OrderListPage) },
       { path: 'orders/:orderNo', element: lazyLoad(OrderDetailPage) },
       { path: 'ai-consultation', element: lazyLoad(AIConsultationPage) },
+      { path: 'ai-consultation/:sessionId', element: lazyLoad(AIConsultationPage) },
+      { path: 'video-consultation', element: lazyLoad(VideoConsultationPage) },
+      { path: 'video-consultation/:id', element: lazyLoad(VideoConsultationPage) },
+      { path: 'video-consultation/:id/:action', element: lazyLoad(VideoConsultationPage) },
+      { path: 'consultation/new', element: lazyLoad(ConsultationFormPage) },
+      { path: 'consultation/history', element: lazyLoad(ConsultationHistoryPage) },
+      { path: 'consultation/:id/select-lawyer', element: lazyLoad(LawyerSelectionPage) },
+      { path: 'consultation/:id/chat', element: lazyLoad(ConsultationChatPage) },
       { path: 'posts', element: lazyLoad(PostListPage) },
       { path: 'posts/new', element: lazyLoad(NewPostPage) },
       { path: 'posts/:id', element: lazyLoad(PostDetailPage) },
       { path: 'posts/:id/edit', element: lazyLoad(EditPostPage) },
       { path: 'forum-assistant', element: lazyLoad(ForumAssistantPage) },
-      { path: 'search', element: lazyLoad(SearchPage) },
       { path: 'feedback', element: lazyLoad(FeedbackPage) },
-      { path: 'faq', element: lazyLoad(FAQPage) },
-      { path: 'admin', element: lazyLoad(AdminDashboardPage) },
-      { path: 'admin/faq', element: lazyLoad(FAQAdminPage) },
-      { path: 'admin/*', element: lazyLoad(AdminDashboardPage) },
-      { path: 'admin/monitor', element: lazyLoad(MonitorPage) },
-      { path: 'admin/ai-quality', element: lazyLoad(AIQualityPage) },
-      { path: 'admin/moderation', element: lazyLoad(ModerationPage) },
+      { path: 'admin/*', element: lazyLoad(AdminRouteShell) },
       { path: 'forum-admin', element: lazyLoad(ForumAdminPage) },
       { path: 'news-admin', element: lazyLoad(NewsAdminPage) },
-      { path: 'admin/news/ingest-runs', element: lazyLoad(NewsIngestRunsPage) },
-      { path: 'admin/news/sources', element: lazyLoad(NewsSourcesPage) },
-      { path: 'admin/news/topics', element: lazyLoad(NewsTopicsPage) },
-      { path: 'admin/news/comments', element: lazyLoad(NewsCommentsPage) },
-      { path: 'admin/lawyer/verifications', element: lazyLoad(LawyerVerificationAdminPage) },
-      { path: 'admin/lawyer/firms', element: lazyLoad(LawFirmsPage) },
-      { path: 'admin/withdrawals', element: lazyLoad(WithdrawalsAdminPage) },
-      { path: 'admin/posts', element: lazyLoad(PostsManagePage) },
-      { path: 'admin/payment/callbacks', element: lazyLoad(PaymentCallbacksPage) },
-      { path: 'admin/payment/settlement', element: lazyLoad(SettlementStatsPage) },
-      { path: 'admin/notifications', element: lazyLoad(SystemNotificationsPage) },
-      { path: 'admin/document-templates', element: lazyLoad(DocumentTemplatesPage) },
-      { path: 'admin/consultation-templates', element: lazyLoad(ConsultationTemplatesPage) },
-      { path: 'admin/settings', element: lazyLoad(SystemSettingsPage) },
-      { path: 'admin/knowledge', element: lazyLoad(KnowledgeAdminPage) },
       // Notification 模块路由
       { path: 'notifications', element: lazyLoad(NotificationCenterPage) },
       // Wechat 模块路由
@@ -251,6 +246,17 @@ const router = createBrowserRouter([
       { path: 'security/2fa-setup', element: lazyLoad(TwoFactorSetupPage) },
       { path: 'security/audit-logs', element: lazyLoad(LoginAuditPage) },
       { path: 'security/devices', element: lazyLoad(DeviceListPage) },
+      // Static Pages 模块路由 - 静态页面
+      { path: 'about', element: lazyLoad(AboutPage) },
+      { path: 'contact', element: lazyLoad(ContactPage) },
+      { path: 'terms', element: lazyLoad(TermsPage) },
+      { path: 'privacy', element: lazyLoad(PrivacyPage) },
+      { path: 'help', element: lazyLoad(HelpPage) },
+      { path: 'calculator', element: lazyLoad(FeeCalculatorPage) },
+      { path: 'ai-disclaimer', element: lazyLoad(TermsPage) }, // AI免责声明暂时重定向到用户协议
+      // Legal Document Mall 模块路由 - 法律文书商城
+      { path: 'legal-documents', element: lazyLoad(LegalDocumentMallPage) },
+      { path: 'legal-documents/:id', element: lazyLoad(LegalDocumentMallPage) },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

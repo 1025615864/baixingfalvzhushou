@@ -1,66 +1,77 @@
+/**
+ * Chat API - 聊天功能 API 接口
+ * 连接真实后端 API
+ *
+ * 后端 API 路径：
+ * - POST /ai/chat - 发送消息（后端自动创建会话）
+ * - GET /ai/consultations - 获取会话列表
+ * - GET /ai/consultations/:sessionId - 获取会话详情
+ * - DELETE /ai/consultations/:sessionId - 删除会话
+ */
+
 import { api } from '@/shared/lib/api/client';
-import type {
-  ChatSession,
-  ChatMessage,
-  SendMessageRequest,
-} from '@/features/chat/types';
+
+// 后端响应类型
+interface BackendChatResponse {
+  session_id: string;
+  answer: string;
+  references: Array<{
+    law_name: string;
+    article: string;
+    content: string;
+    relevance: number;
+    similarity: number;
+  }>;
+  assistant_message_id?: number;
+  confidence?: string;
+}
+
+interface BackendConsultationListItem {
+  id: number;
+  session_id: string;
+  title: string | null;
+  created_at: string;
+  message_count: number;
+}
+
+interface BackendConsultationDetail {
+  id: number;
+  session_id: string;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+  messages: Array<{
+    id: number;
+    role: string;
+    content: string;
+    references: string | null;
+    created_at: string;
+  }>;
+}
 
 // 获取会话列表
-export const getSessions = () => api.get<ChatSession[]>('/chat/sessions');
+export const getSessions = () =>
+  api.get<BackendConsultationListItem[]>('/ai/consultations');
 
 // 获取会话详情
 export const getSession = (sessionId: string) =>
-  api.get<ChatSession>(`/chat/sessions/${sessionId}`);
-
-// 创建新会话
-export const createSession = () => api.post<ChatSession>('/chat/sessions');
+  api.get<BackendConsultationDetail>(`/ai/consultations/${sessionId}`);
 
 // 删除会话
 export const deleteSession = (sessionId: string) =>
-  api.delete<void>(`/chat/sessions/${sessionId}`);
+  api.delete<void>(`/ai/consultations/${sessionId}`);
 
-// 发送消息（流式）
-export const sendMessageStream = async (
-  data: SendMessageRequest,
-  onChunk: (chunk: string) => void
-) => {
-  const response = await fetch(
-    `${import.meta.env.VITE_API_BASE_URL}/chat/stream`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('access_token')}`,
-      },
-      body: JSON.stringify(data),
-    }
-  );
+// 发送消息（非流式）- 后端会自动创建会话
+export const sendMessage = (data: { message: string; session_id?: string | null }) =>
+  api.post<BackendChatResponse>('/ai/chat', data);
 
-  if (!response.ok) {
-    throw new Error('发送消息失败');
-  }
-
-  const reader = response.body?.getReader();
-  if (!reader) {
-    throw new Error('无法读取响应');
-  }
-
-  const decoder = new TextDecoder();
-  let done = false;
-  while (!done) {
-    const result = await reader.read();
-    done = result.done;
-    if (done) break;
-    const { value } = result;
-    const chunk = decoder.decode(value);
-    onChunk(chunk);
-  }
-};
-
-// 获取历史消息
+// 获取历史消息（通过获取会话详情）
 export const getMessages = (sessionId: string) =>
-  api.get<ChatMessage[]>(`/chat/sessions/${sessionId}/messages`);
+  api.get<BackendConsultationDetail>(`/ai/consultations/${sessionId}`);
 
-// 清空会话历史
-export const clearSession = (sessionId: string) =>
-  api.post<void>(`/chat/sessions/${sessionId}/clear`);
+// 导出类型供其他模块使用
+export type {
+  BackendChatResponse,
+  BackendConsultationListItem,
+  BackendConsultationDetail,
+};

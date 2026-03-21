@@ -12,6 +12,8 @@ export interface CardProps {
   padding?: 'none' | 'sm' | 'md' | 'lg' | 'xl';
   shadow?: 'none' | 'sm' | 'md' | 'lg';
   onClick?: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
 export function Card({
@@ -21,6 +23,8 @@ export function Card({
   padding = 'md',
   shadow = 'md',
   onClick,
+  onMouseEnter,
+  onMouseLeave,
 }: CardProps): JSX.Element {
   const baseStyles = 'bg-white rounded-2xl overflow-hidden transition-all duration-300';
 
@@ -57,6 +61,8 @@ export function Card({
         ${className}
       `}
       onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
     >
@@ -83,18 +89,13 @@ export function CardHeader({ children, className = '' }: CardHeaderProps): JSX.E
 export interface CardTitleProps {
   children: React.ReactNode;
   className?: string;
-  as?: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
 }
 
-export function CardTitle({
-  children,
-  className = '',
-  as: Component = 'h3',
-}: CardTitleProps): JSX.Element {
+export function CardTitle({ children, className = '' }: CardTitleProps): JSX.Element {
   return (
-    <Component className={`text-lg font-semibold text-slate-900 ${className}`}>
+    <h3 className={`text-lg font-semibold text-slate-900 ${className}`}>
       {children}
-    </Component>
+    </h3>
   );
 }
 
@@ -134,91 +135,9 @@ export interface CardFooterProps {
 
 export function CardFooter({ children, className = '' }: CardFooterProps): JSX.Element {
   return (
-    <div className={`mt-4 pt-4 border-t border-slate-100 flex items-center gap-3 ${className}`}>
+    <div className={`mt-4 pt-4 border-t border-slate-100 ${className}`}>
       {children}
     </div>
   );
 }
 
-// 特色卡片（带图标）
-export interface FeatureCardProps {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  className?: string;
-  iconBgColor?: string;
-  iconColor?: string;
-  onClick?: () => void;
-}
-
-export function FeatureCard({
-  icon,
-  title,
-  description,
-  className = '',
-  iconBgColor = 'bg-primary-100',
-  iconColor = 'text-primary-600',
-  onClick,
-}: FeatureCardProps): JSX.Element {
-  return (
-    <Card
-      variant={onClick ? 'interactive' : 'hover'}
-      className={className}
-      onClick={onClick}
-    >
-      <div className="flex items-start gap-4">
-        <div className={`flex-shrink-0 w-12 h-12 ${iconBgColor} ${iconColor} rounded-xl flex items-center justify-center`}>
-          {icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <CardTitle className="text-base">{title}</CardTitle>
-          <CardDescription className="mt-1">{description}</CardDescription>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-// 统计卡片
-export interface StatCardProps {
-  value: string | number;
-  label: string;
-  icon?: React.ReactNode;
-  trend?: {
-    value: number;
-    isPositive: boolean;
-  };
-  className?: string;
-}
-
-export function StatCard({
-  value,
-  label,
-  icon,
-  trend,
-  className = '',
-}: StatCardProps): JSX.Element {
-  return (
-    <Card variant="default" className={className}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-2xl font-bold text-slate-900">{value}</p>
-          <p className="text-sm text-slate-500 mt-1">{label}</p>
-          {trend && (
-            <div className={`flex items-center gap-1 mt-2 text-sm font-medium ${
-              trend.isPositive ? 'text-green-600' : 'text-red-600'
-            }`}>
-              <span>{trend.isPositive ? '↑' : '↓'}</span>
-              <span>{Math.abs(trend.value)}%</span>
-            </div>
-          )}
-        </div>
-        {icon && (
-          <div className="flex-shrink-0 w-10 h-10 bg-primary-50 text-primary-600 rounded-lg flex items-center justify-center">
-            {icon}
-          </div>
-        )}
-      </div>
-    </Card>
-  );
-}

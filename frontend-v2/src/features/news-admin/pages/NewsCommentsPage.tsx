@@ -6,7 +6,10 @@
 import { useState } from 'react';
 import { Check, X, Trash2, MessageSquare, Filter } from 'lucide-react';
 
-import { Card, Button, Badge, Pagination } from '@/components/ui';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Pagination } from '@/components/ui/Pagination';
 
 import { useComments, useReviewComment, useDeleteComment } from '../hooks/useNewsAdmin';
 import type { NewsComment, ReviewCommentRequest } from '../types';

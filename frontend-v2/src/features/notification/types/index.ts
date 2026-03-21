@@ -64,6 +64,8 @@ export interface Notification {
   link: string | null;
   /** 是否已读 */
   is_read: boolean;
+  /** 已读时间 */
+  read_at: string | null;
   /** 相关用户ID */
   related_user_id: number | null;
   /** 相关用户名称 */

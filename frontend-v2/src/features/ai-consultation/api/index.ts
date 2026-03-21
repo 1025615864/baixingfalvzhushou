@@ -74,17 +74,9 @@ interface BackendMessageMetadata {
 }
 
 /**
- * 安全获取 JSON 响应
- */
-async function safeJson<T>(response: Response): Promise<T> {
-  const data = await response.json() as T;
-  return data;
-}
-
-/**
  * 获取 API 错误信息
  */
-function getErrorMessage(error: unknown, defaultMsg: string): string {
+function _getErrorMessage(error: unknown, defaultMsg: string): string {
   if (typeof error === 'object' && error !== null && 'detail' in error) {
     return (error as ApiErrorResponse).detail || defaultMsg;
   }
@@ -130,9 +122,9 @@ function isValidErrorCode(code: string): code is AIConsultationErrorCode {
 function createError(error: unknown): AIConsultationError {
   return {
     code: getErrorCode(error),
-    message: getErrorMessage(error, '未知错误'),
-    details: typeof error === 'object' && error !== null 
-      ? error as Record<string, unknown> 
+    message: _getErrorMessage(error, '未知错误'),
+    details: typeof error === 'object' && error !== null
+      ? error as Record<string, unknown>
       : undefined,
   };
 }
@@ -199,30 +191,7 @@ export async function apiCreateSession(
 export async function apiGetSessions(
   params: GetSessionsRequest = {}
 ): Promise<GetSessionsResponse> {
-  const searchParams = new URLSearchParams();
-  if (params.page) searchParams.set('page', String(params.page));
-  if (params.pageSize) searchParams.set('page_size', String(params.pageSize));
-  if (params.status) searchParams.set('status', params.status);
-
-  const url = `${API_BASE}/consultations${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ 
-      detail: '获取会话列表失败',
-      code: 'INTERNAL_ERROR',
-    }));
-    throw new Error(getErrorMessage(error, '获取会话列表失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     sessions: Array<{
       id: string;
       user_id: string;
@@ -240,7 +209,13 @@ export async function apiGetSessions(
     total: number;
     page: number;
     total_pages: number;
-  }>(response);
+  }>(`${API_BASE}/consultations`, {
+    params: {
+      ...(params.page && { page: params.page }),
+      ...(params.pageSize && { page_size: params.pageSize }),
+      ...(params.status && { status: params.status }),
+    },
+  });
 
   return {
     sessions: data.sessions.map(s => ({
@@ -268,23 +243,7 @@ export async function apiGetSessions(
  * 获取会话详情
  */
 export async function apiGetSession(sessionId: string): Promise<AISession> {
-  const response = await fetch(`${API_BASE}/consultations/${sessionId}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ 
-      detail: '获取会话详情失败',
-      code: 'SESSION_NOT_FOUND',
-    }));
-    throw new Error(getErrorMessage(error, '获取会话详情失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     id: string;
     user_id: string;
     title: string;
@@ -307,7 +266,7 @@ export async function apiGetSession(sessionId: string): Promise<AISession> {
       updated_at: string;
       metadata?: BackendMessageMetadata;
     }>;
-  }>(response);
+  }>(`${API_BASE}/consultations/${sessionId}`);
 
   return {
     id: data.id,
@@ -341,29 +300,7 @@ export async function apiGetSession(sessionId: string): Promise<AISession> {
 export async function apiGetSessionHistory(
   params: GetSessionHistoryRequest
 ): Promise<GetSessionHistoryResponse> {
-  const searchParams = new URLSearchParams();
-  if (params.beforeMessageId) searchParams.set('before_message_id', params.beforeMessageId);
-  if (params.limit) searchParams.set('limit', String(params.limit));
-
-  const url = `${API_BASE}/consultations/${params.sessionId}/messages${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ 
-      detail: '获取会话历史失败',
-      code: 'SESSION_NOT_FOUND',
-    }));
-    throw new Error(getErrorMessage(error, '获取会话历史失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     messages: Array<{
       id: string;
       session_id: string;
@@ -375,7 +312,12 @@ export async function apiGetSessionHistory(
       metadata?: BackendMessageMetadata;
     }>;
     has_more: boolean;
-  }>(response);
+  }>(`${API_BASE}/consultations/${params.sessionId}/messages`, {
+    params: {
+      ...(params.beforeMessageId && { before_message_id: params.beforeMessageId }),
+      ...(params.limit && { limit: params.limit }),
+    },
+  });
 
   return {
     messages: data.messages.map(m => ({
@@ -401,6 +343,7 @@ export async function apiDeleteSession(sessionId: string): Promise<void> {
 
 /**
  * 发送消息（非流式）
+ * 注意：修正请求参数与后端对齐 - 后端使用 message 而非 content
  */
 export async function apiSendMessage(
   request: SendMessageRequest
@@ -413,7 +356,7 @@ export async function apiSendMessage(
     metadata?: BackendMessageMetadata;
   }>(`${API_BASE}/chat`, {
     session_id: request.sessionId,
-    content: request.content,
+    message: request.content,  // 后端使用 message 字段
     stream: false,
     context: request.context,
   });
@@ -444,6 +387,7 @@ export interface StreamController {
 
 /**
  * 发送消息（流式响应）
+ * 注意：修正API路径和参数与后端对齐
  */
 export function apiSendMessageStream(
   request: SendMessageRequest,
@@ -453,7 +397,8 @@ export function apiSendMessageStream(
 ): StreamController {
   const abortController = new AbortController();
 
-  fetch(`${API_BASE}/stream`, {
+  // 后端流式响应也使用 /ai/chat 端点，通过 stream: true 参数区分
+  fetch(`${API_BASE}/chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -462,7 +407,7 @@ export function apiSendMessageStream(
     credentials: 'include',
     body: JSON.stringify({
       session_id: request.sessionId,
-      content: request.content,
+      message: request.content,  // 后端使用 message 字段
       stream: true,
       context: request.context,
     }),
@@ -476,7 +421,7 @@ export function apiSendMessageStream(
       } catch {
         errorData = { detail: errorText, code: 'INTERNAL_ERROR' };
       }
-      throw new Error(getErrorMessage(errorData, '流式请求失败'));
+      throw new Error(_getErrorMessage(errorData, '流式请求失败'));
     }
 
     const reader = response.body?.getReader();
@@ -571,22 +516,7 @@ export async function apiCreateShare(request: CreateShareRequest): Promise<Share
  * 获取分享的咨询内容
  */
 export async function apiGetSharedConsultation(token: string): Promise<SharedConsultationResponse> {
-  const response = await fetch(`${API_BASE}/share/${token}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({
-      detail: '获取分享内容失败',
-      code: 'SHARE_INVALID',
-    }));
-    throw new Error(getErrorMessage(error, '获取分享内容失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     session_id: string;
     title: string | null;
     created_at: string | null;
@@ -596,7 +526,7 @@ export async function apiGetSharedConsultation(token: string): Promise<SharedCon
       references?: string;
       created_at: string | null;
     }>;
-  }>(response);
+  }>(`${API_BASE}/share/${token}`);
 
   return {
     sessionId: data.session_id,
@@ -691,4 +621,42 @@ export function parseSSEEvent(line: string): { event?: string; data: string; id?
   }
 
   return result;
+}
+
+// ==================== 元数据转换函数 (FR-005) ====================
+
+/**
+ * AI 消息元数据响应转换函数
+ * 将后端蛇形命名转换为前端驼峰命名
+ */
+export function convertMessageMetadata<T extends Record<string, unknown>>(
+  backendData: T
+): T {
+  const result: Partial<T> = {};
+  
+  for (const [key, value] of Object.entries(backendData)) {
+    // 蛇形转驼峰
+    const camelKey = key.replace(/_([a-z])/g, (match: string, letter: string) => letter.toUpperCase()) as keyof T;
+    result[camelKey] = value as T[keyof T];
+  }
+  
+  return result as T;
+}
+
+/**
+ * AI 消息元数据请求转换函数
+ * 将前端驼峰命名转换为后端蛇形命名
+ */
+export function convertMessageMetadataRequest<T extends Record<string, unknown>>(
+  frontendData: T
+): T {
+  const result: Partial<T> = {};
+  
+  for (const [key, value] of Object.entries(frontendData)) {
+    // 驼峰转蛇形
+    const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase() as keyof T;
+    result[snakeKey] = value as T[keyof T];
+  }
+  
+  return result as T;
 }

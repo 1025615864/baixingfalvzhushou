@@ -48,6 +48,13 @@
     )
     cb = get_circuit_breaker("payment_service", config)
     ```
+
+监控集成:
+    熔断器自动导出Prometheus指标，包括：
+    - 状态变化事件
+    - 调用成功/失败计数
+    - 熔断器打开次数
+    - 平均恢复时间
 """
 from __future__ import annotations
 
@@ -56,9 +63,56 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Union
 
 logger = logging.getLogger("circuit_breaker")
+
+# Prometheus指标（延迟导入避免循环依赖）
+_metrics_enabled = False
+_circuit_state_gauge = None
+_circuit_calls_counter = None
+_circuit_opens_counter = None
+_circuit_recovery_time = None
+
+
+def _init_prometheus_metrics() -> None:
+    """初始化Prometheus指标（延迟加载）"""
+    global _metrics_enabled, _circuit_state_gauge, _circuit_calls_counter
+    global _circuit_opens_counter, _circuit_recovery_time
+    
+    if _metrics_enabled:
+        return
+    
+    try:
+        from prometheus_client import Counter, Gauge, Histogram
+        
+        _circuit_state_gauge = Gauge(
+            'circuit_breaker_state',
+            'Circuit breaker state (0=closed, 1=half_open, 2=open)',
+            ['name']
+        )
+        
+        _circuit_calls_counter = Counter(
+            'circuit_breaker_calls_total',
+            'Total calls through circuit breaker',
+            ['name', 'result']
+        )
+        
+        _circuit_opens_counter = Counter(
+            'circuit_breaker_opens_total',
+            'Total times circuit breaker opened',
+            ['name']
+        )
+        
+        _circuit_recovery_time = Histogram(
+            'circuit_breaker_recovery_seconds',
+            'Time for circuit breaker to recover from open to closed',
+            ['name']
+        )
+        
+        _metrics_enabled = True
+    except ImportError:
+        logger.debug("Prometheus client not available, metrics disabled")
 
 
 class CircuitState(Enum):
@@ -164,18 +218,54 @@ class CircuitBreaker:
 
     def __post_init__(self) -> None:
         self._lock = asyncio.Lock()
+        self._open_time: Optional[float] = None  # 记录打开时间用于计算恢复时间
+        _init_prometheus_metrics()
+        self._update_metrics_state()
+
+    def _update_metrics_state(self) -> None:
+        """更新Prometheus状态指标"""
+        if _metrics_enabled and _circuit_state_gauge:
+            state_value = {
+                CircuitState.CLOSED: 0,
+                CircuitState.HALF_OPEN: 1,
+                CircuitState.OPEN: 2,
+            }.get(self.state, 0)
+            _circuit_state_gauge.labels(name=self.name).set(state_value)
+
+    def _record_call_metrics(self, result: str) -> None:
+        """记录调用指标
+        
+        Args:
+            result: 调用结果 ('success', 'failure', 'rejected')
+        """
+        if _metrics_enabled and _circuit_calls_counter:
+            _circuit_calls_counter.labels(name=self.name, result=result).inc()
+
+    def _record_open_event(self) -> None:
+        """记录熔断器打开事件"""
+        if _metrics_enabled and _circuit_opens_counter:
+            _circuit_opens_counter.labels(name=self.name).inc()
+
+    def _record_recovery_time(self) -> None:
+        """记录恢复时间"""
+        if _metrics_enabled and _circuit_recovery_time and self._open_time:
+            recovery_time = time.time() - self._open_time
+            _circuit_recovery_time.labels(name=self.name).observe(recovery_time)
+            self._open_time = None
 
     def _update_last_failure(self) -> None:
         """更新失败统计"""
         self.stats.last_failure_time = time.time()
         self.stats.consecutive_failures += 1
         self.stats.consecutive_successes = 0
+        self._record_call_metrics('failure')
 
     def _update_last_success(self) -> None:
         """更新成功统计"""
         self.stats.last_success_time = time.time()
         self.stats.consecutive_successes += 1
         self.stats.consecutive_failures = 0
+        self._record_call_metrics('success')
 
     def _should_open(self) -> bool:  # noqa: E501
         """检查是否应该打开熔断器"""
@@ -194,8 +284,12 @@ class CircuitBreaker:
     async def _try_open(self) -> None:
         """尝试打开熔断器"""
         if self._should_open():
+            old_state = self.state
             self.state = CircuitState.OPEN
             self.last_state_change = time.time()
+            self._open_time = time.time()  # 记录打开时间
+            self._update_metrics_state()
+            self._record_open_event()
             logger.warning(
                 f"Circuit breaker '{self.name}' OPENED after "
                 f"{self.stats.consecutive_failures} consecutive failures"
@@ -204,10 +298,13 @@ class CircuitBreaker:
     async def _try_close(self) -> None:
         """尝试关闭熔断器"""
         if self._should_transition_to_closed():
+            old_state = self.state
             self.state = CircuitState.CLOSED
             self.last_state_change = time.time()
             self.stats.consecutive_failures = 0
             self.stats.consecutive_successes = 0
+            self._update_metrics_state()
+            self._record_recovery_time()  # 记录恢复时间
             logger.info(
                 f"Circuit breaker '{self.name}' CLOSED - service recovered"
             )
@@ -219,6 +316,8 @@ class CircuitBreaker:
                 self.state = CircuitState.OPEN
                 self.last_state_change = time.time()
                 self.stats.consecutive_successes = 0
+                self._update_metrics_state()
+                self._record_open_event()
                 logger.warning(
                     f"Circuit breaker '{self.name}' OPENED from "
                     "HALF_OPEN - test failed"
@@ -237,6 +336,7 @@ class CircuitBreaker:
             self.last_state_change = time.time()
             self.stats.consecutive_successes = 0
             self.stats.consecutive_failures = 0
+            self._update_metrics_state()
             logger.info(
                 f"Circuit breaker '{self.name}' HALF_OPEN - "
                 "testing service recovery"
@@ -269,6 +369,8 @@ class CircuitBreaker:
 
             if self.state == CircuitState.OPEN:
                 if not await self._try_transition_to_half_open():
+                    # 记录被拒绝的请求
+                    self._record_call_metrics('rejected')
                     raise CircuitBreakerOpen(
                         f"Circuit breaker '{self.name}' is OPEN"
                     )

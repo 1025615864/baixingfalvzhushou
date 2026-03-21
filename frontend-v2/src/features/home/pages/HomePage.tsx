@@ -1,6 +1,7 @@
 /**
  * HomePage 首页主页面
  * 百姓助手法律服务平台首页
+ * 优化：添加新用户引导入口、个性化推荐卡片
  */
 
 import { Link } from 'react-router-dom';
@@ -19,12 +20,73 @@ import {
 
 import { Button } from '@/components/ui/Button';
 
+import type { FeatureCard } from '../types';
 import { HeroSection } from '../components/HeroSection';
 import { QuickActions } from '../components/QuickActions';
 import { Recommendations } from '../components/Recommendations';
 import { FeatureCards } from '../components/FeatureCards';
 import { StatsSection } from '../components/StatsSection';
 import { useHomePageData } from '../hooks/useHome';
+
+/**
+ * 首页功能卡片数据 - 展示平台核心功能入口
+ */
+const featureCardsData: FeatureCard[] = [
+  {
+    id: 'ai-consultation',
+    title: 'AI智能咨询',
+    description: '基于大模型的智能法律助手，24小时在线解答您的法律问题，提供专业建议',
+    icon: 'ai',
+    link: '/ai-consultation',
+    color: 'blue',
+    stats: { label: '已解答', value: '100万+' },
+  },
+  {
+    id: 'find-lawyer',
+    title: '找律师',
+    description: '根据您的需求和案件类型，智能推荐最合适的专业律师，一对一服务',
+    icon: 'lawyer',
+    link: '/lawyer',
+    color: 'green',
+    stats: { label: '入驻律师', value: '10万+' },
+  },
+  {
+    id: 'knowledge-base',
+    title: '法律知识库',
+    description: '海量法律知识库，涵盖各类法律问题，快速查找您需要的法律信息',
+    icon: 'knowledge',
+    link: '/knowledge',
+    color: 'purple',
+    stats: { label: '知识文章', value: '50万+' },
+  },
+  {
+    id: 'contract-review',
+    title: '合同审查',
+    description: '上传合同文件，AI自动识别风险条款，提供专业修改建议和风险提示',
+    icon: 'document',
+    link: '/contracts',
+    color: 'orange',
+    stats: { label: '审查合同', value: '50万+' },
+  },
+  {
+    id: 'points-mall',
+    title: '积分商城',
+    description: '使用积分兑换精美礼品和优惠券，参与活动赚取更多积分',
+    icon: 'points',
+    link: '/points/mall',
+    color: 'red',
+    stats: { label: '精选好礼', value: '1000+' },
+  },
+  {
+    id: 'vip-center',
+    title: '会员中心',
+    description: '开通会员享专属权益，包括优先咨询、专属客服、更多免费额度等',
+    icon: 'vip',
+    link: '/vip',
+    color: 'amber',
+    stats: { label: '会员特权', value: '20项' },
+  },
+];
 
 export function HomePage(): JSX.Element {
   const {
@@ -44,7 +106,7 @@ export function HomePage(): JSX.Element {
       <QuickActions actions={quickActions} isLoading={isLoading} />
 
       {/* 核心功能 */}
-      <FeatureCards cards={[]} isLoading={isLoading} />
+      <FeatureCards cards={featureCardsData} isLoading={isLoading} />
 
       {/* 统计数据 */}
       <StatsSection stats={stats} isLoading={isLoading} />

@@ -47,7 +47,9 @@ from . import (
     membership,
     security,
     ab_testing,
-    funnel_analysis)
+    funnel_analysis,
+    video_consultation,
+    legal_documents)
 
 # Import admin.py explicitly to avoid conflict with system_admin directory
 from . import admin
@@ -146,6 +148,9 @@ api_router.include_router(wechat_pay.router)
 # 会员体系路由
 api_router.include_router(membership.router)
 
+# 法律文书商城路由
+api_router.include_router(legal_documents.router)
+
 # 数据安全路由
 api_router.include_router(security.router)
 
@@ -163,6 +168,9 @@ api_router.include_router(home.router)
 
 # Cross-Domain 域名管理路由
 api_router.include_router(cross_domain.router)
+
+# 视频咨询路由
+api_router.include_router(video_consultation.router)
 
  
 

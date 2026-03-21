@@ -6,7 +6,9 @@
 import { useState } from 'react';
 import { Plus, Edit2, Trash2, Power, Play, Rss, AlertCircle } from 'lucide-react';
 
-import { Card, Button, Badge } from '@/components/ui';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 
 import { useSources, useCreateSource, useUpdateSource, useDeleteSource, useTriggerIngest, useSourceHealth } from '../hooks/useNewsAdmin';
 import type { NewsSource, NewsSourceHealth, CreateSourceRequest, UpdateSourceRequest } from '../types';

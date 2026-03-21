@@ -243,11 +243,14 @@ export const WebSocketProvider: FC<WebSocketProviderProps> = ({
     };
   }, [url, maxHistorySize, notificationConfig?.enableDesktopNotification, token, eventHandlers, autoConnect]);
 
-  // 自动连接
+  // 自动连接 / token 清空时主动断开
   useEffect(() => {
     if (autoConnect && token) {
       serviceRef.current?.connect();
+      return;
     }
+
+    serviceRef.current?.disconnect();
   }, [autoConnect, token]);
 
   // 请求桌面通知权限

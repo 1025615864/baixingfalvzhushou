@@ -2,11 +2,12 @@
  * PromotionPage - 推广中心页面
  */
 
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 
 import { PromotionLink } from '../components/PromotionLink';
-import { PromotionStats } from '../components/PromotionStats';
-import { CommissionList } from '../components/CommissionList';
+
+const LazyPromotionStats = lazy(() => import('../components/PromotionStats').then((module) => ({ default: module.PromotionStats })));
+const LazyCommissionList = lazy(() => import('../components/CommissionList').then((module) => ({ default: module.CommissionList })));
 
 type TabType = 'overview' | 'commissions' | 'withdrawals';
 
@@ -33,7 +34,9 @@ export function PromotionPage(): JSX.Element {
         return (
           <div className="space-y-6">
             {/* 推广统计 */}
-            <PromotionStats period={statsPeriod} />
+            <Suspense fallback={<div className="bg-white rounded-xl shadow-sm p-6"><div className="animate-pulse space-y-4"><div className="h-4 bg-gray-200 rounded w-1/3" /><div className="grid grid-cols-2 md:grid-cols-4 gap-4">{[1,2,3,4].map((i)=><div key={i} className="h-20 bg-gray-200 rounded" />)}</div><div className="h-64 bg-gray-200 rounded" /></div></div>}>
+              <LazyPromotionStats period={statsPeriod} />
+            </Suspense>
 
             {/* 最近佣金记录 */}
             <div className="bg-white rounded-xl shadow-sm p-6">
@@ -46,7 +49,9 @@ export function PromotionPage(): JSX.Element {
                   查看全部 →
                 </button>
               </div>
-              <CommissionList defaultPageSize={5} />
+              <Suspense fallback={<div className="space-y-3">{Array.from({ length: 5 }).map((_, index) => (<div key={index} className="h-16 rounded-lg bg-gray-100 animate-pulse" />))}</div>}>
+                <LazyCommissionList defaultPageSize={5} />
+              </Suspense>
             </div>
           </div>
         );
@@ -57,7 +62,9 @@ export function PromotionPage(): JSX.Element {
             {/* 佣金列表 */}
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">佣金记录</h3>
-              <CommissionList />
+              <Suspense fallback={<div className="space-y-3">{Array.from({ length: 6 }).map((_, index) => (<div key={index} className="h-16 rounded-lg bg-gray-100 animate-pulse" />))}</div>}>
+                <LazyCommissionList />
+              </Suspense>
             </div>
           </div>
         );

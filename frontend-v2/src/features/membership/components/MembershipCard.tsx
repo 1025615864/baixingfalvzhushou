@@ -1,9 +1,15 @@
 /**
  * MembershipCard 会员卡组件
+ 
+ 会员等级体系：
+ - free: 免费用户
+ - monthly: 月度会员 ¥29/月
+ - annual: 年度会员 ¥299/年 (享8.6折)
+ - lifetime: 终身会员 ¥999 (一次购买终身权益)
  */
 
 import type { LucideIcon } from 'lucide-react';
-import { Sparkles, Zap, Building2, Star } from 'lucide-react';
+import { Sparkles, Crown, Star, Infinity as InfinityIcon } from 'lucide-react';
 
 import type { MembershipTier } from '../types';
 
@@ -21,6 +27,7 @@ const tierConfig: Record<MembershipTier, {
   bgColor: string;
   icon: LucideIcon;
   gradient: string;
+  popular?: boolean;
 }> = {
   free: {
     label: '免费用户',
@@ -29,33 +36,27 @@ const tierConfig: Record<MembershipTier, {
     icon: Star,
     gradient: 'from-slate-200 to-slate-300',
   },
-  basic: {
-    label: '基础会员',
+  monthly: {
+    label: '月度会员',
     color: 'text-blue-600',
     bgColor: 'bg-blue-50',
-    icon: Star,
-    gradient: 'from-blue-200 to-blue-300',
+    icon: Crown,
+    gradient: 'from-blue-400 to-blue-500',
   },
-  standard: {
-    label: '标准会员',
+  annual: {
+    label: '年度会员',
     color: 'text-purple-600',
     bgColor: 'bg-purple-50',
     icon: Sparkles,
-    gradient: 'from-purple-200 to-purple-300',
+    gradient: 'from-purple-400 to-purple-500',
+    popular: true,
   },
-  premium: {
-    label: '高级会员',
+  lifetime: {
+    label: '终身会员',
     color: 'text-amber-600',
     bgColor: 'bg-amber-50',
-    icon: Zap,
-    gradient: 'from-amber-200 to-amber-300',
-  },
-  enterprise: {
-    label: '企业会员',
-    color: 'text-emerald-600',
-    bgColor: 'bg-emerald-50',
-    icon: Building2,
-    gradient: 'from-emerald-200 to-emerald-300',
+    icon: InfinityIcon,
+    gradient: 'from-amber-400 to-amber-500',
   },
 };
 

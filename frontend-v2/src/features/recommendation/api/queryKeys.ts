@@ -19,6 +19,10 @@ export const recommendationKeys = {
   enhancedRecommendations: (recommendationType?: string, limit?: number) =>
     [...recommendationKeys.enhanced(), { recommendationType, limit }] as const,
 
+  /** 增强首页 */
+  enhancedHome: (lawyerLimit?: number, postLimit?: number, newsLimit?: number, knowledgeLimit?: number) =>
+    [...recommendationKeys.all, 'enhanced-home', { lawyerLimit, postLimit, newsLimit, knowledgeLimit }] as const,
+
   /** 推荐权重 */
   weights: () => [...recommendationKeys.all, 'weights'] as const,
 
@@ -32,6 +36,10 @@ export const recommendationKeys = {
   lawyers: () => [...recommendationKeys.all, 'lawyers'] as const,
   lawyerRecommendations: (limit?: number) =>
     [...recommendationKeys.lawyers(), { limit }] as const,
+  lawyerByConsultation: (limit?: number) =>
+    [...recommendationKeys.all, 'lawyers-by-consultation', { limit }] as const,
+  lawyerByLocation: (city?: string, limit?: number) =>
+    [...recommendationKeys.all, 'lawyers-by-location', { city, limit }] as const,
 
   /** 帖子推荐 */
   posts: () => [...recommendationKeys.all, 'posts'] as const,
@@ -42,6 +50,16 @@ export const recommendationKeys = {
   news: () => [...recommendationKeys.all, 'news'] as const,
   newsRecommendations: (limit?: number) =>
     [...recommendationKeys.news(), { limit }] as const,
+
+  /** 知识推荐 */
+  knowledge: () => [...recommendationKeys.all, 'knowledge'] as const,
+  knowledgeByInterests: (limit?: number) =>
+    [...recommendationKeys.all, 'knowledge-by-interests', { limit }] as const,
+
+  /** 首页推荐 */
+  home: () => [...recommendationKeys.all, 'home'] as const,
+  homeRecommendations: (limit?: number) =>
+    [...recommendationKeys.all, 'home-recommendations', { limit }] as const,
 } as const;
 
 export default recommendationKeys;

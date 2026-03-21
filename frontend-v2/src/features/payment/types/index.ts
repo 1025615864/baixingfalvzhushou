@@ -8,6 +8,32 @@ export type PaymentStatus = 'pending' | 'paid' | 'cancelled' | 'refunded' | 'fai
 // 支付方式
 export type PaymentMethod = 'alipay' | 'wechat' | 'balance' | 'ikunpay';
 
+/** 支付错误码 */
+export type PaymentErrorCode =
+  | 'PAYMENT_ORDER_NOT_FOUND'
+  | 'PAYMENT_ORDER_ALREADY_PAID'
+  | 'PAYMENT_ORDER_EXPIRED'
+  | 'PAYMENT_ORDER_CANCELLED'
+  | 'PAYMENT_ORDER_STATUS_INVALID'
+  | 'INSUFFICIENT_BALANCE'
+  | 'BALANCE_NOT_FOUND'
+  | 'PAYMENT_METHOD_NOT_SUPPORTED'
+  | 'PAYMENT_METHOD_INVALID'
+  | 'PAYMENT_FAILED'
+  | 'PAYMENT_TIMEOUT'
+  | 'PAYMENT_PROCESSING_ERROR'
+  | 'PAYMENT_CHANNEL_ERROR'
+  | 'PAYMENT_CONFIG_MISSING'
+  | 'PAYMENT_CONFIG_INVALID';
+
+/** 支付错误详情 */
+export interface PaymentError {
+  message: string;
+  error_code: PaymentErrorCode;
+  suggestion: string;
+  details?: Record<string, unknown>;
+}
+
 // 订单类型
 export type OrderType = 'consultation' | 'service' | 'vip' | 'recharge' | 'light_consult_review';
 
@@ -118,13 +144,15 @@ export interface PaymentStatusResponse {
   trade_no: string | null;
 }
 
-// 支付方法配置
+// 支付方法配置 - 优化：添加推荐属性
 export interface PaymentMethodConfig {
   id: PaymentMethod;
   name: string;
   icon: string;
   description: string;
   enabled: boolean;
+  recommended?: boolean;
+  testId?: string;
 }
 
 // 支付回调数据

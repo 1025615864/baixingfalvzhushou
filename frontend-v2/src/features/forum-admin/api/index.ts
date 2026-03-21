@@ -67,28 +67,7 @@ function getErrorMessage(error: unknown, defaultMsg: string): string {
  * 获取板块列表
  */
 export async function apiGetCategories(params: GetCategoriesRequest = {}): Promise<GetCategoriesResponse> {
-  const searchParams = new URLSearchParams();
-  if (params.status) searchParams.set('status', params.status);
-  if (params.parentId !== undefined) searchParams.set('parent_id', String(params.parentId));
-  if (params.limit) searchParams.set('limit', String(params.limit));
-  if (params.offset) searchParams.set('offset', String(params.offset));
-
-  const url = `${API_BASE}/categories${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取板块列表失败' }));
-    throw new Error(getErrorMessage(error, '获取板块列表失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     categories: Array<{
       id: number;
       name: string;
@@ -110,7 +89,14 @@ export async function apiGetCategories(params: GetCategoriesRequest = {}): Promi
       moderators: number[];
     }>;
     total: number;
-  }>(response);
+  }>(`${API_BASE}/categories`, {
+    params: {
+      ...(params.status && { status: params.status }),
+      ...(params.parentId !== undefined && { parent_id: params.parentId }),
+      ...(params.limit && { limit: params.limit }),
+      ...(params.offset && { offset: params.offset }),
+    },
+  });
 
   return {
     categories: data.categories.map(cat => ({

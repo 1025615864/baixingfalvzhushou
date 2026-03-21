@@ -201,7 +201,7 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({ pageSize = 20 })
   }
 
   return (
-    <div>
+    <div data-testid="payment-history-table">
       <div className="space-y-3">
         {data.items.map((transaction) => (
           <TransactionItem key={transaction.id} transaction={transaction} />

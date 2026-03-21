@@ -1,19 +1,16 @@
 /**
  * StatsCards 组件 - 统计卡片
+ * 使用 Tailwind CSS + shadcn/ui 风格
  */
 
 import React from 'react';
-import { Card, Row, Col, Statistic, Skeleton } from 'antd';
-import {
-  UserOutlined,
-  FileTextOutlined,
-  ReadOutlined,
-  BankOutlined,
-  CommentOutlined,
-  CustomerServiceOutlined,
-} from '@ant-design/icons';
+import { Users, FileText, BookOpen, Building2, MessageSquare, Headphones } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
+import { Skeleton } from '@/components/ui/Skeleton';
 
 import type { AdminStats } from '../types';
+
 
 /** 统计卡片Props */
 interface StatsCardsProps {
@@ -22,50 +19,70 @@ interface StatsCardsProps {
 }
 
 /** 统计项配置 */
-const STAT_CONFIG = [
+const STAT_CONFIG: ReadonlyArray<{
+  key: keyof AdminStats;
+  title: string;
+  icon: LucideIcon;
+  iconColor: string;
+  bgColor: string;
+  borderColor: string;
+  valueColor: string;
+}> = [
   {
     key: 'users',
     title: '总用户数',
-    icon: <UserOutlined style={{ color: '#1890ff' }} />,
-    color: '#e6f7ff',
-    borderColor: '#91d5ff',
+    icon: Users,
+    iconColor: 'text-blue-600',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-200',
+    valueColor: 'text-blue-700',
   },
   {
     key: 'news',
     title: '新闻数量',
-    icon: <FileTextOutlined style={{ color: '#52c41a' }} />,
-    color: '#f6ffed',
-    borderColor: '#b7eb8f',
+    icon: FileText,
+    iconColor: 'text-green-600',
+    bgColor: 'bg-green-50',
+    borderColor: 'border-green-200',
+    valueColor: 'text-green-700',
   },
   {
     key: 'posts',
     title: '帖子数量',
-    icon: <ReadOutlined style={{ color: '#faad14' }} />,
-    color: '#fffbe6',
-    borderColor: '#ffe58f',
+    icon: BookOpen,
+    iconColor: 'text-amber-600',
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-200',
+    valueColor: 'text-amber-700',
   },
   {
     key: 'lawfirms',
     title: '律所数量',
-    icon: <BankOutlined style={{ color: '#722ed1' }} />,
-    color: '#f9f0ff',
-    borderColor: '#d3adf7',
+    icon: Building2,
+    iconColor: 'text-purple-600',
+    bgColor: 'bg-purple-50',
+    borderColor: 'border-purple-200',
+    valueColor: 'text-purple-700',
   },
   {
     key: 'comments',
     title: '评论数量',
-    icon: <CommentOutlined style={{ color: '#eb2f96' }} />,
-    color: '#fff0f6',
-    borderColor: '#ffadd2',
+    icon: MessageSquare,
+    iconColor: 'text-pink-600',
+    bgColor: 'bg-pink-50',
+    borderColor: 'border-pink-200',
+    valueColor: 'text-pink-700',
   },
   {
     key: 'consultations',
     title: '咨询数量',
-    icon: <CustomerServiceOutlined style={{ color: '#13c2c2' }} />,
-    color: '#e6fffb',
-    borderColor: '#87e8de',
+    icon: Headphones,
+    iconColor: 'text-cyan-600',
+    bgColor: 'bg-cyan-50',
+    borderColor: 'border-cyan-200',
+    valueColor: 'text-cyan-700',
   },
-] as const;
+];
 
 /**
  * 格式化数字（大于1000显示为k）
@@ -81,40 +98,62 @@ function formatNumber(num: number): string {
 }
 
 /**
+ * 单个统计卡片组件
+ */
+interface StatCardProps {
+  config: (typeof STAT_CONFIG)[number];
+  value: number;
+  loading: boolean;
+}
+
+const StatCard: React.FC<StatCardProps> = ({ config, value, loading }) => {
+  const Icon = config.icon;
+  
+  return (
+    <div
+      className={`
+        ${config.bgColor} ${config.borderColor}
+        border rounded-2xl p-5 transition-all duration-300
+        hover:shadow-lg hover:-translate-y-0.5
+      `}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <p className="text-sm text-slate-500 mb-2">{config.title}</p>
+          {loading ? (
+            <Skeleton className="h-8 w-24" />
+          ) : (
+            <p className={`text-2xl font-bold ${config.valueColor}`}>
+              {formatNumber(value)}
+            </p>
+          )}
+        </div>
+        <div className={`
+          ${config.bgColor} ${config.iconColor}
+          w-12 h-12 rounded-xl flex items-center justify-center
+          border ${config.borderColor}
+        `}>
+          <Icon className="w-6 h-6" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
  * 统计卡片组件
  */
 export const StatsCards: React.FC<StatsCardsProps> = ({ stats, loading }) => {
   return (
-    <Row gutter={[16, 16]}>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
       {STAT_CONFIG.map((config) => (
-        <Col xs={24} sm={12} lg={8} xl={4} key={config.key}>
-          <Card
-            bodyStyle={{ padding: '20px 24px' }}
-            style={{
-              backgroundColor: config.color,
-              borderColor: config.borderColor,
-              borderWidth: 1,
-              borderStyle: 'solid',
-            }}
-          >
-            {loading || !stats ? (
-              <Skeleton active paragraph={false} title={{ width: '80%' }} />
-            ) : (
-              <Statistic
-                title={
-                  <span style={{ color: 'rgba(0, 0, 0, 0.45)' }}>
-                    {config.title}
-                  </span>
-                }
-                value={stats[config.key as keyof AdminStats]}
-                prefix={config.icon}
-                formatter={(value) => formatNumber(Number(value))}
-                valueStyle={{ color: 'rgba(0, 0, 0, 0.85)', fontWeight: 600 }}
-              />
-            )}
-          </Card>
-        </Col>
+        <StatCard
+          key={config.key}
+          config={config}
+          value={stats?.[config.key] ?? 0}
+          loading={loading}
+        />
       ))}
-    </Row>
+    </div>
   );
 };

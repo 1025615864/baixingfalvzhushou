@@ -45,10 +45,11 @@ const QUERY_KEYS = {
 /**
  * 获取审核队列
  */
-export function useModerationQueue(params?: GetModerationQueueRequest) {
+export function useModerationQueue(params?: GetModerationQueueRequest, enabled = true) {
   return useQuery<{ items: ModerationQueueItem[]; total: number }, Error>({
     queryKey: params ? QUERY_KEYS.queueFiltered(params) : QUERY_KEYS.queue,
     queryFn: () => apiGetModerationQueue(params),
+    enabled,
     staleTime: 30 * 1000, // 30秒
   });
 }
@@ -56,10 +57,11 @@ export function useModerationQueue(params?: GetModerationQueueRequest) {
 /**
  * 获取审核记录
  */
-export function useModerationRecords(params?: GetModerationRecordsRequest) {
+export function useModerationRecords(params?: GetModerationRecordsRequest, enabled = true) {
   return useQuery<{ records: ModerationRecord[]; total: number }, Error>({
     queryKey: params ? QUERY_KEYS.recordsFiltered(params) : QUERY_KEYS.records,
     queryFn: () => apiGetModerationRecords(params),
+    enabled,
     staleTime: 60 * 1000, // 1分钟
   });
 }
@@ -67,10 +69,11 @@ export function useModerationRecords(params?: GetModerationRecordsRequest) {
 /**
  * 获取审核统计
  */
-export function useModerationStats(startDate?: string, endDate?: string) {
+export function useModerationStats(startDate?: string, endDate?: string, enabled = true) {
   return useQuery<ModerationStats, Error>({
     queryKey: QUERY_KEYS.statsByDate(startDate, endDate),
     queryFn: () => apiGetModerationStats(startDate, endDate),
+    enabled,
     staleTime: 5 * 60 * 1000, // 5分钟
   });
 }
@@ -138,7 +141,7 @@ export function useCheckKeywords() {
 /**
  * 审核管理综合 Hook
  */
-export function useModerationManager() {
+export function useModerationManager(activeTab: 'queue' | 'records' | 'stats' = 'queue') {
   const _queryClient = useQueryClient();
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
@@ -154,26 +157,30 @@ export function useModerationManager() {
   });
 
   // 数据查询
+  const shouldLoadQueue = activeTab === 'queue';
+  const shouldLoadRecords = activeTab === 'records';
+  const shouldLoadStats = activeTab === 'stats' || activeTab === 'queue';
+
   const {
     data: queueData,
     isLoading: isLoadingQueue,
     error: queueError,
     refetch: refetchQueue,
-  } = useModerationQueue(queueFilters);
+  } = useModerationQueue(queueFilters, shouldLoadQueue);
 
   const {
     data: recordsData,
     isLoading: isLoadingRecords,
     error: recordsError,
     refetch: refetchRecords,
-  } = useModerationRecords(recordFilters);
+  } = useModerationRecords(recordFilters, shouldLoadRecords);
 
   const {
     data: stats,
     isLoading: isLoadingStats,
     error: statsError,
     refetch: refetchStats,
-  } = useModerationStats();
+  } = useModerationStats(undefined, undefined, shouldLoadStats);
 
   // Mutations
   const submitReview = useSubmitReview();

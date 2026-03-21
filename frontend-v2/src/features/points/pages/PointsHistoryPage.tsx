@@ -2,8 +2,11 @@
  * PointsHistoryPage - 积分历史页面
  */
 
+import { lazy, Suspense } from 'react';
+
 import { PointsBalance } from '../components/PointsBalance';
-import { PointsHistory } from '../components/PointsHistory';
+
+const LazyPointsHistory = lazy(() => import('../components/PointsHistory').then((module) => ({ default: module.PointsHistory })));
 
 /**
  * 积分历史页面
@@ -35,7 +38,9 @@ export function PointsHistoryPage(): JSX.Element {
               去积分商城 →
             </a>
           </div>
-          <PointsHistory />
+          <Suspense fallback={<div className="space-y-3">{Array.from({ length: 5 }).map((_, index) => (<div key={index} className="h-16 rounded-lg bg-gray-100 animate-pulse" />))}</div>}>
+            <LazyPointsHistory />
+          </Suspense>
         </div>
       </div>
     </div>

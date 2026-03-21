@@ -54,7 +54,7 @@ export interface FeatureCard {
   description: string;
   icon: string;
   link: string;
-  color: 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'teal';
+  color: 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'teal' | 'indigo' | 'amber';
   stats?: {
     label: string;
     value: string;

@@ -2,7 +2,7 @@
  * Settlement（结算管理）API 层
  *
  * 使用统一的 apiClient 进行 HTTP 请求
- * 后端路由: /api/v1/settlement/*
+ * 后端路由：/api/settlement/*
  */
 
 import { apiClient } from "@/shared/lib/api/client";
@@ -21,6 +21,7 @@ import type {
   WithdrawMethod,
   AccountType,
 } from '../types';
+
 
 
 /** 添加银行账户请求 */

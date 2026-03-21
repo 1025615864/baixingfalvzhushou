@@ -37,6 +37,7 @@ const PAYMENT_BASE = '/payment';
  * 获取订单列表
  * @param params 查询参数
  * @returns 订单列表响应
+ * 注意：修正参数名与后端对齐 - 后端使用 status 而非 status_filter
  */
 export async function getOrders(params: OrderListParams = {}): Promise<OrderListResponse> {
   const { page = 1, page_size = 20, status_filter } = params;
@@ -44,7 +45,7 @@ export async function getOrders(params: OrderListParams = {}): Promise<OrderList
     params: {
       page,
       page_size,
-      ...(status_filter && { status_filter }),
+      ...(status_filter && { status: status_filter }),  // 后端使用 status 参数
     },
   });
   return response.data;

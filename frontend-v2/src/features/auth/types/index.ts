@@ -48,10 +48,18 @@ export interface RegisterRequest {
   agree_ai_disclaimer: boolean;
 }
 
-/** 登录响应 - 后端直接返回 {user, token?, message} */
+/** JWT Token 信息 */
+export interface Token {
+  access_token: string;
+  refresh_token?: string;
+  token_type: string;
+  expires_in: number;
+}
+
+/** 登录响应 - 后端返回 {user, token: Token, message} */
 export interface LoginResponse {
   user: User;
-  token?: string;
+  token?: Token;
   message?: string;
 }
 

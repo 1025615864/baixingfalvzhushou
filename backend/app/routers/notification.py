@@ -40,6 +40,7 @@ class NotificationResponse(BaseModel):
     content: str | None
     link: str | None
     is_read: bool
+    read_at: datetime | None = None
     related_user_id: int | None
     related_user_name: str | None = None
     created_at: datetime
@@ -115,6 +116,7 @@ async def get_notifications(
                 content=n.content,
                 link=n.link,
                 is_read=bool(n.is_read),
+                read_at=n.read_at,
                 related_user_id=n.related_user_id,
                 related_user_name=related_user_name,
                 created_at=n.created_at,
@@ -141,13 +143,14 @@ async def get_unread_count(
     return {"unread_count": count}
 
 
-@router.put("/{notification_id}/read")
+@router.patch("/{notification_id}/read")
 async def mark_as_read(
     notification_id: int,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """标记通知为已读"""
+    from datetime import datetime
     result = await db.execute(
         select(Notification).where(
             Notification.id == notification_id,
@@ -162,21 +165,23 @@ async def mark_as_read(
             detail="通知不存在")
 
     notification.is_read = True
+    notification.read_at = datetime.utcnow()
     await db.commit()
 
-    return {"message": "已标记为已读"}
+    return {"message": "已标记为已读", "notification_id": notification_id}
 
 
-@router.put("/read-all")
+@router.patch("/read-all")
 async def mark_all_as_read(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """标记所有通知为已读"""
-    _ = await db.execute(
+    from datetime import datetime
+    result = await db.execute(
         update(Notification)
         .where(Notification.user_id == current_user.id, Notification.is_read == False)
-        .values(is_read=True)
+        .values(is_read=True, read_at=datetime.utcnow())
     )
     await db.commit()
 
@@ -215,7 +220,7 @@ class BatchIdsRequest(BaseModel):
     ids: list[int]
 
 
-@router.post("/batch-read", summary="批量标记已读")
+@router.patch("/batch-read", summary="批量标记已读")
 async def batch_mark_read(
     data: BatchIdsRequest,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -225,13 +230,14 @@ async def batch_mark_read(
     if not data.ids:
         return {"message": "没有选择通知", "count": 0}
 
+    from datetime import datetime
     _ = await db.execute(
         update(Notification)
         .where(
             Notification.id.in_(data.ids),
             Notification.user_id == current_user.id
         )
-        .values(is_read=True)
+        .values(is_read=True, read_at=datetime.utcnow())
     )
     await db.commit()
     return {"message": "批量标记成功", "count": len(data.ids)}

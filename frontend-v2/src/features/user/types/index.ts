@@ -56,6 +56,16 @@ export interface UserSettings {
   newsletter: boolean;
   language: 'zh-CN' | 'zh-TW' | 'en';
   theme: 'light' | 'dark' | 'auto';
+  privacy: 'public' | 'friends' | 'private';
+}
+
+export interface UpdateSettingsDTO {
+  emailNotifications?: boolean;
+  smsNotifications?: boolean;
+  newsletter?: boolean;
+  language?: 'zh-CN' | 'zh-TW' | 'en';
+  theme?: 'light' | 'dark' | 'auto';
+  privacy?: 'public' | 'friends' | 'private';
 }
 
 export interface UpdateProfileDTO {

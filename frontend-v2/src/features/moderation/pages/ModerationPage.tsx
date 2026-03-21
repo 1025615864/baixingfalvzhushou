@@ -4,7 +4,7 @@
  * 管理员进行内容审核的主页面，包含队列、记录、统计三个主要视图
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { Suspense, lazy, useState, useCallback } from 'react';
 import {
   Layout,
   Tabs,
@@ -13,8 +13,6 @@ import {
   Button,
   message,
   Modal,
-  Radio,
-  Input,
   Badge,
 } from 'antd';
 import {
@@ -25,13 +23,43 @@ import {
 } from '@ant-design/icons';
 
 import { useModerationManager } from '../hooks/useModeration';
-import { ModerationQueue } from '../components/ModerationQueue';
-import { ModerationDetail } from '../components/ModerationDetail';
-import { ModerationStats } from '../components/ModerationStats';
 import type { ModerationQueueItem, ReviewAction } from '../types';
 
+const LazyModerationQueue = lazy(() =>
+  import('../components/ModerationQueue').then((module) => ({
+    default: module.ModerationQueue,
+  }))
+);
+
+const LazyModerationDetail = lazy(() =>
+  import('../components/ModerationDetail').then((module) => ({
+    default: module.ModerationDetail,
+  }))
+);
+
+const LazyModerationStats = lazy(() =>
+  import('../components/ModerationStats').then((module) => ({
+    default: module.ModerationStats,
+  }))
+);
+
+const LazyQuickReviewModal = lazy(() =>
+  import('../components/QuickReviewModal').then((module) => ({
+    default: module.QuickReviewModal,
+  }))
+);
+
 const { Content } = Layout;
-const { TextArea } = Input;
+
+function ModerationSectionSkeleton({ rows = 3 }: { rows?: number }): JSX.Element {
+  return (
+    <div className="space-y-4">
+      {Array.from({ length: rows }).map((_, index) => (
+        <div key={index} className="h-24 animate-pulse rounded-lg bg-slate-100" />
+      ))}
+    </div>
+  );
+}
 
 /**
  * 内容审核中心页面
@@ -67,7 +95,7 @@ export const ModerationPage: React.FC = () => {
     handleBatchReview,
     isSubmitting,
     refreshAll,
-  } = useModerationManager();
+  } = useModerationManager(activeTab as 'queue' | 'records' | 'stats');
 
   // 查看详情
   const handleViewDetail = useCallback((item: ModerationQueueItem) => {
@@ -188,6 +216,7 @@ export const ModerationPage: React.FC = () => {
           <Tabs
             activeKey={activeTab}
             onChange={setActiveTab}
+            destroyInactiveTabPane
             items={[
               {
                 key: 'queue',
@@ -203,30 +232,32 @@ export const ModerationPage: React.FC = () => {
                   </span>
                 ),
                 children: (
-                  <ModerationQueue
-                    items={queueItems}
-                    total={queueTotal}
-                    selectedItems={selectedItems}
-                    loading={isLoadingQueue}
-                    page={queueFilters.page || 1}
-                    pageSize={queueFilters.pageSize || 20}
-                    onSelectionChange={(ids) => {
-                      // 清空选择后重新设置
-                      if (ids.length === 0) {
-                        clearSelection();
-                      } else {
-                        // 使用 toggleSelectAll 来处理全选
-                        const currentIds = queueItems.map((item) => item.id);
-                        if (ids.length === currentIds.length) {
-                          toggleSelectAll(currentIds);
+                  <Suspense fallback={<ModerationSectionSkeleton rows={4} />}>
+                    <LazyModerationQueue
+                      items={queueItems}
+                      total={queueTotal}
+                      selectedItems={selectedItems}
+                      loading={isLoadingQueue}
+                      page={queueFilters.page || 1}
+                      pageSize={queueFilters.pageSize || 20}
+                      onSelectionChange={(ids) => {
+                        // 清空选择后重新设置
+                        if (ids.length === 0) {
+                          clearSelection();
+                        } else {
+                          // 使用 toggleSelectAll 来处理全选
+                          const currentIds = queueItems.map((item) => item.id);
+                          if (ids.length === currentIds.length) {
+                            toggleSelectAll(currentIds);
+                          }
                         }
-                      }
-                    }}
-                    onViewDetail={handleViewDetail}
-                    onReview={handleOpenQuickReview}
-                    onBatchReview={handleSubmitBatchReview}
-                    onPageChange={setQueuePage}
-                  />
+                      }}
+                      onViewDetail={handleViewDetail}
+                      onReview={handleOpenQuickReview}
+                      onBatchReview={handleSubmitBatchReview}
+                      onPageChange={setQueuePage}
+                    />
+                  </Suspense>
                 ),
               },
               {
@@ -253,7 +284,9 @@ export const ModerationPage: React.FC = () => {
                   </span>
                 ),
                 children: (
-                  <ModerationStats stats={stats} loading={isLoadingStats} />
+                  <Suspense fallback={<ModerationSectionSkeleton rows={3} />}>
+                    <LazyModerationStats stats={stats} loading={isLoadingStats} />
+                  </Suspense>
                 ),
               },
             ]}
@@ -261,70 +294,36 @@ export const ModerationPage: React.FC = () => {
         </Card>
 
         {/* 审核详情抽屉 */}
-        <ModerationDetail
-          item={selectedItem}
-          visible={detailVisible}
-          onClose={handleCloseDetail}
-          onSubmit={handleSubmitReview}
-          submitting={isSubmitting}
-        />
+        {(detailVisible || selectedItem) && (
+          <Suspense fallback={null}>
+            <LazyModerationDetail
+              item={selectedItem}
+              visible={detailVisible}
+              onClose={handleCloseDetail}
+              onSubmit={handleSubmitReview}
+              submitting={isSubmitting}
+            />
+          </Suspense>
+        )}
 
         {/* 快速审核弹窗 */}
-        <Modal
-          title="确认审核操作"
-          open={quickReviewVisible}
-          onOk={handleSubmitQuickReview}
-          onCancel={() => setQuickReviewVisible(false)}
-          confirmLoading={isSubmitting}
-          okText="确认"
-          cancelText="取消"
-          okButtonProps={{
-            danger: quickReviewAction === 'reject',
-          }}
-        >
-          {quickReviewItem && (
-            <div>
-              <p>
-                <strong>内容类型：</strong>
-                {quickReviewItem.contentType}
-              </p>
-              <p>
-                <strong>内容摘要：</strong>
-                {quickReviewItem.content.substring(0, 100)}
-                {quickReviewItem.content.length > 100 ? '...' : ''}
-              </p>
-              <p>
-                <strong>审核操作：</strong>
-                <Radio.Group
-                  value={quickReviewAction}
-                  onChange={(e) => setQuickReviewAction(e.target.value as ReviewAction)}
-                >
-                  <Radio value="approve">通过</Radio>
-                  <Radio value="reject">拒绝</Radio>
-                  <Radio value="escalate">升级</Radio>
-                </Radio.Group>
-              </p>
-              <div style={{ marginTop: 16 }}>
-                <p>审核原因（可选）：</p>
-                <TextArea
-                  value={quickReviewReason}
-                  onChange={(e) => setQuickReviewReason(e.target.value)}
-                  placeholder="请输入审核原因，将通知用户"
-                  rows={3}
-                />
-              </div>
-              <div style={{ marginTop: 16 }}>
-                <p>内部备注（仅管理员可见）：</p>
-                <TextArea
-                  value={quickReviewNote}
-                  onChange={(e) => setQuickReviewNote(e.target.value)}
-                  placeholder="请输入内部备注"
-                  rows={2}
-                />
-              </div>
-            </div>
-          )}
-        </Modal>
+        {quickReviewVisible && (
+          <Suspense fallback={null}>
+            <LazyQuickReviewModal
+              visible={quickReviewVisible}
+              item={quickReviewItem}
+              action={quickReviewAction}
+              reason={quickReviewReason}
+              note={quickReviewNote}
+              submitting={isSubmitting}
+              onActionChange={setQuickReviewAction}
+              onReasonChange={setQuickReviewReason}
+              onNoteChange={setQuickReviewNote}
+              onSubmit={handleSubmitQuickReview}
+              onCancel={() => setQuickReviewVisible(false)}
+            />
+          </Suspense>
+        )}
       </Content>
     </Layout>
   );

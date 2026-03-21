@@ -56,9 +56,12 @@ export const typeNames: Record<OrderType, string> = {
  * 获取订单列表 Hook
  */
 export function useOrders(params: OrderListParams = {}) {
-  return useQuery<{ items: Order[]; total: number }>({
+  return useQuery<Order[]>({
     queryKey: ['orders', params],
-    queryFn: () => getOrders(params),
+    queryFn: async () => {
+      const response = await getOrders(params);
+      return response.items || [];
+    },
   });
 }
 
@@ -234,9 +237,10 @@ export function useTransactions() {
 export function useRefundOrder() {
   const queryClient = useQueryClient();
 
-  return useMutation<Refund, Error, { orderNo: string; amount: number; reason?: string }>({
+  return useMutation<{ success: boolean; refund?: Refund }, Error, { orderNo: string; amount: number; reason?: string }>({
     mutationFn: async ({ orderNo, amount, reason }) => {
-      return createRefund({ orderNo, amount, reason });
+      const refund = await createRefund({ orderNo, amount, reason });
+      return { success: true, refund };
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['orders'] });

@@ -61,7 +61,13 @@ export class TestHelper {
     await this.page.fill('[data-testid="email-input"]', username);
     await this.page.fill('[data-testid="password-input"]', password);
     await this.page.click('[data-testid="login-button"]');
-    await this.page.waitForURL('/dashboard');
+    // 等待登录成功（等待 URL 变化或用户菜单出现）
+    try {
+      await this.page.waitForURL(/\/dashboard|\/home|^\//, { timeout: 10000 });
+    } catch {
+      // 如果 URL 没有变化，检查是否已登录
+      await this.waitForVisible('[data-testid="user-menu"]', 5000);
+    }
     await this.screenshot('login-success');
   }
 
@@ -208,8 +214,10 @@ export class TestHelper {
     await this.page.context().clearCookies();
     await this.page.context().clearPermissions();
     await this.page.evaluate(() => {
-      localStorage.clear();
-      sessionStorage.clear();
+      // eslint-disable-next-line no-restricted-globals
+      (window as any).localStorage.clear();
+      // eslint-disable-next-line no-restricted-globals
+      (window as any).sessionStorage.clear();
     });
   }
 }

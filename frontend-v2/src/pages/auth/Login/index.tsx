@@ -83,6 +83,7 @@ export function Login(): JSX.Element {
                 name="username"
                 type="text"
                 required
+                data-testid="email-input"
                 className="input"
                 placeholder="请输入用户名或邮箱"
                 value={formData.username}
@@ -103,6 +104,7 @@ export function Login(): JSX.Element {
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   required
+                  data-testid="password-input"
                   className="input pr-10"
                   placeholder="请输入密码"
                   value={formData.password}
@@ -158,6 +160,7 @@ export function Login(): JSX.Element {
               <button
                 type="submit"
                 disabled={isPending}
+                data-testid="login-button"
                 className={`w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white
                   transition-all duration-200
                   ${isPending || !formData.username || !formData.password

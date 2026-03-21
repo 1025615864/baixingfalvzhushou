@@ -27,23 +27,23 @@ const footerLinks = {
     { label: '帮助中心', href: '/help' },
     { label: '常见问题', href: '/faq' },
     { label: '法律资讯', href: '/news' },
-    { label: '案例分享', href: '/cases' },
-    { label: '法律法规', href: '/laws' },
-    { label: '普法课堂', href: '/courses' },
+    { label: '案例分享', href: '/knowledge' }, // 重定向到知识库
+    { label: '法律法规', href: '/knowledge' }, // 重定向到知识库
+    // { label: '普法课堂', href: '/courses' }, // 暂时移除，待功能上线
   ],
   about: [
     { label: '关于我们', href: '/about' },
-    { label: '加入我们', href: '/careers' },
-    { label: '合作伙伴', href: '/partners' },
+    // { label: '加入我们', href: '/careers' }, // 暂时移除，待功能上线
+    // { label: '合作伙伴', href: '/partners' }, // 暂时移除，待功能上线
     { label: '联系方式', href: '/contact' },
     { label: '意见反馈', href: '/feedback' },
-    { label: '投诉建议', href: '/complaint' },
+    { label: '投诉建议', href: '/feedback' }, // 重定向到意见反馈
   ],
   legal: [
     { label: '用户协议', href: '/terms' },
     { label: '隐私政策', href: '/privacy' },
-    { label: 'AI免责声明', href: '/ai-disclaimer' },
-    { label: 'Cookie政策', href: '/cookies' },
+    { label: 'AI免责声明', href: '/terms' }, // 合并到用户协议
+    { label: 'Cookie政策', href: '/privacy' }, // 合并到隐私政策
   ],
 };
 

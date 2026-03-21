@@ -18,53 +18,53 @@ import type {
 const USER_API_BASE = '/user';
 const ADMIN_API_BASE = '/admin';
 
-/** API 错误响应 */
-interface ApiErrorResponse {
-  detail?: string;
-}
-
-/**
- * 安全获取 JSON 响应
- */
-function safeJson<T>(response: Response): Promise<T> {
-  return response.json() as Promise<T>;
-}
-
-/**
- * 获取 API 错误信息
- */
-function getErrorMessage(error: unknown, defaultMsg: string): string {
-  if (typeof error === 'object' && error !== null && 'detail' in error) {
-    return (error as ApiErrorResponse).detail || defaultMsg;
-  }
-  return defaultMsg;
-}
-
 /**
  * 获取用户列表
  */
 export async function apiGetUsers(request: GetUsersRequest = {}): Promise<GetUsersResponse> {
-  const searchParams = new URLSearchParams();
-  if (request.page) searchParams.set('page', request.page.toString());
-  if (request.pageSize) searchParams.set('page_size', request.pageSize.toString());
-  if (request.keyword) searchParams.set('keyword', request.keyword);
-
-  const url = `${USER_API_BASE}/admin/list${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
+  const { data } = await apiClient.get<{
+    items: Array<{
+      id: number;
+      username: string;
+      email: string;
+      nickname: string | null;
+      phone: string | null;
+      avatar: string | null;
+      role: string;
+      is_active: boolean;
+      email_verified: boolean;
+      created_at: string;
+      updated_at: string | null;
+    }>;
+    total: number;
+    page: number;
+    page_size: number;
+  }>(`${USER_API_BASE}/admin/list`, {
+    params: {
+      ...(request.page && { page: request.page }),
+      ...(request.pageSize && { page_size: request.pageSize }),
+      ...(request.keyword && { keyword: request.keyword }),
     },
-    credentials: 'include',
   });
 
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取用户列表失败' }));
-    throw new Error(getErrorMessage(error, '获取用户列表失败'));
-  }
-
-  return safeJson<GetUsersResponse>(response);
+  return {
+    items: data.items.map(item => ({
+      id: item.id,
+      username: item.username,
+      email: item.email,
+      nickname: item.nickname,
+      phone: item.phone,
+      avatar: item.avatar,
+      role: item.role as 'user' | 'lawyer' | 'admin',
+      is_active: item.is_active,
+      email_verified: item.email_verified,
+      created_at: item.created_at,
+      updated_at: item.updated_at,
+    })),
+    total: data.total,
+    page: data.page,
+    page_size: data.page_size,
+  };
 }
 
 /**
@@ -98,78 +98,39 @@ export async function apiGetAdminStats(): Promise<AdminStats> {
  * 导出用户数据
  */
 export async function apiExportUsers(format: 'csv' = 'csv'): Promise<Blob> {
-  const response = await fetch(`${ADMIN_API_BASE}/export/users?format=${format}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
+  const response = await apiClient.get<Blob>(`${ADMIN_API_BASE}/export/users`, {
+    params: { format },
+    responseType: 'blob',
   });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ detail: '导出用户数据失败' })) as { detail?: string };
-    throw new Error(errorData.detail || '导出用户数据失败');
-  }
-
-  return response.blob();
+  return response.data;
 }
 
 /**
  * 导出帖子数据
  */
 export async function apiExportPosts(): Promise<Blob> {
-  const response = await fetch(`${ADMIN_API_BASE}/export/posts`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
+  const response = await apiClient.get<Blob>(`${ADMIN_API_BASE}/export/posts`, {
+    responseType: 'blob',
   });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '导出帖子数据失败' }));
-    throw new Error(getErrorMessage(error, '导出帖子数据失败'));
-  }
-
-  return response.blob();
+  return response.data;
 }
 
 /**
  * 导出新闻数据
  */
 export async function apiExportNews(): Promise<Blob> {
-  const response = await fetch(`${ADMIN_API_BASE}/export/news`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
+  const response = await apiClient.get<Blob>(`${ADMIN_API_BASE}/export/news`, {
+    responseType: 'blob',
   });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '导出新闻数据失败' }));
-    throw new Error(getErrorMessage(error, '导出新闻数据失败'));
-  }
-
-  return response.blob();
+  return response.data;
 }
 
 /**
  * 导出律所数据
  */
 export async function apiExportLawfirms(): Promise<Blob> {
-  const response = await fetch(`${ADMIN_API_BASE}/export/lawfirms`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
+  const response = await apiClient.get<Blob>(`${ADMIN_API_BASE}/export/lawfirms`, {
+    responseType: 'blob',
   });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '导出律所数据失败' }));
-    throw new Error(getErrorMessage(error, '导出律所数据失败'));
-  }
-
-  return response.blob();
+  return response.data;
 }

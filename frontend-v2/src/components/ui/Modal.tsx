@@ -90,6 +90,7 @@ export function Modal({
               {showCloseButton && (
                 <button
                   onClick={onClose}
+                  aria-label="关闭"
                   className="p-2 -m-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                 >
                   <X className="w-5 h-5" />

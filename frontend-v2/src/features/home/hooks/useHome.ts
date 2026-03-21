@@ -1,5 +1,6 @@
 /**
  * Home（首页）Hooks
+ * 优化：增加新用户引导状态查询
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -24,6 +25,14 @@ import {
   apiTrackClick,
   apiUpdateInterests,
 } from '../api';
+
+// ==================== Onboarding Types ====================
+export interface OnboardingStatus {
+  has_role: boolean;
+  current_step: string;
+  current_step_value: number;
+  completed?: boolean;
+}
 
 // ==================== Query Keys ====================
 

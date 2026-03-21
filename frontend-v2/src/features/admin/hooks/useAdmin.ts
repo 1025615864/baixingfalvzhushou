@@ -33,7 +33,7 @@ const ADMIN_QUERY_KEYS = {
 /**
  * 获取用户列表 Hook
  */
-export function useUsers(params: GetUsersRequest = {}) {
+export function useUsers(params: GetUsersRequest = {}, enabled = true) {
   return useQuery<{ users: UserListItem[]; total: number }>({
     queryKey: ADMIN_QUERY_KEYS.users(params),
     queryFn: async () => {
@@ -43,6 +43,7 @@ export function useUsers(params: GetUsersRequest = {}) {
         total: response.total,
       };
     },
+    enabled,
     staleTime: 30 * 1000, // 30秒缓存
   });
 }

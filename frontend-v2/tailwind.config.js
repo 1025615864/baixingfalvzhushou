@@ -418,10 +418,10 @@ export default {
           '@apply bg-gradient-to-br from-secondary-500 via-secondary-600 to-secondary-700': {},
         },
         '.bg-gradient-hero': {
-          'background': 'linear-gradient(135deg, #1433e1 0%, #1a44f5 50%, #3366ff 100%)': {},
+          'background': 'linear-gradient(135deg, #1433e1 0%, #1a44f5 50%, #3366ff 100%)',
         },
         '.bg-gradient-trust': {
-          'background': 'linear-gradient(135deg, #047857 0%, #10b981 50%, #34d399 100%)': {},
+          'background': 'linear-gradient(135deg, #047857 0%, #10b981 50%, #34d399 100%)',
         },
 
         // 聚焦环
@@ -465,12 +465,12 @@ export default {
 
         // 网格背景
         '.bg-grid': {
-          'background-image': 'linear-gradient(to right, rgba(51, 102, 255, 0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(51, 102, 255, 0.05) 1px, transparent 1px)': {},
-          'background-size': '40px 40px': {},
+          'background-image': 'linear-gradient(to right, rgba(51, 102, 255, 0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(51, 102, 255, 0.05) 1px, transparent 1px)',
+          'background-size': '40px 40px',
         },
         '.bg-dots': {
-          'background-image': 'radial-gradient(circle, rgba(51, 102, 255, 0.1) 1px, transparent 1px)': {},
-          'background-size': '20px 20px': {},
+          'background-image': 'radial-gradient(circle, rgba(51, 102, 255, 0.1) 1px, transparent 1px)',
+          'background-size': '20px 20px',
         },
 
         // 动画延迟

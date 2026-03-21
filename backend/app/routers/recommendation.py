@@ -1,5 +1,5 @@
-"""个性化推荐API路由"""
-from typing import Any, Annotated
+"""个性化推荐API路由 - 增强版"""
+from typing import Any, Annotated, Optional
 from typing_extensions import TypedDict
 
 from fastapi import APIRouter, Depends, Query
@@ -17,6 +17,7 @@ from ..services.recommendation import (
     get_cold_start_service,
     record_user_interaction,
 )
+from ..services.personalized_home import personalized_home_service
 from ..database import get_db
 from ..utils.deps import get_current_user
 
@@ -273,3 +274,138 @@ async def recommend_similar_users_content(
         limit=limit,
     )
     return {"content": content}
+
+
+# ==================== 增强版推荐端点 ====================
+
+
+@router.get(
+    "/enhanced/personalized-home",
+    summary="获取增强版个性化首页",
+)
+async def get_enhanced_personalized_home(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    lawyer_limit: Annotated[int, Query(ge=1, le=20)] = 5,
+    post_limit: Annotated[int, Query(ge=1, le=20)] = 5,
+    news_limit: Annotated[int, Query(ge=1, le=20)] = 5,
+    knowledge_limit: Annotated[int, Query(ge=1, le=20)] = 5,
+):
+    """
+    获取增强版个性化首页推荐
+    
+    整合多种推荐策略：
+    - 基于用户历史行为推荐内容
+    - 基于用户兴趣标签推荐
+    - 热门内容推荐（冷启动用户）
+    - 近期咨询相关推荐
+    """
+    result = await personalized_home_service.get_enhanced_personalized_home(
+        user_id=current_user.id,
+        db_session=db,
+        lawyer_limit=lawyer_limit,
+        post_limit=post_limit,
+        news_limit=news_limit,
+        knowledge_limit=knowledge_limit,
+    )
+    return result
+
+
+@router.get(
+    "/lawyers/by-consultation",
+    summary="基于咨询历史推荐律师",
+)
+async def recommend_lawyers_by_consultation(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: Annotated[int, Query(description="推荐数量", ge=1, le=20)] = 10,
+):
+    """
+    基于用户咨询历史推荐相似领域律师
+    
+    根据用户曾经的咨询记录，推荐擅长相关领域的律师
+    """
+    lawyers = await RecommendationService.recommend_lawyers_by_consultation_history(
+        db=db,
+        user_id=current_user.id,
+        limit=limit,
+    )
+    return {"lawyers": lawyers}
+
+
+@router.get(
+    "/lawyers/by-location",
+    summary="基于位置推荐律师",
+)
+async def recommend_lawyers_by_location(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    city: Annotated[Optional[str], Query(description="城市名称")] = None,
+    limit: Annotated[int, Query(description="推荐数量", ge=1, le=20)] = 10,
+):
+    """
+    基于地理位置推荐附近律师
+    
+    根据用户所在城市，推荐本地律师
+    """
+    lawyers = await RecommendationService.recommend_lawyers_by_location(
+        db=db,
+        user_id=current_user.id,
+        city=city,
+        limit=limit,
+    )
+    return {"lawyers": lawyers}
+
+
+@router.get(
+    "/knowledge/by-interests",
+    summary="基于兴趣推荐知识文章",
+)
+async def recommend_knowledge_by_interests(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: Annotated[int, Query(description="推荐数量", ge=1, le=20)] = 10,
+):
+    """
+    基于用户兴趣推荐法律知识文章
+    
+    根据用户兴趣标签推荐相关的法律知识内容
+    """
+    knowledge = await RecommendationService.recommend_knowledge_by_interests(
+        db=db,
+        user_id=current_user.id,
+        limit=limit,
+    )
+    return {"knowledge": knowledge}
+
+
+@router.get(
+    "/home",
+    summary="获取首页推荐数据",
+)
+async def get_home_recommendations(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    recommendation_limit: Annotated[int, Query(ge=1, le=20)] = 10,
+):
+    """
+    获取首页推荐数据
+    
+    返回综合推荐数据，包括：
+    - 个性化推荐律师
+    - 个性化推荐帖子
+    - 个性化推荐新闻
+    - 热门内容
+    """
+    # 获取各类推荐
+    lawyers = await RecommendationService.recommend_lawyers(db, current_user.id, 5)
+    posts = await RecommendationService.recommend_forum_posts(db, current_user.id, 5)
+    news = await RecommendationService.recommend_news(db, current_user.id, 5)
+    knowledge = await RecommendationService.recommend_knowledge_by_interests(db, current_user.id, 5)
+    
+    return {
+        "lawyers": lawyers,
+        "posts": posts,
+        "news": news,
+        "knowledge": knowledge,
+    }

@@ -1,5 +1,8 @@
 """AI核心工具函数"""
+import logging
 import tiktoken
+
+logger = logging.getLogger(__name__)
 
 
 class AICore:
@@ -115,7 +118,8 @@ class AICore:
         m = str(model or "").strip()
         try:
             return tiktoken.encoding_for_model(m)
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to get encoding for model '%s', using fallback: %s", m, e)
             return tiktoken.get_encoding("cl100k_base")
 
     @classmethod
@@ -126,7 +130,8 @@ class AICore:
         enc = cls._encoding_for_model(model)
         try:
             return int(len(enc.encode(s)))
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to count tokens with encoding, using estimation: %s", e)
             return int(max(0, len(s) // 4))
 
     @classmethod

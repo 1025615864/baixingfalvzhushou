@@ -1,5 +1,11 @@
-import { AppRouter } from '@/app/providers/Router';
+import { lazy, Suspense } from 'react';
+
+const LazyAppRouter = lazy(() => import('@/app/providers/Router').then((module) => ({ default: module.AppRouter })));
 
 export function App(): JSX.Element {
-  return <AppRouter />;
+  return (
+    <Suspense fallback={null}>
+      <LazyAppRouter />
+    </Suspense>
+  );
 }

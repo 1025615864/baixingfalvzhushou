@@ -7,9 +7,12 @@ import { apiClient } from "@/shared/lib/api/client";
 
 import type {
   User,
+  UserProfile,
   UserStats,
   UpdateProfileDTO,
   ChangePasswordDTO,
+  UserSettings,
+  UpdateSettingsDTO,
 } from '../types';
 
 
@@ -78,6 +81,16 @@ interface BackendUserStatsResponse {
   post_count: number;
   favorite_count: number;
   comment_count: number;
+}
+
+/** 后端用户设置响应 */
+interface BackendUserSettingsResponse {
+  email_notifications?: boolean;
+  sms_notifications?: boolean;
+  newsletter?: boolean;
+  language?: string;
+  theme?: string;
+  privacy?: 'public' | 'friends' | 'private';
 }
 
 /** 后端消息响应 */
@@ -150,7 +163,7 @@ interface BackendUserListResponse {
 /**
  * 转换后端用户到前端格式
  */
-function mapBackendToUser(data: BackendUserResponse): User {
+function mapBackendToUser(data: BackendUserResponse): UserProfile {
   return {
     id: String(data.id),
     name: data.nickname || data.username,
@@ -338,6 +351,50 @@ export async function apiGetUserStats(): Promise<UserStats> {
     documentCount: response.data.favorite_count || 0,
     knowledgeCount: response.data.comment_count || 0,
     totalSpent: 0,
+  };
+}
+
+// ==================== 用户设置 API ====================
+
+/**
+ * 获取当前用户设置
+ */
+export async function apiGetUserSettings(): Promise<UserSettings> {
+  const response = await apiClient.get<BackendUserSettingsResponse>(`${API_BASE}/me/settings`);
+
+  return {
+    emailNotifications: response.data.email_notifications ?? true,
+    smsNotifications: response.data.sms_notifications ?? false,
+    newsletter: response.data.newsletter ?? false,
+    language: (response.data.language as UserSettings['language']) ?? 'zh-CN',
+    theme: (response.data.theme as UserSettings['theme']) ?? 'light',
+    privacy: response.data.privacy ?? 'public',
+  };
+}
+
+/**
+ * 更新当前用户设置
+ */
+export async function apiUpdateUserSettings(
+  data: UpdateSettingsDTO
+): Promise<UserSettings> {
+  const payload: Record<string, unknown> = {};
+  if (data.emailNotifications !== undefined) payload.email_notifications = data.emailNotifications;
+  if (data.smsNotifications !== undefined) payload.sms_notifications = data.smsNotifications;
+  if (data.newsletter !== undefined) payload.newsletter = data.newsletter;
+  if (data.language !== undefined) payload.language = data.language;
+  if (data.theme !== undefined) payload.theme = data.theme;
+  if (data.privacy !== undefined) payload.privacy = data.privacy;
+
+  const response = await apiClient.put<BackendUserSettingsResponse>(`${API_BASE}/me/settings`, payload);
+
+  return {
+    emailNotifications: response.data.email_notifications ?? true,
+    smsNotifications: response.data.sms_notifications ?? false,
+    newsletter: response.data.newsletter ?? false,
+    language: (response.data.language as UserSettings['language']) ?? 'zh-CN',
+    theme: (response.data.theme as UserSettings['theme']) ?? 'light',
+    privacy: response.data.privacy ?? 'public',
   };
 }
 
@@ -659,6 +716,10 @@ export const userApi = {
 
   // 统计
   getUserStats: apiGetUserStats,
+
+  // 用户设置
+  getUserSettings: apiGetUserSettings,
+  updateUserSettings: apiUpdateUserSettings,
 
   // 安全设置
   changePassword: apiChangePassword,

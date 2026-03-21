@@ -2,10 +2,15 @@
  * DeviceListPage - 设备管理页面
  */
 
+import { lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DesktopOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 
-import { DeviceList } from '../components/DeviceList';
+const LazyDeviceList = lazy(() =>
+  import('../components/DeviceList').then((module) => ({
+    default: module.DeviceList,
+  }))
+);
 
 /**
  * 设备管理页面
@@ -51,7 +56,9 @@ export function DeviceListPage(): JSX.Element {
           </div>
 
           {/* 设备列表 */}
-          <DeviceList />
+          <Suspense fallback={<div className="h-96 animate-pulse rounded bg-white" />}>
+            <LazyDeviceList />
+          </Suspense>
         </div>
       </div>
     </div>

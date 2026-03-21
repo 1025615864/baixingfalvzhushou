@@ -1,6 +1,6 @@
 /**
  * Knowledge（知识库）API 层
- * 基于统一的 apiClient，对接后端 /api/v1/knowledge 端点
+ * 基于统一的 apiClient，对接后端 /api/knowledge 端点
  */
 
 import { apiClient } from "@/shared/lib/api/client";
@@ -236,11 +236,12 @@ export async function apiDeleteArticle(articleId: string): Promise<{ message: st
 
 /**
  * 搜索法律知识
+ * 注意：修正搜索路径 - 后端使用 /laws 路由，但搜索参数通过 query 参数传递
  */
 export async function apiSearchArticles(
   params: SearchArticlesRequest
 ): Promise<SearchArticlesResponse> {
-  const response = await apiClient.get<BackendSearchResponse>(`${API_BASE}/search`, {
+  const response = await apiClient.get<BackendSearchResponse>(`${API_BASE}/laws`, {
     params: {
       keyword: params.query,
       category: params.category,

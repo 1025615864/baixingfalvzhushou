@@ -190,12 +190,21 @@ class AIModelConfig(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     model_id: Mapped[str] = mapped_column(
         String(200), nullable=False, unique=True, index=True)
+    provider: Mapped[str] = mapped_column(String(50), nullable=False, default="openai", index=True)
     api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     base_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     weight: Mapped[int] = mapped_column(Integer, default=1)  # 权重，用于负载均衡
+    priority: Mapped[int] = mapped_column(Integer, default=0)
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
     max_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     temperature: Mapped[float | None] = mapped_column(Float, nullable=True)
+    call_count: Mapped[int] = mapped_column(Integer, default=0)
+    error_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    health_status: Mapped[str] = mapped_column(String(20), default="unknown")
+    last_health_check: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    health_check_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

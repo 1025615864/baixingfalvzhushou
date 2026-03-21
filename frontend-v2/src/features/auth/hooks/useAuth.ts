@@ -4,6 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import * as authApi from '@/features/auth/api';
 import type { LoginRequest, RegisterRequest } from '@/features/auth/types';
+import {
+  clearAuthStorage,
+  setRefreshToken,
+  setToken,
+} from '@/shared/lib/security/tokenStorage';
 
 // 查询 keys
 export const authKeys = {
@@ -20,11 +25,13 @@ export function useLogin() {
   return useMutation({
     mutationFn: (data: LoginRequest) => authApi.login(data),
     onSuccess: (response) => {
-      // 后端直接返回 { user, token?, message }
+      // 后端返回 { user, token: { access_token, token_type, expires_in }, message }
       const { user, token } = response;
-      // 如果后端返回 token，存储到 localStorage
-      if (token) {
-        localStorage.setItem('access_token', token);
+      if (token?.access_token) {
+        setToken(token.access_token);
+      }
+      if ('refresh_token' in (token ?? {}) && typeof (token as { refresh_token?: unknown }).refresh_token === 'string') {
+        setRefreshToken((token as { refresh_token: string }).refresh_token);
       }
       setAuth(user);
       queryClient.setQueryData(authKeys.user(), user);
@@ -60,7 +67,7 @@ export function useLogout() {
   return useMutation({
     mutationFn: authApi.logout,
     onSuccess: () => {
-      localStorage.removeItem('access_token');
+      clearAuthStorage();
       clearAuth();
       // 只清除认证相关的缓存，保留其他数据
       queryClient.removeQueries({ queryKey: authKeys.all });
@@ -68,7 +75,7 @@ export function useLogout() {
     },
     onError: () => {
       // 即使失败也清除本地状态
-      localStorage.removeItem('access_token');
+      clearAuthStorage();
       clearAuth();
       queryClient.removeQueries({ queryKey: authKeys.all });
       navigate('/login');

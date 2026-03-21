@@ -27,29 +27,6 @@ import type {
 // API 基础路径
 const API_BASE = '/admin/monitor';
 
-/** API 错误响应 */
-interface ApiErrorResponse {
-  detail?: string;
-}
-
-/**
- * 安全获取 JSON 响应
- */
-async function safeJson<T>(response: Response): Promise<T> {
-  const data = await response.json() as T;
-  return data;
-}
-
-/**
- * 获取 API 错误信息
- */
-function getErrorMessage(error: unknown, defaultMsg: string): string {
-  if (typeof error === 'object' && error !== null && 'detail' in error) {
-    return (error as ApiErrorResponse).detail || defaultMsg;
-  }
-  return defaultMsg;
-}
-
 // ==================== 健康检查 API ====================
 
 /**
@@ -92,29 +69,15 @@ export async function apiGetMetrics(hours?: number): Promise<MetricsSummaryRespo
  * 获取API性能指标
  */
 export async function apiGetApiMetrics(endpoint?: string, hours?: number): Promise<ApiMetricsResponse> {
-  const searchParams = new URLSearchParams();
-  if (endpoint) searchParams.set('endpoint', endpoint);
-  if (hours) searchParams.set('hours', hours.toString());
-
-  const url = `${API_BASE}/api-metrics${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({
-      detail: '获取API指标失败',
-    }));
-    throw new Error(getErrorMessage(error, '获取API指标失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     endpoints?: Record<string, unknown>;
     count?: number;
-  }>(response);
+  }>(`${API_BASE}/api-metrics`, {
+    params: {
+      ...(endpoint && { endpoint }),
+      ...(hours && { hours }),
+    },
+  });
 
   // 转换后端数据格式为前端格式
   const endpoints: Record<string, ApiMetricsResponse['endpoints'][string]> = {};
@@ -144,29 +107,15 @@ export async function apiGetApiMetrics(endpoint?: string, hours?: number): Promi
  * 获取AI服务指标
  */
 export async function apiGetAiMetrics(hours?: number): Promise<AiMetricsResponse> {
-  const searchParams = new URLSearchParams();
-  if (hours) searchParams.set('hours', hours.toString());
-
-  const url = `${API_BASE}/ai-metrics${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({
-      detail: '获取AI指标失败',
-    }));
-    throw new Error(getErrorMessage(error, '获取AI指标失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     response_time?: Record<string, number>;
     total_responses?: number;
     total_tokens?: number;
-  }>(response);
+  }>(`${API_BASE}/ai-metrics`, {
+    params: {
+      ...(hours && { hours }),
+    },
+  });
 
   const rt = data.response_time ?? {};
 
@@ -190,24 +139,11 @@ export async function apiGetAiMetrics(hours?: number): Promise<AiMetricsResponse
  * 获取用户活跃指标
  */
 export async function apiGetUserMetrics(): Promise<UserMetrics> {
-  const response = await fetch(`${API_BASE}/user-metrics`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({
-      detail: '获取用户指标失败',
-    }));
-    throw new Error(getErrorMessage(error, '获取用户指标失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     active_now?: number;
     registered_total?: number;
     vip_users?: number;
-  }>(response);
+  }>(`${API_BASE}/user-metrics`);
 
   return {
     activeNow: data.active_now ?? 0,
@@ -220,25 +156,12 @@ export async function apiGetUserMetrics(): Promise<UserMetrics> {
  * 获取业务指标
  */
 export async function apiGetBusinessMetrics(): Promise<BusinessMetrics> {
-  const response = await fetch(`${API_BASE}/business-metrics`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({
-      detail: '获取业务指标失败',
-    }));
-    throw new Error(getErrorMessage(error, '获取业务指标失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     consultations?: number;
     documents_generated?: number;
     lawyer_bookings?: number;
     posts_created?: number;
-  }>(response);
+  }>(`${API_BASE}/business-metrics`);
 
   return {
     consultations: data.consultations ?? 0,
@@ -254,26 +177,7 @@ export async function apiGetBusinessMetrics(): Promise<BusinessMetrics> {
  * 获取告警列表
  */
 export async function apiGetAlerts(hours?: number, level?: string): Promise<AlertsResponse> {
-  const searchParams = new URLSearchParams();
-  if (hours) searchParams.set('hours', hours.toString());
-  if (level) searchParams.set('level', level);
-
-  const url = `${API_BASE}/alerts${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({
-      detail: '获取告警列表失败',
-    }));
-    throw new Error(getErrorMessage(error, '获取告警列表失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     total?: number;
     alerts?: Array<{
       rule_name?: string;
@@ -282,7 +186,12 @@ export async function apiGetAlerts(hours?: number, level?: string): Promise<Aler
       timestamp?: string;
       resolved?: boolean;
     }>;
-  }>(response);
+  }>(`${API_BASE}/alerts`, {
+    params: {
+      ...(hours && { hours }),
+      ...(level && { level }),
+    },
+  });
 
   return {
     total: data.total ?? 0,
@@ -300,20 +209,7 @@ export async function apiGetAlerts(hours?: number, level?: string): Promise<Aler
  * 获取告警规则
  */
 export async function apiGetAlertRules(): Promise<AlertRulesResponse> {
-  const response = await fetch(`${API_BASE}/alert-rules`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({
-      detail: '获取告警规则失败',
-    }));
-    throw new Error(getErrorMessage(error, '获取告警规则失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     rules?: Array<{
       name?: string;
       description?: string;
@@ -322,7 +218,7 @@ export async function apiGetAlertRules(): Promise<AlertRulesResponse> {
       enabled?: boolean;
     }>;
     total?: number;
-  }>(response);
+  }>(`${API_BASE}/alert-rules`);
 
   return {
     rules: (data.rules ?? []).map(rule => ({
@@ -358,20 +254,7 @@ export async function apiDisableAlertRule(ruleName: string): Promise<{ success: 
  * 获取查询统计
  */
 export async function apiGetQueryStats(): Promise<QueryStatsResponse> {
-  const response = await fetch(`${API_BASE}/query-stats`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({
-      detail: '获取查询统计失败',
-    }));
-    throw new Error(getErrorMessage(error, '获取查询统计失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     stats?: {
       total_queries?: number;
       slow_queries?: number;
@@ -389,7 +272,7 @@ export async function apiGetQueryStats(): Promise<QueryStatsResponse> {
       suggestion?: string;
       priority?: string;
     }>;
-  }>(response);
+  }>(`${API_BASE}/query-stats`);
 
   return {
     stats: {
@@ -426,20 +309,7 @@ export async function apiResetQueryStats(): Promise<{ message: string }> {
  * 获取系统信息
  */
 export async function apiGetSystemInfo(): Promise<SystemInfo> {
-  const response = await fetch(`${API_BASE}/system-info`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({
-      detail: '获取系统信息失败',
-    }));
-    throw new Error(getErrorMessage(error, '获取系统信息失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     platform?: string;
     platform_version?: string;
     processor?: string;
@@ -458,7 +328,7 @@ export async function apiGetSystemInfo(): Promise<SystemInfo> {
       percent?: number;
       count?: number;
     };
-  }>(response);
+  }>(`${API_BASE}/system-info`);
 
   return {
     platform: data.platform ?? 'unknown',
@@ -488,25 +358,12 @@ export async function apiGetSystemInfo(): Promise<SystemInfo> {
  * 获取数据库状态
  */
 export async function apiGetDatabaseStatus(): Promise<DatabaseStatus> {
-  const response = await fetch(`${API_BASE}/database-status`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({
-      detail: '获取数据库状态失败',
-    }));
-    throw new Error(getErrorMessage(error, '获取数据库状态失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     status?: string;
     connection?: string;
     version?: string;
     error?: string;
-  }>(response);
+  }>(`${API_BASE}/database-status`);
 
   return {
     status: (data.status ?? 'unhealthy') as DatabaseStatus['status'],
@@ -522,27 +379,14 @@ export async function apiGetDatabaseStatus(): Promise<DatabaseStatus> {
  * 获取缓存状态
  */
 export async function apiGetCacheStatus(): Promise<CacheStatus> {
-  const response = await fetch(`${API_BASE}/cache-status`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({
-      detail: '获取缓存状态失败',
-    }));
-    throw new Error(getErrorMessage(error, '获取缓存状态失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     status?: string;
     connection?: string;
     memory?: string;
     clients?: number;
     message?: string;
     error?: string;
-  }>(response);
+  }>(`${API_BASE}/cache-status`);
 
   return {
     status: (data.status ?? 'unhealthy') as CacheStatus['status'],
@@ -560,24 +404,11 @@ export async function apiGetCacheStatus(): Promise<CacheStatus> {
  * 获取WebSocket状态
  */
 export async function apiGetWebSocketStatus(): Promise<WebSocketStatus> {
-  const response = await fetch(`${API_BASE}/websocket-status`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({
-      detail: '获取WebSocket状态失败',
-    }));
-    throw new Error(getErrorMessage(error, '获取WebSocket状态失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     total_connections?: number;
     online_users?: number;
     rooms?: string[];
-  }>(response);
+  }>(`${API_BASE}/websocket-status`);
 
   return {
     totalConnections: data.total_connections ?? 0,
@@ -599,30 +430,7 @@ export async function apiGetLogs(params?: {
   limit?: number;
   offset?: number;
 }): Promise<LogsResponse> {
-  const searchParams = new URLSearchParams();
-  if (params?.level) searchParams.set('level', params.level);
-  if (params?.source) searchParams.set('source', params.source);
-  if (params?.startTime) searchParams.set('start_time', params.startTime);
-  if (params?.endTime) searchParams.set('end_time', params.endTime);
-  if (params?.limit) searchParams.set('limit', params.limit.toString());
-  if (params?.offset) searchParams.set('offset', params.offset.toString());
-
-  const url = `${API_BASE}/logs${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({
-      detail: '获取系统日志失败',
-    }));
-    throw new Error(getErrorMessage(error, '获取系统日志失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     total?: number;
     logs?: Array<{
       id?: string;
@@ -633,7 +441,16 @@ export async function apiGetLogs(params?: {
       metadata?: Record<string, unknown>;
     }>;
     has_more?: boolean;
-  }>(response);
+  }>(`${API_BASE}/logs`, {
+    params: {
+      ...(params?.level && { level: params.level }),
+      ...(params?.source && { source: params.source }),
+      ...(params?.startTime && { start_time: params.startTime }),
+      ...(params?.endTime && { end_time: params.endTime }),
+      ...(params?.limit && { limit: params.limit }),
+      ...(params?.offset && { offset: params.offset }),
+    },
+  });
 
   return {
     total: data.total ?? 0,
@@ -655,25 +472,7 @@ export async function apiGetLogs(params?: {
  * 获取日报表
  */
 export async function apiGetDailyReport(date?: string): Promise<DailyReport> {
-  const searchParams = new URLSearchParams();
-  if (date) searchParams.set('date', date);
-
-  const url = `${API_BASE}/daily-report${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({
-      detail: '获取日报表失败',
-    }));
-    throw new Error(getErrorMessage(error, '获取日报表失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     date?: string;
     summary?: {
       api_requests?: number;
@@ -681,7 +480,11 @@ export async function apiGetDailyReport(date?: string): Promise<DailyReport> {
       ai_responses?: number;
     };
     health_status?: string;
-  }>(response);
+  }>(`${API_BASE}/daily-report`, {
+    params: {
+      ...(date && { date }),
+    },
+  });
 
   return {
     date: data.date ?? new Date().toISOString().split('T')[0],

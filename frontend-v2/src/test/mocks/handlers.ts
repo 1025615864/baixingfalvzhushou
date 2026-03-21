@@ -230,80 +230,160 @@ export const paymentHandlers = [
     });
   }),
 
-  // 创建订单
+  // 创建订单 - 支持多种请求格式
   http.post(`${API_BASE}/payment/orders`, async ({ request }) => {
     await delay(200);
-    const body = (await request.json()) as { amount?: number };
+    const body = (await request.json()) as {
+      amount?: number;
+      title?: string;
+      description?: string;
+      type?: string;
+      order_type?: string;
+    };
+
+    // 生成订单号
+    const orderNo = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     return HttpResponse.json({
       order_id: 'mock_order_12345',
-      order_no: 'ORDER-2026-001',
+      order_no: orderNo,
       amount: body.amount || 100,
+      title: body.title || '测试订单',
+      description: body.description || '',
+      order_type: body.order_type || body.type || 'service',
       status: 'pending',
       created_at: new Date().toISOString(),
       expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     }, { status: 201 });
   }),
 
-  // 获取订单列表
-  http.get(`${API_BASE}/payment/orders`, async () => {
+  // 获取订单列表 - 支持分页参数
+  http.get(`${API_BASE}/payment/orders`, async ({ request }) => {
     await delay(100);
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const pageSize = parseInt(url.searchParams.get('page_size') || '20');
+
+    // 模拟订单数据
+    const orders = Array.from({ length: Math.min(pageSize, 5) }, (_, i) => ({
+      id: i + 1,
+      order_no: `ORDER-2026-${String(i + 1).padStart(3, '0')}`,
+      order_type: i % 2 === 0 ? 'recharge' : 'consultation',
+      amount: (i + 1) * 100,
+      actual_amount: (i + 1) * 100,
+      status: i % 3 === 0 ? 'paid' : i % 3 === 1 ? 'pending' : 'cancelled',
+      payment_method: 'wechat',
+      title: `测试订单 ${i + 1}`,
+      description: `这是测试订单 ${i + 1} 的描述`,
+      created_at: new Date(Date.now() - i * 86400000).toISOString(),
+      paid_at: i % 3 === 0 ? new Date().toISOString() : null,
+    }));
+
     return HttpResponse.json({
-      items: [
-        {
-          id: 1,
-          order_no: 'ORDER-2026-001',
-          order_type: 'recharge',
-          amount: 100,
-          actual_amount: 100,
-          status: 'paid',
-          payment_method: 'wechat',
-          title: '测试订单',
-          created_at: new Date().toISOString(),
-          paid_at: new Date().toISOString(),
-        },
-      ],
-      total: 1,
+      items: orders,
+      total: 10,
+      page,
+      page_size: pageSize,
+    });
+  }),
+
+  // 获取订单详情
+  http.get(`${API_BASE}/payment/orders/:orderNo`, async ({ params }) => {
+    await delay(50);
+    const { orderNo } = params;
+    return HttpResponse.json({
+      id: 1,
+      order_no: orderNo as string,
+      order_type: 'consultation',
+      amount: 100,
+      actual_amount: 100,
+      status: 'pending',
+      payment_method: null,
+      title: '测试订单详情',
+      description: '这是订单详情描述',
+      created_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    });
+  }),
+
+  // 支付订单 - 支持 :orderNo 和 :orderId 两种路径参数
+  http.post(`${API_BASE}/payment/orders/:orderNo/pay`, async ({ params }) => {
+    await delay(200);
+    const { orderNo } = params;
+    const orderNoStr = String(orderNo);
+
+    return HttpResponse.json({
+      success: true,
+      order_no: orderNoStr,
+      payment_url: `https://mock-payment.example.com/pay/${orderNoStr}`,
+      qr_code: 'data:image/png;base64,mock-qr-code',
+      message: '支付请求已处理',
     });
   }),
 
   // 取消订单
-  http.post(`${API_BASE}/payment/orders/:orderId/cancel`, async () => {
+  http.post(`${API_BASE}/payment/orders/:orderId/cancel`, async ({ params }) => {
     await delay(100);
+    const { orderId } = params;
     return HttpResponse.json({
-      message: '订单已取消',
       success: true,
+      order_id: orderId as string,
+      message: '订单已取消',
     });
   }),
 
   // 申请退款
   http.post(`${API_BASE}/payment/refunds`, async ({ request }) => {
     await delay(100);
-    const body = (await request.json()) as { order_no?: string; amount?: number; reason?: string };
+    const body = (await request.json()) as { order_no?: string; amount?: number; reason?: string } | undefined;
 
     return HttpResponse.json({
-      refund_no: 'REFUND-2026-001',
-      order_no: body.order_no || 'ORDER-2026-001',
-      amount: body.amount || 100,
-      status: 'pending',
-      reason: body.reason || null,
+      refund_no: `REFUND-${Date.now()}`,
+      order_no: body?.order_no || 'ORDER-2026-001',
+      amount: body?.amount || 100,
+      status: 'pending' as const,
+      reason: body?.reason || null,
       created_at: new Date().toISOString(),
+      success: true,
     });
   }),
 
-  // 充值钱包 - 注意这个 endpoint 是 /payment/balance/recharge 而不是 /payment/wallet/recharge
-  http.post(`${API_BASE}/payment/balance/recharge`, async ({ request }) => {
-    await delay(200);
-    const body = (await request.json()) as { amount?: number; payment_method?: string };
+  // 获取退款列表
+  http.get(`${API_BASE}/payment/refunds`, async ({ request }) => {
+    await delay(100);
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const pageSize = parseInt(url.searchParams.get('page_size') || '20');
+    const status = url.searchParams.get('status');
+
+    const refunds = Array.from({ length: Math.min(pageSize, 3) }, (_, i) => ({
+      refund_no: `REFUND-2026-${String(i + 1).padStart(3, '0')}`,
+      order_no: `ORDER-2026-${String(i + 1).padStart(3, '0')}`,
+      amount: (i + 1) * 50,
+      status: status || 'pending',
+      reason: i === 0 ? '用户申请退款' : null,
+      created_at: new Date(Date.now() - i * 86400000).toISOString(),
+    }));
 
     return HttpResponse.json({
-      success: true,
-      transaction_id: 'trans-123',
-      amount: body.amount || 100,
-      balance_after: 1000 + (body.amount || 100),
-      status: 'success',
+      items: refunds,
+      total: 3,
+      page,
+      page_size: pageSize,
+    });
+  }),
+
+  // 获取退款详情
+  http.get(`${API_BASE}/payment/refunds/:refundNo`, async ({ params }) => {
+    await delay(50);
+    const { refundNo } = params;
+    return HttpResponse.json({
+      refund_no: refundNo as string,
+      order_no: 'ORDER-2026-001',
+      amount: 100,
+      status: 'pending',
+      reason: '用户申请退款',
       created_at: new Date().toISOString(),
-      message: '充值成功',
     });
   }),
 
@@ -313,26 +393,54 @@ export const paymentHandlers = [
     return HttpResponse.json({
       balance: 1000,
       frozen: 0,
-      total_recharged: 5000,
-      total_consumed: 4000,
+      currency: 'CNY',
     });
   }),
 
-  // 获取交易记录
-  http.get(`${API_BASE}/payment/balance/transactions`, async () => {
+  // 获取余额交易记录
+  http.get(`${API_BASE}/payment/balance/transactions`, async ({ request }) => {
     await delay(100);
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const pageSize = parseInt(url.searchParams.get('page_size') || '20');
+
+    const transactions = Array.from({ length: Math.min(pageSize, 10) }, (_, i) => ({
+      id: i + 1,
+      type: i % 2 === 0 ? 'recharge' : 'payment',
+      amount: (i + 1) * 100,
+      balance_after: 1000 + i * 100,
+      description: i % 2 === 0 ? '余额充值' : '支付消费',
+      created_at: new Date(Date.now() - i * 86400000).toISOString(),
+    }));
+
+    return HttpResponse.json({
+      items: transactions,
+      total: 10,
+      page,
+      page_size: pageSize,
+    });
+  }),
+
+  // 获取价格表
+  http.get(`${API_BASE}/payment/pricing`, async () => {
+    await delay(50);
     return HttpResponse.json({
       items: [
         {
-          id: 1,
-          type: 'recharge',
+          id: 'consultation-1',
+          name: '单次咨询',
+          description: '30 分钟在线咨询',
           amount: 100,
-          balance_after: 1000,
-          description: '余额充值',
-          created_at: new Date().toISOString(),
+          currency: 'CNY',
+        },
+        {
+          id: 'consultation-10',
+          name: '10 次咨询套餐',
+          description: '10 次在线咨询（有效期 90 天）',
+          amount: 800,
+          currency: 'CNY',
         },
       ],
-      total: 1,
     });
   }),
 ];

@@ -8,7 +8,6 @@ import type {
   GetReviewHistoryRequest,
   GetReviewHistoryResponse,
   ReviewContractResponse,
-  ReviewContractErrorResponse,
   CompareContractsRequest,
   CompareContractsResponse,
   GenerateContractRequest,
@@ -18,34 +17,9 @@ import type {
   DeleteReviewResponse,
 } from '../types';
 
+
 // API 基础路径
 const API_BASE = '/contracts';
-
-/** API 错误响应 */
-interface ApiErrorResponse {
-  detail?: string;
-  error_code?: string;
-  message?: string;
-}
-
-/**
- * 安全获取 JSON 响应
- */
-async function safeJson<T>(response: Response): Promise<T> {
-  const data = await response.json() as T;
-  return data;
-}
-
-/**
- * 获取 API 错误信息
- */
-function getErrorMessage(error: unknown, defaultMsg: string): string {
-  if (typeof error === 'object' && error !== null) {
-    const apiError = error as ApiErrorResponse;
-    return apiError.detail || apiError.message || defaultMsg;
-  }
-  return defaultMsg;
-}
 
 /**
  * 获取审查历史记录列表
@@ -53,26 +27,7 @@ function getErrorMessage(error: unknown, defaultMsg: string): string {
 export async function apiGetReviewHistory(
   params: GetReviewHistoryRequest = {}
 ): Promise<GetReviewHistoryResponse> {
-  const searchParams = new URLSearchParams();
-  if (params.page) searchParams.set('page', String(params.page));
-  if (params.pageSize) searchParams.set('page_size', String(params.pageSize));
-
-  const url = `${API_BASE}/review/history${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取审查历史失败' }));
-    throw new Error(getErrorMessage(error, '获取审查历史失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     items: Array<{
       id: string;
       filename: string;
@@ -85,7 +40,12 @@ export async function apiGetReviewHistory(
     total: number;
     page: number;
     page_size: number;
-  }>(response);
+  }>(`${API_BASE}/review/history`, {
+    params: {
+      ...(params.page && { page: params.page }),
+      ...(params.pageSize && { page_size: params.pageSize }),
+    },
+  });
 
   return {
     items: data.items.map(item => ({
@@ -107,22 +67,7 @@ export async function apiGetReviewHistory(
  * 获取审查详情
  */
 export async function apiGetReviewDetail(reviewId: string): Promise<ContractReviewDetail> {
-  const response = await fetch(`${API_BASE}/review/history/${reviewId}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ReviewContractErrorResponse>(response).catch(() => ({
-      message: '获取审查详情失败',
-    }));
-    throw new Error(error.message || '获取审查详情失败');
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     filename: string;
     content_type: string | null;
     contract_type: string | null;
@@ -134,7 +79,7 @@ export async function apiGetReviewDetail(reviewId: string): Promise<ContractRevi
     report_markdown: string;
     request_id: string;
     created_at?: string;
-  }>(response);
+  }>(`${API_BASE}/review/history/${reviewId}`);
 
   return {
     id: reviewId,
@@ -315,7 +260,7 @@ export async function apiExportReportPdf(
   );
 
   if (!response.ok) {
-    const error = await safeJson<{ detail?: string }>(response).catch(() => ({ detail: '导出 PDF 失败' }));
+    const error = await response.json().catch(() => ({ detail: '导出 PDF 失败' })) as { detail?: string };
     throw new Error(error.detail || '导出 PDF 失败');
   }
 
@@ -343,7 +288,7 @@ export async function apiExportReportWord(
   );
 
   if (!response.ok) {
-    const error = await safeJson<{ detail?: string }>(response).catch(() => ({ detail: '导出 Word 失败' }));
+    const error = await response.json().catch(() => ({ detail: '导出 Word 失败' })) as { detail?: string };
     throw new Error(error.detail || '导出 Word 失败');
   }
 

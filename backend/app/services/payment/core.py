@@ -95,14 +95,44 @@ class PaymentCoreService:
         trade_no: str,
         paid_at: Optional[datetime] = None
     ) -> PaymentOrder:
-        """标记订单为已支付"""
-        order.status = PaymentStatus.PAID
-        order.trade_no = trade_no
-        order.paid_at = paid_at or datetime.now()
+        """标记订单为已支付（幂等，原子操作）
 
-        await db.flush()
+        使用 UPDATE WHERE 条件确保只有 PENDING 状态的订单才会被更新，
+        避免并发回调导致的重复支付问题。
+
+        Returns:
+            更新后的订单对象
+
+        Raises:
+            ValueError: 如果订单不是 PENDING 状态（可能已被处理）
+        """
+        from sqlalchemy import update
+
+        paid_at_value = paid_at or datetime.now()
+
+        # 使用原子更新，只有 PENDING 状态才会被更新
+        stmt = (
+            update(PaymentOrder)
+            .where(PaymentOrder.id == order.id)
+            .where(PaymentOrder.status == PaymentStatus.PENDING)
+            .values(
+                status=PaymentStatus.PAID,
+                trade_no=trade_no,
+                paid_at=paid_at_value
+            )
+        )
+
+        result = await db.execute(stmt)
+
+        if result.rowcount == 0:
+            # 订单可能已被其他请求处理
+            await db.refresh(order)
+            if order.status == PaymentStatus.PAID:
+                logger.info(f"Order already paid (idempotent): {order.order_no}")
+                return order
+            raise ValueError(f"Cannot mark order as paid: current status is {order.status}")
+
         await db.refresh(order)
-
         logger.info(f"Order marked as paid: {order.order_no}, trade_no: {trade_no}")
         return order
 

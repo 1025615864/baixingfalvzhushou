@@ -7,7 +7,11 @@ import { useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { CreditCard, Download, Search, CheckCircle, XCircle, Clock, Eye } from 'lucide-react';
 
-import { Card, Input, Button, Badge, Pagination } from '@/components/ui';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Pagination } from '@/components/ui/Pagination';
 
 import {
   useWithdrawalsAdmin,

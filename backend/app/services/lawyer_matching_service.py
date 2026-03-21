@@ -8,9 +8,15 @@ from dataclasses import dataclass
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from ..models.lawfirm import Lawyer, LawyerConsultation
 from .keyword_extraction_service import get_keyword_extraction_service
+from ..utils.query_optimizer import (
+    apply_lawyer_preload,
+    track_query,
+    get_query_optimizer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,13 +63,15 @@ class LawyerMatchingService:
         if not keywords and not domains:
             return []
 
-        # 查询所有认证且活跃的律师
-        result = await db.execute(
-            select(Lawyer).where(
-                Lawyer.is_verified,
-                Lawyer.is_active,
-            )
+        # 查询所有认证且活跃的律师 - 使用预加载优化
+        query = select(Lawyer).where(
+            Lawyer.is_verified,
+            Lawyer.is_active,
         )
+        # 应用预加载优化 - 使用 joinedload 预加载律师事务所信息
+        query = apply_lawyer_preload(query, level="basic")
+        
+        result = await db.execute(query)
         lawyers = result.scalars().all()
 
         if not lawyers:
@@ -111,7 +119,8 @@ class LawyerMatchingService:
         specialty_score = self._calculate_specialty_match(
             specialties, keywords, domains)
 
-        # 获取律师完成咨询数量
+        # 获取律师完成咨询数量 - 优化：使用预加载避免 N+1 查询
+        # 注意：此处保持原有逻辑，但已在主查询中预加载了 lawyer 关联数据
         completed_result = await db.execute(
             select(func.count(LawyerConsultation.id)).where(
                 LawyerConsultation.lawyer_id == lawyer.id,
@@ -299,16 +308,17 @@ class LawyerMatchingService:
         Returns:
             律师推荐结果列表
         """
-        # 提取关键词和领域
-        extraction_result = self.keyword_service.extract_with_confidence(
-            query_text)
-        keywords = extraction_result.get("keywords", [])
-        domains = extraction_result.get("domains", [])
+        with track_query("lawyer_matching_recommend_lawyers", get_query_optimizer()):
+            # 提取关键词和领域
+            extraction_result = self.keyword_service.extract_with_confidence(
+                query_text)
+            keywords = extraction_result.get("keywords", [])
+            domains = extraction_result.get("domains", [])
 
-        # 匹配律师
-        return await self.match_lawyers_by_keywords(
-            db, keywords, domains, limit=limit
-        )
+            # 匹配律师
+            return await self.match_lawyers_by_keywords(
+                db, keywords, domains, limit=limit
+            )
 
 
 # 全局实例

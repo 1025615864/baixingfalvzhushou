@@ -72,7 +72,7 @@ const NEWS_ADMIN_QUERY_KEYS = {
 /**
  * 获取新闻列表 Hook
  */
-export function useNewsList(params: GetNewsListRequest = {}) {
+export function useNewsList(params: GetNewsListRequest = {}, enabled = true) {
   return useQuery<{
     items: NewsAdminListItem[];
     total: number;
@@ -81,6 +81,7 @@ export function useNewsList(params: GetNewsListRequest = {}) {
   }>({
     queryKey: NEWS_ADMIN_QUERY_KEYS.articles(params),
     queryFn: () => apiGetNewsList(params),
+    enabled,
     staleTime: 30 * 1000, // 30秒缓存
   });
 }
@@ -404,10 +405,11 @@ export function useIngestRuns(params: GetIngestRunsRequest = {}) {
 /**
  * 获取分类统计 Hook
  */
-export function useCategoryStats() {
+export function useCategoryStats(enabled = true) {
   return useQuery<CategoryCount[]>({
     queryKey: NEWS_ADMIN_QUERY_KEYS.categoryStats,
     queryFn: apiGetCategoryStats,
+    enabled,
     staleTime: 5 * 60 * 1000, // 5分钟缓存
   });
 }
@@ -415,10 +417,11 @@ export function useCategoryStats() {
 /**
  * 获取新闻统计 Hook
  */
-export function useNewsStats() {
+export function useNewsStats(enabled = true) {
   return useQuery<NewsStats>({
     queryKey: NEWS_ADMIN_QUERY_KEYS.newsStats,
     queryFn: apiGetNewsStats,
+    enabled,
     staleTime: 60 * 1000, // 1分钟缓存
   });
 }

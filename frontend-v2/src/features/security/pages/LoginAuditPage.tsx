@@ -2,10 +2,15 @@
  * LoginAuditPage - 登录审计日志页面
  */
 
+import { lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuditOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 
-import { LoginAuditTable } from '../components/LoginAuditTable';
+const LazyLoginAuditTable = lazy(() =>
+  import('../components/LoginAuditTable').then((module) => ({
+    default: module.LoginAuditTable,
+  }))
+);
 
 /**
  * 登录审计日志页面
@@ -50,7 +55,9 @@ export function LoginAuditPage(): JSX.Element {
           </div>
 
           {/* 登录审计表格 */}
-          <LoginAuditTable pageSize={10} />
+          <Suspense fallback={<div className="h-96 animate-pulse rounded bg-white" />}>
+            <LazyLoginAuditTable pageSize={10} />
+          </Suspense>
         </div>
       </div>
     </div>

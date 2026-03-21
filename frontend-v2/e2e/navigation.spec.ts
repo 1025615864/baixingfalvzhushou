@@ -4,40 +4,40 @@
 
 import { test, expect } from '@playwright/test';
 
+test.describe.configure({ mode: 'serial' });
+
+async function gotoFast(page: import('@playwright/test').Page, path: string): Promise<void> {
+  await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 15000 });
+}
+
 test.describe('页面导航', () => {
   test('用户应该能从首页导航到各功能页面', async ({ page }) => {
-    // 访问首页
-    await page.goto('/');
-    
-    // 验证首页加载
-    await expect(page.locator('nav')).toBeVisible();
-    
-    // 导航到 AI 对话
-    await page.click('text=AI咨询');
+    await gotoFast(page, '/');
+
+    await expect
+      .poll(async () => page.getByRole('link', { name: 'AI咨询' }).count(), { timeout: 15000 })
+      .toBeGreaterThan(0);
+
+    const aiConsultationLink = page.getByRole('link', { name: 'AI咨询' }).first();
+    await aiConsultationLink.click();
     await expect(page).toHaveURL(/.*chat/);
-    
-    // 返回首页
-    await page.goto('/');
-    
-    // 导航到知识库
-    await page.click('text=知识库');
+
+    await gotoFast(page, '/');
+
+    await page.getByRole('link', { name: '法律知识' }).first().click();
     await expect(page).toHaveURL(/.*knowledge/);
   });
 
   test('移动端应该有响应式菜单', async ({ page }) => {
-    // 设置移动端视口
     await page.setViewportSize({ width: 375, height: 667 });
-    
-    await page.goto('/');
-    
-    // 验证移动端菜单按钮存在
+    await gotoFast(page, '/');
+
     const menuButton = page.locator('button[aria-label="菜单"]').first();
     await expect(menuButton).toBeVisible();
-    
-    // 点击菜单按钮
+
     await menuButton.click();
-    
-    // 验证菜单展开
-    await expect(page.locator('nav')).toBeVisible();
+
+    await expect(page.locator('[data-testid="mobile-menu-panel"]')).toBeVisible();
+    await expect(page.locator('[data-testid="mobile-nav-items"]')).toBeVisible();
   });
 });

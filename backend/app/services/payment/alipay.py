@@ -228,7 +228,7 @@ class AlipayService:
         处理支付宝回调
 
         Returns:
-            {"success": True, "order_no": "订单号"} 或 {"success": False, "error": "错误信息"}
+            {"success": True, "order_no": "订单号", "trade_no": "交易号", "amount": 金额} 或 {"success": False, "error": "错误信息"}
         """
         try:
             sign = params.get("sign")
@@ -243,9 +243,16 @@ class AlipayService:
             order_no = params.get("out_trade_no")
             trade_no = params.get("trade_no")
             trade_status = params.get("trade_status")
+            # 支付宝回调中的金额（单位是元）
+            total_amount = params.get("total_amount")
 
             if trade_status in ["TRADE_SUCCESS", "TRADE_FINISHED"]:
-                return {"success": True, "order_no": order_no, "trade_no": trade_no}
+                return {
+                    "success": True,
+                    "order_no": order_no,
+                    "trade_no": trade_no,
+                    "amount": float(total_amount) if total_amount else None
+                }
             else:
                 return {"success": True, "order_no": order_no, "status": trade_status}
 

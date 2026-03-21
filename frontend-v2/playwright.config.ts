@@ -29,7 +29,7 @@ export default defineConfig({
   // 全局测试配置
   use: {
     // 基础 URL
-    baseURL: process.env.E2E_BASE_URL || 'http://localhost:5173',
+    baseURL: process.env.E2E_BASE_URL || 'http://127.0.0.1:4173',
 
     // 收集失败测试的 trace
     trace: 'on-first-retry',
@@ -73,9 +73,9 @@ export default defineConfig({
 
   // 启动开发服务器
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
+    command: 'npm run dev -- --host 127.0.0.1 --port 4173 --strictPort',
+    url: 'http://127.0.0.1:4173',
+    reuseExistingServer: false,
     timeout: 120 * 1000,
   },
 });

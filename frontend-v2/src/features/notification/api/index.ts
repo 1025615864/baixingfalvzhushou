@@ -54,7 +54,7 @@ export async function getUnreadCount(): Promise<UnreadCountResponse> {
  * @returns 操作结果
  */
 export async function markAsRead(notificationId: number): Promise<{ message: string }> {
-  const response = await apiClient.put<{ message: string }>(
+  const response = await apiClient.patch<{ message: string }>(
     `/notifications/${notificationId}/read`
   );
   return response.data;
@@ -65,7 +65,7 @@ export async function markAsRead(notificationId: number): Promise<{ message: str
  * @returns 操作结果
  */
 export async function markAllAsRead(): Promise<{ message: string }> {
-  const response = await apiClient.put<{ message: string }>('/notifications/read-all');
+  const response = await apiClient.patch<{ message: string }>('/notifications/read-all');
   return response.data;
 }
 

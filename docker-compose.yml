@@ -108,7 +108,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-baixing_law}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       DEBUG: ${DEBUG:-true}
-      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-'["http://localhost:3000","http://localhost:5173"]'}
+      CORS_ALLOW_ORIGINS: '["http://localhost:3000","http://localhost:5173"]'
       DB_ALLOW_RUNTIME_DDL: "1"
       REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/0
       AI_QUALITY_REDIS_ENABLED: ${AI_QUALITY_REDIS_ENABLED:-true}

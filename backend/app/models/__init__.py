@@ -25,9 +25,12 @@ from .payment import (
     PaymentOrder, UserBalance, BalanceTransaction, PaymentCallbackEvent,
     PaymentStatus, RefundStatus, PaymentRefund, BankCard
 )
-from .user_profile import UserProfile, UserInterestHistory, UserTagInteraction
+from .user_profile import UserProfile, UserInterestHistory, UserTagInteraction, UserOnboarding
 from .points import PointsUser, PointsHistory, PointsDailyCount, PointsProduct, PointsExchangeOrder
 from .periodic_task import PeriodicTaskRun, TaskStatus
+from .membership import Membership
+from .legal_document import LegalDocument, LegalDocumentOrder, LegalDocumentFavorite
+from .video_consultation import VideoConsultation, VideoConsultationUsage, VideoSchedule
 
 __all__ = [
     "User",
@@ -88,6 +91,7 @@ __all__ = [
     "UserProfile",
     "UserInterestHistory",
     "UserTagInteraction",
+    "UserOnboarding",
     "PointsUser",
     "PointsHistory",
     "PointsDailyCount",
@@ -98,4 +102,11 @@ __all__ = [
     "UserSecuritySettings",
     "UserDevice",
     "LoginAudit",
+    "Membership",
+    "LegalDocument",
+    "LegalDocumentOrder",
+    "LegalDocumentFavorite",
+    "VideoConsultation",
+    "VideoConsultationUsage",
+    "VideoSchedule",
 ]

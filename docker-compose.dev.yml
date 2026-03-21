@@ -14,10 +14,13 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-baixing_dev_2024}
       POSTGRES_DB: ${POSTGRES_DB:-baixing_law}
+      POSTGRES_HOST_AUTH_METHOD: trust
     volumes:
       - baixing_dev_postgres:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    networks:
+      - baixing-dev-backend-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
@@ -33,6 +36,8 @@ services:
       - baixing_dev_redis:/data
     ports:
       - "16379:6379"
+    networks:
+      - baixing-dev-backend-network
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-baixing_redis_2024}", "ping"]
       interval: 10s
@@ -45,6 +50,7 @@ services:
     container_name: baixing_dev_backend
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-baixing_dev_2024}@db:5432/${POSTGRES_DB:-baixing_law}
+      PGSSLMODE: disable
       SECRET_KEY: ${JWT_SECRET_KEY:-dev-jwt-secret-key-for-local-testing-only-32chars}
       ALGORITHM: HS256
       DEBUG: "true"
@@ -65,8 +71,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - baixing_dev_uploads:/app/uploads
+    # volumes:
+    #   - baixing_dev_uploads:/app/uploads
+    networks:
+      - baixing-dev-backend-network
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
@@ -75,19 +83,28 @@ services:
       retries: 3
       start_period: 40s
 
-  # 前端服务 (可选 - 网络问题时可本地运行)
-  # frontend:
-  #   build:
-  #     context: ./frontend-v2
-  #     dockerfile: Dockerfile
-  #   container_name: baixing_dev_frontend
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     - backend
-  #   environment:
-  #     - VITE_API_BASE_URL=/api
-  #     - VITE_WS_URL=ws://localhost:8000/ws
+  # 前端服务
+  frontend:
+    build:
+      context: ./frontend-v2
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+        VITE_WS_URL: ws://backend:8000/ws
+    container_name: baixing_dev_frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_BASE_URL=/api
+      - VITE_WS_URL=ws://backend:8000/ws
+    networks:
+      - baixing-dev-backend-network
+
+networks:
+  baixing-dev-backend-network:
+    driver: bridge
 
 volumes:
   baixing_dev_postgres:

@@ -37,7 +37,7 @@ export const ENDPOINTS = {
     profile: '/user/me',            // PUT /user/me
     password: '/user/me/password',  // PUT /user/me/password
     avatar: '/user/avatar',         // POST /user/avatar (假设)
-    csrf: '/user/csrf-token',       // GET /user/csrf-token
+    csrf: '/user/me/csrf-token',    // GET /user/me/csrf-token - FR-001 修正
   },
   
   // 用户相关 - 使用 /user 前缀
@@ -53,12 +53,16 @@ export const ENDPOINTS = {
     updateRole: (id: number) => `/user/admin/${id}/role`,
   },
   
-  // AI 对话相关 - 需要检查 backend/app/routers/ai.py
+  // AI 对话相关 - 与 backend/app/routers/ai/consultations.py 匹配 - FR-002 修正
   ai: {
-    chat: '/ai/chat',               // POST /ai/chat
-    history: '/ai/history',         // GET /ai/history
-    sessions: '/ai/sessions',       // GET/POST /ai/sessions
-    session: (id: string) => `/ai/sessions/${id}`,
+    chat: '/ai/chat',                       // POST /ai/chat
+    history: '/ai/history',                 // GET /ai/history
+    consultations: '/ai/consultations',     // GET/POST /ai/consultations
+    consultation: (id: string) => `/ai/consultations/${id}`,
+    messages: (id: string) => `/ai/consultations/${id}/messages`,
+    analysis: '/ai/analysis',               // POST /ai/analysis
+    transcribe: '/ai/transcribe',           // POST /ai/transcribe
+    share: '/ai/share',                     // POST /ai/share
   },
   
   // 咨询相关 - 需要检查 backend/app/routers/lawfirm/consultations.py

@@ -1,11 +1,18 @@
 /**
  * Membership（会员系统）Hooks
+ 
+ 会员等级体系：
+ - free: 免费用户
+ - monthly: 月度会员 ¥29/月
+ - annual: 年度会员 ¥299/年 (享8.6折)
+ - lifetime: 终身会员 ¥999 (一次购买终身权益)
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type {
   UserMembership,
+  MembershipPricing,
   MembershipBenefits,
   ConversionHistoryItem,
   ConversionStats,
@@ -16,6 +23,7 @@ import type {
   CancelMembershipOrderRequest,
 } from '../types';
 import {
+  apiGetMembershipPricing,
   apiGetMembershipInfo,
   apiGetMembershipLevels,
   apiGetMembershipBenefits,
@@ -30,6 +38,7 @@ import {
 // ==================== Query Keys ====================
 
 const MEMBERSHIP_QUERY_KEYS = {
+  pricing: ['membership', 'pricing'] as const,
   membership: ['membership', 'me'] as const,
   levels: ['membership', 'levels'] as const,
   benefits: (tier: string) => ['membership', 'benefits', tier] as const,
@@ -39,6 +48,17 @@ const MEMBERSHIP_QUERY_KEYS = {
 } as const;
 
 // ==================== Membership Hooks ====================
+
+/**
+ * 获取会员价格配置 Hook
+ */
+export function useMembershipPricing() {
+  return useQuery<MembershipPricing[]>({
+    queryKey: MEMBERSHIP_QUERY_KEYS.pricing,
+    queryFn: apiGetMembershipPricing,
+    staleTime: 30 * 60 * 1000, // 30分钟缓存，价格配置不常变化
+  });
+}
 
 /**
  * 获取当前用户会员信息 Hook

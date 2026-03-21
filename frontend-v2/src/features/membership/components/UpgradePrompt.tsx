@@ -18,23 +18,21 @@ interface UpgradePromptProps {
 
 const tierLabels: Record<MembershipTier, string> = {
   free: '免费用户',
-  basic: '基础会员',
-  standard: '标准会员',
-  premium: '高级会员',
-  enterprise: '企业会员',
+  monthly: '月度会员',
+  annual: '年度会员',
+  lifetime: '终身会员',
 };
 
 const tierPrices: Record<MembershipTier, { month: number; quarter: number; year: number }> = {
   free: { month: 0, quarter: 0, year: 0 },
-  basic: { month: 9.9, quarter: 26.9, year: 99 },
-  standard: { month: 29.9, quarter: 79.9, year: 299 },
-  premium: { month: 59.9, quarter: 159.9, year: 599 },
-  enterprise: { month: 199, quarter: 549, year: 1999 },
+  monthly: { month: 29, quarter: 79, year: 299 },
+  annual: { month: 299, quarter: 799, year: 2990 },
+  lifetime: { month: 999, quarter: 999, year: 999 },
 };
 
 export function UpgradePrompt({
   currentTier,
-  recommendedTier = 'standard',
+  recommendedTier = 'monthly',
   recommendedReason = '解锁更多AI对话和高级功能',
   onUpgrade,
   onClose,
@@ -47,7 +45,7 @@ export function UpgradePrompt({
     onUpgrade(selectedTier, selectedDuration);
   };
 
-  const tiers: MembershipTier[] = ['basic', 'standard', 'premium', 'enterprise'];
+  const tiers: MembershipTier[] = ['monthly', 'annual', 'lifetime'];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">

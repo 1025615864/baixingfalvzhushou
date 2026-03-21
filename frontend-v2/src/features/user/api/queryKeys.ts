@@ -12,6 +12,9 @@ export const userKeys = {
   /** 当前用户信息 */
   me: () => [...userKeys.all, 'me'] as const,
 
+  /** 用户设置 */
+  settings: () => [...userKeys.all, 'settings'] as const,
+
   /** 用户配额 */
   quotas: () => [...userKeys.all, 'quotas'] as const,
   quotaUsage: (days?: number) => [...userKeys.quotas(), 'usage', days] as const,
@@ -30,7 +33,7 @@ export const userKeys = {
   userList: (page?: number, pageSize?: number, keyword?: string) =>
     [...userKeys.list(), { page, pageSize, keyword }] as const,
 
-  /** 活跃Token */
+  /** 活跃 Token */
   activeTokens: () => [...userKeys.all, 'active-tokens'] as const,
 } as const;
 

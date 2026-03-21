@@ -2,7 +2,7 @@
  * AIQualityPage - AI质量监控中心页面
  */
 
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 
 import {
   useAIMetrics,
@@ -16,11 +16,47 @@ import {
   useResolveAlert,
   useAILogs,
 } from '../hooks/useAIQuality';
-import { QualityDashboard } from '../components/QualityDashboard';
-import { SessionReview } from '../components/SessionReview';
-import { AlertList } from '../components/AlertList';
-import { MetricsChart } from '../components/MetricsChart';
 import type { AlertLevel, AlertStatus, AlertType, ReviewResult, QualityLevel } from '../types';
+
+const LazyQualityDashboard = lazy(() =>
+  import('../components/QualityDashboard').then((module) => ({
+    default: module.QualityDashboard,
+  }))
+);
+
+const LazyMetricsChart = lazy(() =>
+  import('../components/MetricsChart').then((module) => ({
+    default: module.MetricsChart,
+  }))
+);
+
+const LazySessionReview = lazy(() =>
+  import('../components/SessionReview').then((module) => ({
+    default: module.SessionReview,
+  }))
+);
+
+const LazyAlertList = lazy(() =>
+  import('../components/AlertList').then((module) => ({
+    default: module.AlertList,
+  }))
+);
+
+function ChartSectionSkeleton(): JSX.Element {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((index) => (
+          <div key={index} className="h-32 animate-pulse rounded-lg bg-white shadow-sm" />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="h-80 animate-pulse rounded-lg bg-white shadow-sm" />
+        <div className="h-80 animate-pulse rounded-lg bg-white shadow-sm" />
+      </div>
+    </div>
+  );
+}
 
 /**
  * AI质量监控中心页面
@@ -48,17 +84,26 @@ export function AIQualityPage(): JSX.Element {
   const [sessionPage, setSessionPage] = useState(1);
   const [sessionPageSize] = useState(20);
 
+  const shouldLoadDashboard = activeTab === 'dashboard';
+  const shouldLoadMetrics = activeTab === 'metrics';
+  const shouldLoadSessions = activeTab === 'sessions';
+  const shouldLoadAlerts = activeTab === 'alerts';
+  const shouldLoadLogs = activeTab === 'dashboard' || activeTab === 'metrics';
+
   // 质量指标数据
-  const { data: metrics, isLoading: metricsLoading } = useAIMetrics();
-  const { data: dashboardData, isLoading: dashboardLoading } = useDashboardData();
-  const { data: trendData, isLoading: trendLoading } = useQualityTrend(7);
+  const { data: metrics, isLoading: metricsLoading } = useAIMetrics(shouldLoadMetrics);
+  const { data: dashboardData, isLoading: dashboardLoading } = useDashboardData(shouldLoadDashboard);
+  const { data: trendData, isLoading: trendLoading } = useQualityTrend(7, shouldLoadDashboard || shouldLoadMetrics);
 
   // 会话列表 - 使用筛选和分页状态
-  const { data: sessionList, isLoading: sessionListLoading } = useSessionQuality({
-    page: sessionPage,
-    page_size: sessionPageSize,
-    ...sessionFilters,
-  });
+  const { data: sessionList, isLoading: sessionListLoading } = useSessionQuality(
+    {
+      page: sessionPage,
+      page_size: sessionPageSize,
+      ...sessionFilters,
+    },
+    shouldLoadSessions
+  );
 
   // 会话详情
   const { data: sessionDetail, isLoading: sessionDetailLoading } = useSessionDetail({
@@ -66,16 +111,22 @@ export function AIQualityPage(): JSX.Element {
   });
 
   // 告警列表
-  const { data: alertsData, isLoading: alertsLoading } = useQualityAlerts({
-    page: alertPage,
-    page_size: alertPageSize,
-    ...alertFilters,
-  });
+  const { data: alertsData, isLoading: alertsLoading } = useQualityAlerts(
+    {
+      page: alertPage,
+      page_size: alertPageSize,
+      ...alertFilters,
+    },
+    shouldLoadAlerts
+  );
 
   // 日志列表
-  const { data: logsData, isLoading: logsLoading } = useAILogs({
-    limit: 100,
-  });
+  const { data: logsData, isLoading: logsLoading } = useAILogs(
+    {
+      limit: 100,
+    },
+    shouldLoadLogs
+  );
 
   // Mutations
   const reviewMutation = useReviewSession();
@@ -186,11 +237,13 @@ export function AIQualityPage(): JSX.Element {
         {/* 标签页内容 */}
         <div className="space-y-6">
           {activeTab === 'dashboard' && (
-            <QualityDashboard
-              data={dashboardData}
-              trendData={trendData}
-              loading={dashboardLoading || trendLoading}
-            />
+            <Suspense fallback={<ChartSectionSkeleton />}>
+              <LazyQualityDashboard
+                data={dashboardData}
+                trendData={trendData}
+                loading={dashboardLoading || trendLoading}
+              />
+            </Suspense>
           )}
   
           {activeTab === 'sessions' && (
@@ -292,11 +345,13 @@ export function AIQualityPage(): JSX.Element {
               {/* 会话详情和审核 */}
               <div className="lg:col-span-2">
                 {selectedSessionId ? (
-                  <SessionReview
-                    session={sessionDetail}
-                    loading={sessionDetailLoading}
-                    onReview={handleReview}
-                  />
+                  <Suspense fallback={<ChartSectionSkeleton />}>
+                    <LazySessionReview
+                      session={sessionDetail}
+                      loading={sessionDetailLoading}
+                      onReview={handleReview}
+                    />
+                  </Suspense>
                 ) : (
                   <div className="flex h-full min-h-[400px] items-center justify-center rounded-lg bg-white p-12 shadow-sm">
                     <div className="text-center">
@@ -322,105 +377,111 @@ export function AIQualityPage(): JSX.Element {
           )}
   
           {activeTab === 'alerts' && alertsData && (
-            <AlertList
-              alerts={alertsData.alerts}
-              total={alertsData.total}
-              page={alertsData.page}
-              pageSize={alertsData.page_size}
-              summary={alertsData.summary}
-              loading={alertsLoading}
-              onPageChange={handleAlertPageChange}
-              onAcknowledge={handleAcknowledgeAlert}
-              onResolve={handleResolveAlert}
-              onFilterChange={handleAlertFilterChange}
-            />
+            <Suspense fallback={<ChartSectionSkeleton />}>
+              <LazyAlertList
+                alerts={alertsData.alerts}
+                total={alertsData.total}
+                page={alertsData.page}
+                pageSize={alertsData.page_size}
+                summary={alertsData.summary}
+                loading={alertsLoading}
+                onPageChange={handleAlertPageChange}
+                onAcknowledge={handleAcknowledgeAlert}
+                onResolve={handleResolveAlert}
+                onFilterChange={handleAlertFilterChange}
+              />
+            </Suspense>
           )}
   
           {activeTab === 'metrics' && (
-            <MetricsChart
-              metrics={metrics}
-              trendData={trendData}
-              loading={metricsLoading || trendLoading}
-            />
+            <Suspense fallback={<ChartSectionSkeleton />}>
+              <LazyMetricsChart
+                metrics={metrics}
+                trendData={trendData}
+                loading={metricsLoading || trendLoading}
+              />
+            </Suspense>
           )}
         </div>
 
         {/* 日志预览 */}
-        <div className="mt-8">
-          <h3 className="mb-4 text-lg font-medium text-gray-900">最近日志</h3>
-          <div className="rounded-lg bg-white p-4 shadow-sm">
-            <div className="max-h-64 overflow-y-auto">
-              {logsLoading ? (
-                <div className="space-y-2">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <div key={i} className="h-8 animate-pulse rounded bg-gray-200"></div>
-                  ))}
-                </div>
-              ) : logsData?.logs.length === 0 ? (
-                <div className="py-8 text-center text-gray-500">暂无日志数据</div>
-              ) : (
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                        时间
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                        级别
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                        会话
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                        响应时间
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                        质量分
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                        话题
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {logsData?.logs.slice(0, 10).map((log) => (
-                      <tr key={log.request_id} className="hover:bg-gray-50">
-                        <td className="whitespace-nowrap px-4 py-2 text-sm text-gray-500">
-                          {new Date(log.timestamp).toLocaleString()}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-2">
-                          <span
-                            className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${
-                              log.level === 'error'
-                                ? 'bg-red-100 text-red-700'
-                                : log.level === 'warning'
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : 'bg-blue-100 text-blue-700'
-                            }`}
-                          >
-                            {log.level === 'error' ? '错误' : log.level === 'warning' ? '警告' : '信息'}
-                          </span>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-2 text-sm text-gray-900">
-                          {log.session_id ? log.session_id.slice(0, 8) : '-'}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-2 text-sm text-gray-900">
-                          {log.response_time_ms}ms
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-2 text-sm text-gray-900">
-                          {log.quality_score || '-'}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-gray-500">
-                          {log.topics.slice(0, 2).join(', ') || '-'}
-                        </td>
-                      </tr>
+        {shouldLoadLogs && (
+          <div className="mt-8">
+            <h3 className="mb-4 text-lg font-medium text-gray-900">最近日志</h3>
+            <div className="rounded-lg bg-white p-4 shadow-sm">
+              <div className="max-h-64 overflow-y-auto">
+                {logsLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className="h-8 animate-pulse rounded bg-gray-200"></div>
                     ))}
-                  </tbody>
-                </table>
-              )}
+                  </div>
+                ) : logsData?.logs.length === 0 ? (
+                  <div className="py-8 text-center text-gray-500">暂无日志数据</div>
+                ) : (
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                          时间
+                        </th>
+                        <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                          级别
+                        </th>
+                        <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                          会话
+                        </th>
+                        <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                          响应时间
+                        </th>
+                        <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                          质量分
+                        </th>
+                        <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                          话题
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {logsData?.logs.slice(0, 10).map((log) => (
+                        <tr key={log.request_id} className="hover:bg-gray-50">
+                          <td className="whitespace-nowrap px-4 py-2 text-sm text-gray-500">
+                            {new Date(log.timestamp).toLocaleString()}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-2">
+                            <span
+                              className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${
+                                log.level === 'error'
+                                  ? 'bg-red-100 text-red-700'
+                                  : log.level === 'warning'
+                                    ? 'bg-yellow-100 text-yellow-700'
+                                    : 'bg-blue-100 text-blue-700'
+                              }`}
+                            >
+                              {log.level === 'error' ? '错误' : log.level === 'warning' ? '警告' : '信息'}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-2 text-sm text-gray-900">
+                            {log.session_id ? log.session_id.slice(0, 8) : '-'}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-2 text-sm text-gray-900">
+                            {log.response_time_ms}ms
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-2 text-sm text-gray-900">
+                            {log.quality_score || '-'}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-500">
+                            {log.topics.slice(0, 2).join(', ') || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

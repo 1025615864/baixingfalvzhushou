@@ -1,10 +1,19 @@
 """RAG 知识库服务
 
 提供知识库增强、数据源扩充、检索优化等功能。
+集成缓存优化：向量检索缓存、结果去重、批量检索优化。
 """
 import logging
 from datetime import datetime, timezone
 from typing import Any
+
+from .ai.cache_optimizer import (
+    get_ai_cache_optimizer,
+    VectorSearchCache,
+    ResultDeduplicator,
+    BatchRetrievalOptimizer,
+    CachePriority,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -193,11 +202,30 @@ class KnowledgeBaseManager:
 
 
 class RetrievalOptimizer:
-    """检索优化器"""
+    """检索优化器
+    
+    集成了缓存和去重功能的检索优化器。
+    """
 
-    def __init__(self):
+    def __init__(self, use_cache: bool = True):
         self._index: dict[str, list[dict[str, Any]]] = {}
         self._weights: dict[str, float] = {}
+        
+        # 缓存相关组件
+        self._use_cache = use_cache
+        self._cache: VectorSearchCache | None = None
+        self._deduplicator: ResultDeduplicator | None = None
+        self._batch_optimizer: BatchRetrievalOptimizer | None = None
+        
+        if use_cache:
+            try:
+                cache_optimizer = get_ai_cache_optimizer()
+                self._cache = cache_optimizer.vector_search_cache
+                self._deduplicator = cache_optimizer.deduplicator
+                self._batch_optimizer = cache_optimizer.batch_optimizer
+                logger.info("RetrievalOptimizer cache initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize cache: {e}")
 
     def build_index(self, chunks: list[dict[str, Any]]) -> None:
         """构建索引
@@ -273,6 +301,8 @@ class RetrievalOptimizer:
         query: str,
         top_k: int = 5,
         filters: dict[str, Any] | None = None,
+        use_cache: bool | None = None,
+        deduplicate: bool = True,
     ) -> list[dict[str, Any]]:
         """搜索
 
@@ -280,10 +310,26 @@ class RetrievalOptimizer:
             query: 查询词
             top_k: 返回数量
             filters: 筛选条件
+            use_cache: 是否使用缓存
+            deduplicate: 是否对结果去重
 
         Returns:
             结果列表
         """
+        effective_use_cache = use_cache if use_cache is not None else self._use_cache
+        
+        # 尝试从缓存获取
+        if effective_use_cache and self._cache is not None:
+            try:
+                cached_results = self._cache.get_sync(query, top_k)
+                if cached_results is not None:
+                    logger.debug(f"RetrievalOptimizer cache hit for query: {query[:50]}...")
+                    # 转换缓存格式
+                    return [{"id": r[1].get("id"), "content": r[0], "metadata": r[1], "score": r[2]}
+                            for r in cached_results]
+            except Exception as e:
+                logger.debug(f"Cache get error: {e}")
+        
         keywords = self._extract_keywords(query)
         results: dict[int, dict[str, Any]] = {}
 
@@ -304,8 +350,33 @@ class RetrievalOptimizer:
             results.values(),
             key=lambda x: x["score"],
             reverse=True)
+        
+        result_chunks = [r["chunk"] for r in sorted_results[:top_k]]
+        
+        # 去重处理
+        if deduplicate and self._deduplicator is not None and result_chunks:
+            # 转换为去重器期望的格式
+            dedupe_input = [
+                (c.get("content", ""), c, c.get("score", 0))
+                for c in result_chunks
+            ]
+            deduped = self._deduplicator.deduplicate(dedupe_input)
+            result_chunks = [r[1] for r in deduped]
+            logger.debug(f"Deduplicated results: {len(result_chunks)} items")
+        
+        # 存入缓存
+        if effective_use_cache and self._cache is not None and result_chunks:
+            try:
+                cache_entries = [
+                    (c.get("content", ""), c, c.get("score", 0))
+                    for c in result_chunks
+                ]
+                self._cache.set_sync(query, cache_entries, top_k, ttl=600)
+                logger.debug(f"Cached results for query: {query[:50]}...")
+            except Exception as e:
+                logger.debug(f"Cache set error: {e}")
 
-        return [r["chunk"] for r in sorted_results[:top_k]]
+        return result_chunks
 
     async def rerank(
         self,
@@ -342,11 +413,15 @@ class RetrievalOptimizer:
 
 
 class RAGService:
-    """RAG 服务"""
+    """RAG 服务
+    
+    集成了缓存优化的 RAG 服务。
+    """
 
-    def __init__(self):
+    def __init__(self, use_cache: bool = True):
         self.knowledge_base = KnowledgeBaseManager()
-        self.retrieval_optimizer = RetrievalOptimizer()
+        self.retrieval_optimizer = RetrievalOptimizer(use_cache=use_cache)
+        self._use_cache = use_cache
 
     async def enhance_knowledge_base(
         self,
@@ -392,6 +467,8 @@ class RAGService:
         question: str,
         top_k: int = 5,
         use_rerank: bool = True,
+        use_cache: bool | None = None,
+        deduplicate: bool = True,
     ) -> dict[str, Any]:
         """查询
 
@@ -399,11 +476,20 @@ class RAGService:
             question: 问题
             top_k: 返回数量
             use_rerank: 是否重排序
+            use_cache: 是否使用缓存
+            deduplicate: 是否对结果去重
 
         Returns:
             查询结果
         """
-        candidates = await self.retrieval_optimizer.search(query=question, top_k=top_k * 2)
+        effective_use_cache = use_cache if use_cache is not None else self._use_cache
+        
+        candidates = await self.retrieval_optimizer.search(
+            query=question,
+            top_k=top_k * 2,
+            use_cache=effective_use_cache,
+            deduplicate=deduplicate,
+        )
 
         if use_rerank and candidates:
             candidates = await self.retrieval_optimizer.rerank(query=question, candidates=candidates)
@@ -421,6 +507,76 @@ class RAGService:
             ],
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
+    
+    async def batch_query(
+        self,
+        questions: list[str],
+        top_k: int = 5,
+        use_rerank: bool = True,
+        use_cache: bool | None = None,
+        deduplicate: bool = True,
+    ) -> list[dict[str, Any]]:
+        """批量查询
+
+        利用缓存优化批量检索性能。
+
+        Args:
+            questions: 问题列表
+            top_k: 每个问题返回数量
+            use_rerank: 是否重排序
+            use_cache: 是否使用缓存
+            deduplicate: 是否对结果去重
+
+        Returns:
+            查询结果列表
+        """
+        results = []
+        for question in questions:
+            result = await self.query(
+                question=question,
+                top_k=top_k,
+                use_rerank=use_rerank,
+                use_cache=use_cache,
+                deduplicate=deduplicate,
+            )
+            results.append(result)
+        return results
+    
+    def get_cache_stats(self) -> dict[str, Any]:
+        """获取缓存统计信息
+
+        Returns:
+            缓存统计信息
+        """
+        if self.retrieval_optimizer._cache is None:
+            return {"cache_enabled": False}
+        
+        return {
+            "cache_enabled": True,
+            "cache_stats": self.retrieval_optimizer._cache.get_stats(),
+        }
+    
+    async def invalidate_cache(self, query: str | None = None) -> int:
+        """使缓存失效
+
+        Args:
+            query: 特定查询文本，如果为 None 则清除所有缓存
+
+        Returns:
+            失效的缓存条目数
+        """
+        if self.retrieval_optimizer._cache is None:
+            return 0
+        
+        try:
+            if query is not None:
+                await self.retrieval_optimizer._cache.invalidate(query)
+                return 1
+            else:
+                return await self.retrieval_optimizer._cache.invalidate_all()
+        except Exception as e:
+            logger.warning(f"Cache invalidation error: {e}")
+            return 0
 
     async def get_retrieval_metrics(self) -> dict[str, Any]:
         """获取检索指标

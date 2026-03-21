@@ -150,21 +150,47 @@ async def alipay_callback(
         if result.get("success"):
             order_no = result.get("order_no")
             trade_no = result.get("trade_no")
-            
-            # 查找订单并更新状态
+            callback_amount = result.get("amount")  # 支付宝回调金额（元）
+
+            # 查找订单
             order = await PaymentCoreService.get_order_by_no(db, order_no)
-            if order and order.status == PaymentStatus.PENDING:
-                await PaymentCoreService.mark_order_paid(db, order, trade_no)
-                
-                # 如果是充值订单，充值余额
-                if order.order_type == "recharge":
-                    await PaymentCoreService.recharge_balance(
-                        db=db,
-                        user_id=order.user_id,
-                        amount=order.actual_amount,
-                        order_id=order.id,
-                        description=f"支付宝支付充值"
+            if not order:
+                logger.warning(f"Order not found for Alipay callback: {order_no}")
+                return Response(content="success")
+
+            # 检查订单是否已支付（幂等处理）
+            if order.status == PaymentStatus.PAID:
+                logger.info(f"Order already paid (idempotent): {order_no}")
+                return Response(content="success")
+
+            # 安全检查：验证回调金额与订单金额一致
+            if callback_amount is not None:
+                order_amount = order.actual_amount
+                # 允许 0.01 元的浮点数误差
+                if abs(callback_amount - order_amount) > 0.01:
+                    logger.error(
+                        "Alipay amount mismatch: order_no=%s, callback=%s, order=%s",
+                        order_no, callback_amount, order_amount
                     )
+                    # 记录异常但返回 success 避免重试
+                    return Response(content="success")
+
+            try:
+                await PaymentCoreService.mark_order_paid(db, order, trade_no)
+            except ValueError as e:
+                # 订单已被其他请求处理，这是正常的幂等情况
+                logger.info(f"Order payment race condition handled: {order_no}, {e}")
+                return Response(content="success")
+
+            # 如果是充值订单，充值余额
+            if order.order_type == "recharge":
+                await PaymentCoreService.recharge_balance(
+                    db=db,
+                    user_id=order.user_id,
+                    amount=order.actual_amount,
+                    order_id=order.id,
+                    description=f"支付宝支付充值"
+                )
             
             # 返回成功响应给支付宝
             return Response(content="success")

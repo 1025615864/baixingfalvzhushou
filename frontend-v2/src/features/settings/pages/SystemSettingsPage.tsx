@@ -6,7 +6,10 @@
 import { useState } from 'react';
 import { Save, RefreshCw, Server, Shield, Bell, CreditCard, FileText, Users, Globe, Database, Activity } from 'lucide-react';
 
-import { Card, Input, Button, Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 
 import {
   useSystemConfig,

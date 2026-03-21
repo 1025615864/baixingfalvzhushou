@@ -6,7 +6,10 @@
 import { useMemo, useState } from 'react';
 import { Calendar, Filter, RefreshCw } from 'lucide-react';
 
-import { Card, Button, Badge, Pagination } from '@/components/ui';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Pagination } from '@/components/ui/Pagination';
 
 import { useNewsSources } from '../../hooks/useNewsSources';
 import { useNewsIngestRuns } from '../../hooks/useNewsIngestRuns';

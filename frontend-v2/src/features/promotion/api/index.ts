@@ -29,6 +29,7 @@ import type {
   WithdrawalStatsSnake,
 } from '../types';
 
+
 // API 基础路径
 const API_BASE = '/promotion';
 
@@ -38,17 +39,9 @@ interface ApiErrorResponse {
 }
 
 /**
- * 安全获取 JSON 响应
- */
-async function safeJson<T>(response: Response): Promise<T> {
-  const data = await response.json() as T;
-  return data;
-}
-
-/**
  * 获取 API 错误信息
  */
-function getErrorMessage(error: unknown, defaultMsg: string): string {
+function _getErrorMessage(error: unknown, defaultMsg: string): string {
   if (typeof error === 'object' && error !== null && 'detail' in error) {
     return (error as ApiErrorResponse).detail || defaultMsg;
   }
@@ -90,26 +83,13 @@ export async function apiGeneratePromotionLink(): Promise<PromotionLink> {
 export async function apiGetPromotionStats(
   _params: GetPromotionStatsRequest = {}
 ): Promise<PromotionStats> {
-  const response = await fetch(`${API_BASE}/invite/stats`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取推广统计失败' }));
-    throw new Error(getErrorMessage(error, '获取推广统计失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     total_invited?: number;
     total_registered?: number;
     total_rewards?: number;
     pending_rewards?: number;
     conversion_rate?: number;
-  }>(response);
+  }>(`${API_BASE}/invite/stats`);
 
   return {
     totalInvited: data.total_invited ?? 0,
@@ -135,32 +115,17 @@ export async function apiGetCommissionRecords(
   limit: number;
   offset: number;
 }> {
-  const searchParams = new URLSearchParams();
-  if (params.limit) searchParams.set('page_size', String(params.limit));
-  if (params.offset) {
-    const page = Math.floor(params.offset / (params.limit ?? 20)) + 1;
-    searchParams.set('page', String(page));
-  }
+  const page = params.offset ? Math.floor(params.offset / (params.limit ?? 20)) + 1 : 1;
 
-  const url = `${API_BASE}/invite/history${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取邀请记录失败' }));
-    throw new Error(getErrorMessage(error, '获取邀请记录失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     history?: InviteHistoryItem[];
     total?: number;
-  }>(response);
+  }>(`${API_BASE}/invite/history`, {
+    params: {
+      ...(params.limit && { page_size: params.limit }),
+      page,
+    },
+  });
 
   // 将邀请历史映射到佣金记录格式
   const records: CommissionRecord[] = (data.history ?? []).map(item => ({
@@ -190,22 +155,11 @@ export async function apiGetCommissionRecords(
  * 获取邀请排行榜（映射到海报列表）
  */
 export async function apiGetPosters(): Promise<PromotionPoster[]> {
-  const response = await fetch(`${API_BASE}/ranking/invite?limit=10`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取排行榜失败' }));
-    throw new Error(getErrorMessage(error, '获取排行榜失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     ranking?: InviteRankingItem[];
-  }>(response);
+  }>(`${API_BASE}/ranking/invite`, {
+    params: { limit: 10 },
+  });
 
   // 将排行榜映射到海报格式（用于展示优秀推广者）
   return (data.ranking ?? []).map((item, index) => ({
@@ -229,32 +183,19 @@ export async function apiGeneratePoster(
   request: GeneratePosterRequest = {}
 ): Promise<PromotionPoster> {
   // 首先获取邀请码
-  const linkResponse = await fetch(`${API_BASE}/invite/generate`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!linkResponse.ok) {
-    const error = await safeJson<ApiErrorResponse>(linkResponse).catch(() => ({ detail: '生成海报失败' }));
-    throw new Error(getErrorMessage(error, '生成海报失败'));
-  }
-
-  const linkData = await linkResponse.json() as {
+  const linkResponse = await apiClient.get<{
     invite_code: string;
     qrcode_url: string;
-  };
+  }>(`${API_BASE}/invite/generate`);
 
   return {
     id: `poster-${Date.now()}`,
     templateId: request.templateId ?? 'default',
-    imageUrl: linkData.qrcode_url,
+    imageUrl: linkResponse.data.qrcode_url,
     title: request.customTitle ?? '扫码加入百姓助手',
     description: request.customDescription ?? '专业法律服务平台',
     customData: {
-      inviteCode: linkData.invite_code,
+      inviteCode: linkResponse.data.invite_code,
     },
     createdAt: new Date().toISOString(),
   };
@@ -278,7 +219,7 @@ export async function apiRequestWithdrawal(
     const error = {
       detail: '领取奖励失败',
     };
-    throw new Error(getErrorMessage(error, '领取奖励失败'));
+    throw new Error(_getErrorMessage(error, '领取奖励失败'));
   }
 
   return {
@@ -297,22 +238,9 @@ export async function apiRequestWithdrawal(
  * 获取奖励记录
  */
 export async function apiGetWithdrawals(): Promise<CommissionWithdrawal[]> {
-  const response = await fetch(`${API_BASE}/invite/history`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取奖励记录失败' }));
-    throw new Error(getErrorMessage(error, '获取奖励记录失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     history?: InviteHistoryItem[];
-  }>(response);
+  }>(`${API_BASE}/invite/history`);
 
   // 将已领取的邀请记录映射到提现记录
   return (data.history ?? [])
@@ -342,24 +270,11 @@ export async function apiGetPromotionRules(): Promise<{
     description: string;
   };
 }> {
-  const response = await fetch(`${API_BASE}/seo/config`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取推广规则失败' }));
-    throw new Error(getErrorMessage(error, '获取推广规则失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     config?: {
       description?: string;
     };
-  }>(response);
+  }>(`${API_BASE}/seo/config`);
 
   return {
     rules: {
@@ -381,26 +296,13 @@ export async function apiGetInvitationAnalytics(): Promise<{
   rewardsClaimed: number;
   rewardsPending: number;
 }> {
-  const response = await fetch(`${API_BASE}/analytics/invitation`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取转化分析失败' }));
-    throw new Error(getErrorMessage(error, '获取转化分析失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     total_visits?: number;
     total_signups?: number;
     conversion_rate?: number;
     rewards_claimed?: number;
     rewards_pending?: number;
-  }>(response);
+  }>(`${API_BASE}/analytics/invitation`);
 
   return {
     totalVisits: data.total_visits ?? 0,
@@ -475,34 +377,22 @@ function transformWithdrawalStats(data: WithdrawalStatsSnake): WithdrawalStats {
 export async function apiGetWithdrawalsAdmin(
   params: GetWithdrawalsRequest = {}
 ): Promise<GetWithdrawalsAdminResponse> {
-  const searchParams = new URLSearchParams();
-  if (params.page) searchParams.set('page', String(params.page));
-  if (params.pageSize) searchParams.set('page_size', String(params.pageSize));
-  if (params.status) searchParams.set('status', params.status);
-  if (params.keyword) searchParams.set('keyword', params.keyword);
-  if (params.fromTime) searchParams.set('from_time', params.fromTime);
-  if (params.toTime) searchParams.set('to_time', params.toTime);
-
-  const response = await fetch(`${API_BASE}/admin/withdrawals?${searchParams.toString()}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取提现列表失败' }));
-    throw new Error(getErrorMessage(error, '获取提现列表失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     items: WithdrawalItemSnake[];
     total: number;
     page: number;
     page_size: number;
     stats: WithdrawalStatsSnake;
-  }>(response);
+  }>(`${API_BASE}/admin/withdrawals`, {
+    params: {
+      ...(params.page && { page: params.page }),
+      ...(params.pageSize && { page_size: params.pageSize }),
+      ...(params.status && { status: params.status }),
+      ...(params.keyword && { keyword: params.keyword }),
+      ...(params.fromTime && { from_time: params.fromTime }),
+      ...(params.toTime && { to_time: params.toTime }),
+    },
+  });
 
   return {
     items: (data.items ?? []).map(transformWithdrawalItem),
@@ -517,20 +407,7 @@ export async function apiGetWithdrawalsAdmin(
  * 获取提现详情（管理员用）
  */
 export async function apiGetWithdrawalDetail(id: string): Promise<WithdrawalDetail> {
-  const response = await fetch(`${API_BASE}/admin/withdrawals/${id}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取提现详情失败' }));
-    throw new Error(getErrorMessage(error, '获取提现详情失败'));
-  }
-
-  const data = await safeJson<WithdrawalDetailSnake>(response);
+  const { data } = await apiClient.get<WithdrawalDetailSnake>(`${API_BASE}/admin/withdrawals/${id}`);
   return transformWithdrawalDetail(data);
 }
 
@@ -556,24 +433,14 @@ export async function apiReviewWithdrawal(
 export async function apiExportWithdrawals(
   params: Omit<GetWithdrawalsRequest, 'page' | 'pageSize'>
 ): Promise<Blob> {
-  const searchParams = new URLSearchParams();
-  if (params.status) searchParams.set('status', params.status);
-  if (params.keyword) searchParams.set('keyword', params.keyword);
-  if (params.fromTime) searchParams.set('from_time', params.fromTime);
-  if (params.toTime) searchParams.set('to_time', params.toTime);
-
-  const response = await fetch(`${API_BASE}/admin/withdrawals/export?${searchParams.toString()}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
+  const { data } = await apiClient.get<Blob>(`${API_BASE}/admin/withdrawals/export`, {
+    params: {
+      ...(params.status && { status: params.status }),
+      ...(params.keyword && { keyword: params.keyword }),
+      ...(params.fromTime && { from_time: params.fromTime }),
+      ...(params.toTime && { to_time: params.toTime }),
     },
-    credentials: 'include',
+    responseType: 'blob',
   });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '导出提现记录失败' }));
-    throw new Error(getErrorMessage(error, '导出提现记录失败'));
-  }
-
-  return response.blob();
+  return data;
 }

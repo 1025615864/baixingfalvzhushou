@@ -68,3 +68,10 @@ class User(Base):
         cascade="all, delete-orphan",
         lazy="selectin"
     )
+    # 关联会员（一对一关系）
+    membership: Mapped["Membership"] = relationship(
+        "Membership",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan"
+    )

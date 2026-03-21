@@ -4,6 +4,12 @@
 
 import { test, expect } from '@playwright/test';
 
+test.describe.configure({ mode: 'serial' });
+
+async function gotoFast(page: import('@playwright/test').Page, path: string): Promise<void> {
+  await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 15000 });
+}
+
 test.describe('响应式设计', () => {
   const viewports = [
     { name: 'Mobile', width: 375, height: 667 },
@@ -17,7 +23,7 @@ test.describe('响应式设计', () => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       
       // 访问首页
-      await page.goto('/');
+      await gotoFast(page, '/');
       
       // 验证页面主要内容可见
       await expect(page.locator('main')).toBeVisible();
@@ -34,7 +40,7 @@ test.describe('响应式设计', () => {
 
   test('移动端应该显示汉堡菜单', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/');
+    await gotoFast(page, '/');
     
     // 验证汉堡菜单按钮存在
     const menuButton = page.locator('button[aria-label="菜单"]').first();
@@ -44,15 +50,16 @@ test.describe('响应式设计', () => {
     await menuButton.click();
     
     // 验证导航菜单展开
-    await expect(page.locator('nav a')).toBeVisible();
+    await expect(page.locator('[data-testid="mobile-menu-panel"]')).toBeVisible();
+    await expect(page.locator('[data-testid="mobile-nav-items"]')).toBeVisible();
   });
 
   test('桌面端应该显示完整导航栏', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
-    await page.goto('/');
+    await gotoFast(page, '/');
     
     // 验证导航链接可见
-    const navLinks = ['首页', 'AI咨询', '知识库', '律师', '资讯'];
+    const navLinks = ['首页', 'AI咨询', '找律师', '法律知识', '资讯'];
     for (const link of navLinks) {
       await expect(page.locator(`nav a:has-text("${link}")`)).toBeVisible();
     }
@@ -60,7 +67,7 @@ test.describe('响应式设计', () => {
 
   test('页面内容应该适应不同屏幕尺寸', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/');
+    await gotoFast(page, '/');
     
     // 验证主要内容区域存在
     const main = page.locator('main');

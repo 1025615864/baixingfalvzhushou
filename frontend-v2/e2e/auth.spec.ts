@@ -5,10 +5,16 @@
 
 import { test, expect } from '@playwright/test';
 
+test.describe.configure({ mode: 'serial' });
+
+async function gotoFast(page: import('@playwright/test').Page, path: string): Promise<void> {
+  await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 15000 });
+}
+
 test.describe('认证流程', () => {
   test.beforeEach(async ({ page }) => {
     // 访问首页
-    await page.goto('/');
+    await gotoFast(page, '/');
   });
 
   test('应该显示登录按钮', async ({ page }) => {
@@ -18,7 +24,7 @@ test.describe('认证流程', () => {
 
   test('登录页面应该显示登录表单', async ({ page }) => {
     // 访问登录页面
-    await page.goto('/login');
+    await gotoFast(page, '/login');
 
     // 检查登录表单元素
     await expect(page.locator('input[type="text"]').first()).toBeVisible();
@@ -26,30 +32,31 @@ test.describe('认证流程', () => {
   });
 
   test('应该显示注册链接', async ({ page }) => {
-    await page.goto('/login');
+    await gotoFast(page, '/login');
     
     // 检查是否有注册链接
-    const registerLink = page.locator('a[href*="register"], a:has-text("注册")');
-    await expect(registerLink.first()).toBeVisible();
+    const registerLink = page.getByRole('link', { name: /注册|免费注册|立即注册/ }).first();
+    await expect(registerLink).toBeVisible();
   });
 });
 
 test.describe('注册流程', () => {
   test('注册页面应该显示注册表单', async ({ page }) => {
-    await page.goto('/register');
+    await gotoFast(page, '/register');
 
     // 检查注册表单元素
-    await expect(page.locator('input[type="text"]').first()).toBeVisible();
-    await expect(page.locator('input[type="email"]').first()).toBeVisible();
-    await expect(page.locator('input[type="password"]').first()).toBeVisible();
+    await expect(page.locator('input#username')).toBeVisible();
+    await expect(page.locator('input#email')).toBeVisible();
+    await expect(page.locator('input#password')).toBeVisible();
+    await expect(page.locator('input#confirm-password')).toBeVisible();
   });
 
   test('注册表单应该包含协议勾选框', async ({ page }) => {
-    await page.goto('/register');
+    await gotoFast(page, '/register');
 
     // 检查协议勾选框
-    const checkboxes = page.locator('input[type="checkbox"]');
-    const count = await checkboxes.count();
-    expect(count).toBeGreaterThan(0);
+    await expect(page.locator('input#agree_terms')).toBeVisible();
+    await expect(page.locator('input#agree_privacy')).toBeVisible();
+    await expect(page.locator('input#agree_ai_disclaimer')).toBeVisible();
   });
 });

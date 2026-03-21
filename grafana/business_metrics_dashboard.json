@@ -1,0 +1,520 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "business-metrics",
+    "title": "百姓助手 - 业务指标监控",
+    "description": "监控关键业务指标，包括咨询转化率、支付成功率、用户留存率、律师响应时间和内容审核效率",
+    "tags": ["business", "metrics", "baixing"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "datasource",
+          "type": "datasource",
+          "query": "prometheus",
+          "current": {
+            "text": "Prometheus",
+            "value": "Prometheus"
+          }
+        },
+        {
+          "name": "interval",
+          "type": "interval",
+          "query": "1m,5m,10m,30m,1h,6h,12h,24h",
+          "current": {
+            "text": "5m",
+            "value": "5m"
+          }
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "gridPos": {"h": 4, "w": 24, "x": 0, "y": 0},
+        "type": "stat",
+        "title": "核心指标概览",
+        "targets": [
+          {
+            "expr": "baixing_consultation_conversion_rate_overall",
+            "legendFormat": "咨询转化率",
+            "refId": "A"
+          },
+          {
+            "expr": "baixing_payment_success_rate",
+            "legendFormat": "支付成功率",
+            "refId": "B"
+          },
+          {
+            "expr": "baixing_user_retention_day1",
+            "legendFormat": "次日留存率",
+            "refId": "C"
+          }
+        ],
+        "options": {
+          "orientation": "horizontal",
+          "textMode": "auto",
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "center"
+        },
+        "fieldDefaults": {
+          "unit": "percentunit",
+          "decimals": 2
+        }
+      },
+      {
+        "id": 2,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+        "type": "timeseries",
+        "title": "咨询转化漏斗趋势",
+        "targets": [
+          {
+            "expr": "baixing_consultation_funnel_view",
+            "legendFormat": "浏览咨询页",
+            "refId": "A"
+          },
+          {
+            "expr": "baixing_consultation_funnel_start",
+            "legendFormat": "开始填写",
+            "refId": "B"
+          },
+          {
+            "expr": "baixing_consultation_funnel_create",
+            "legendFormat": "创建咨询",
+            "refId": "C"
+          },
+          {
+            "expr": "baixing_consultation_funnel_pay",
+            "legendFormat": "完成支付",
+            "refId": "D"
+          },
+          {
+            "expr": "baixing_consultation_funnel_complete",
+            "legendFormat": "咨询完成",
+            "refId": "E"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "right", "showValues": true},
+          "tooltip": {"mode": "multi"}
+        },
+        "fieldDefaults": {
+          "unit": "short"
+        }
+      },
+      {
+        "id": 3,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+        "type": "timeseries",
+        "title": "咨询转化率趋势",
+        "targets": [
+          {
+            "expr": "baixing_consultation_conversion_rate_view_to_start",
+            "legendFormat": "浏览→开始",
+            "refId": "A"
+          },
+          {
+            "expr": "baixing_consultation_conversion_rate_start_to_create",
+            "legendFormat": "开始→创建",
+            "refId": "B"
+          },
+          {
+            "expr": "baixing_consultation_conversion_rate_create_to_pay",
+            "legendFormat": "创建→支付",
+            "refId": "C"
+          },
+          {
+            "expr": "baixing_consultation_conversion_rate_pay_to_complete",
+            "legendFormat": "支付→完成",
+            "refId": "D"
+          },
+          {
+            "expr": "baixing_consultation_conversion_rate_overall",
+            "legendFormat": "整体转化率",
+            "refId": "E"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "right", "showValues": true},
+          "tooltip": {"mode": "multi"}
+        },
+        "fieldDefaults": {
+          "unit": "percentunit",
+          "decimals": 2
+        },
+        "thresholds": {
+          "steps": [
+            {"value": 0, "color": "red"},
+            {"value": 0.3, "color": "yellow"},
+            {"value": 0.5, "color": "green"}
+          ]
+        }
+      },
+      {
+        "id": 4,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+        "type": "timeseries",
+        "title": "支付指标",
+        "targets": [
+          {
+            "expr": "rate(baixing_payment_orders_total[$interval])",
+            "legendFormat": "总订单数",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(baixing_payment_orders_success[$interval])",
+            "legendFormat": "成功订单数",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(baixing_payment_orders_failed[$interval])",
+            "legendFormat": "失败订单数",
+            "refId": "C"
+          },
+          {
+            "expr": "rate(baixing_payment_orders_refunded[$interval])",
+            "legendFormat": "退款订单数",
+            "refId": "D"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "right", "showValues": true},
+          "tooltip": {"mode": "multi"}
+        },
+        "fieldDefaults": {
+          "unit": "ops"
+        }
+      },
+      {
+        "id": 5,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+        "type": "timeseries",
+        "title": "支付成功率趋势",
+        "targets": [
+          {
+            "expr": "baixing_payment_success_rate",
+            "legendFormat": "整体支付成功率",
+            "refId": "A"
+          },
+          {
+            "expr": "baixing_payment_success_rate{method=\"wechat\"}",
+            "legendFormat": "微信支付",
+            "refId": "B"
+          },
+          {
+            "expr": "baixing_payment_success_rate{method=\"alipay\"}",
+            "legendFormat": "支付宝",
+            "refId": "C"
+          },
+          {
+            "expr": "baixing_payment_success_rate{method=\"balance\"}",
+            "legendFormat": "余额支付",
+            "refId": "D"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "right", "showValues": true},
+          "tooltip": {"mode": "multi"}
+        },
+        "fieldDefaults": {
+          "unit": "percentunit",
+          "decimals": 2
+        },
+        "thresholds": {
+          "steps": [
+            {"value": 0, "color": "red"},
+            {"value": 0.8, "color": "yellow"},
+            {"value": 0.95, "color": "green"}
+          ]
+        }
+      },
+      {
+        "id": 6,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+        "type": "timeseries",
+        "title": "用户留存率",
+        "targets": [
+          {
+            "expr": "baixing_user_retention_day1",
+            "legendFormat": "次日留存",
+            "refId": "A"
+          },
+          {
+            "expr": "baixing_user_retention_day7",
+            "legendFormat": "7 日留存",
+            "refId": "B"
+          },
+          {
+            "expr": "baixing_user_retention_day30",
+            "legendFormat": "30 日留存",
+            "refId": "C"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "right", "showValues": true},
+          "tooltip": {"mode": "multi"}
+        },
+        "fieldDefaults": {
+          "unit": "percentunit",
+          "decimals": 2
+        }
+      },
+      {
+        "id": 7,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+        "type": "timeseries",
+        "title": "活跃用户趋势",
+        "targets": [
+          {
+            "expr": "baixing_user_dau",
+            "legendFormat": "日活跃用户 (DAU)",
+            "refId": "A"
+          },
+          {
+            "expr": "baixing_user_wau",
+            "legendFormat": "周活跃用户 (WAU)",
+            "refId": "B"
+          },
+          {
+            "expr": "baixing_user_mau",
+            "legendFormat": "月活跃用户 (MAU)",
+            "refId": "C"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "right", "showValues": true},
+          "tooltip": {"mode": "multi"}
+        },
+        "fieldDefaults": {
+          "unit": "short"
+        }
+      },
+      {
+        "id": 8,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
+        "type": "timeseries",
+        "title": "律师响应时间",
+        "targets": [
+          {
+            "expr": "baixing_lawyer_response_avg_seconds",
+            "legendFormat": "平均响应时间",
+            "refId": "A"
+          },
+          {
+            "expr": "baixing_lawyer_response_median_seconds",
+            "legendFormat": "中位数响应时间",
+            "refId": "B"
+          },
+          {
+            "expr": "baixing_lawyer_response_p95_seconds",
+            "legendFormat": "P95 响应时间",
+            "refId": "C"
+          },
+          {
+            "expr": "baixing_lawyer_response_p99_seconds",
+            "legendFormat": "P99 响应时间",
+            "refId": "D"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "right", "showValues": true},
+          "tooltip": {"mode": "multi"}
+        },
+        "fieldDefaults": {
+          "unit": "s",
+          "decimals": 2
+        },
+        "thresholds": {
+          "steps": [
+            {"value": 0, "color": "green"},
+            {"value": 300, "color": "yellow"},
+            {"value": 600, "color": "red"}
+          ]
+        }
+      },
+      {
+        "id": 9,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
+        "type": "timeseries",
+        "title": "律师响应量统计",
+        "targets": [
+          {
+            "expr": "rate(baixing_lawyer_response_total[$interval])",
+            "legendFormat": "律师响应次数",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "right", "showValues": true},
+          "tooltip": {"mode": "multi"}
+        },
+        "fieldDefaults": {
+          "unit": "ops"
+        }
+      },
+      {
+        "id": 10,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 36},
+        "type": "timeseries",
+        "title": "内容审核统计",
+        "targets": [
+          {
+            "expr": "rate(baixing_moderation_total[$interval])",
+            "legendFormat": "总审核数",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(baixing_moderation_approved[$interval])",
+            "legendFormat": "审核通过",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(baixing_moderation_rejected[$interval])",
+            "legendFormat": "审核拒绝",
+            "refId": "C"
+          },
+          {
+            "expr": "baixing_moderation_pending",
+            "legendFormat": "待审核",
+            "refId": "D"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "right", "showValues": true},
+          "tooltip": {"mode": "multi"}
+        },
+        "fieldDefaults": {
+          "unit": "ops"
+        }
+      },
+      {
+        "id": 11,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 36},
+        "type": "timeseries",
+        "title": "内容审核效率",
+        "targets": [
+          {
+            "expr": "baixing_moderation_approval_rate",
+            "legendFormat": "审核通过率",
+            "refId": "A"
+          },
+          {
+            "expr": "baixing_moderation_avg_time_seconds",
+            "legendFormat": "平均审核时长",
+            "refId": "B"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "right", "showValues": true},
+          "tooltip": {"mode": "multi"}
+        },
+        "fieldDefaults": {
+          "unit": "s",
+          "decimals": 2
+        }
+      },
+      {
+        "id": 12,
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 44},
+        "type": "table",
+        "title": "支付方式统计",
+        "targets": [
+          {
+            "expr": "baixing_payment_orders_success",
+            "legendFormat": "{{method}} - 成功",
+            "refId": "A"
+          },
+          {
+            "expr": "baixing_payment_orders_failed",
+            "legendFormat": "{{method}} - 失败",
+            "refId": "B"
+          }
+        ],
+        "options": {
+          "showHeader": true,
+          "columns": [
+            {"field": "Time", "displayName": "时间"},
+            {"field": "Value", "displayName": "数量"},
+            {"field": "method", "displayName": "支付方式"}
+          ]
+        }
+      },
+      {
+        "id": 13,
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 52},
+        "type": "table",
+        "title": "内容类型审核统计",
+        "targets": [
+          {
+            "expr": "baixing_moderation_by_content_type",
+            "legendFormat": "{{content_type}} - {{action}}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showHeader": true,
+          "columns": [
+            {"field": "Time", "displayName": "时间"},
+            {"field": "Value", "displayName": "数量"},
+            {"field": "content_type", "displayName": "内容类型"},
+            {"field": "action", "displayName": "操作"}
+          ]
+        }
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "name": "Annotations",
+          "datasource": "${datasource}",
+          "enable": true,
+          "expr": "baixing_annotations",
+          "iconColor": "blue",
+          "step": "60s"
+        }
+      ]
+    },
+    "links": [
+      {
+        "title": "系统监控",
+        "url": "/d/system-metrics",
+        "icon": "dashboard"
+      },
+      {
+        "title": "AI 质量监控",
+        "url": "/d/ai-quality",
+        "icon": "dashboard"
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  }
+}

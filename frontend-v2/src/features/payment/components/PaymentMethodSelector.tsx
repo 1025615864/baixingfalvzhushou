@@ -6,35 +6,42 @@ import React, { useCallback } from 'react';
 
 import type { PaymentMethod, PaymentMethodConfig } from '../types';
 
-// 支付方式配置
+// 支付方式配置 - 优化：完善支付方式说明、添加支付推荐
 const paymentMethods: PaymentMethodConfig[] = [
   {
     id: 'alipay',
     name: '支付宝',
     icon: 'alipay',
-    description: '推荐使用，安全便捷',
+    description: '推荐使用，安全便捷，最快到账',
     enabled: true,
+    recommended: true,
+    testId: 'payment-method-alipay',
   },
   {
     id: 'wechat',
     name: '微信支付',
     icon: 'wechat',
-    description: '微信支付',
+    description: '微信用户首选，快速支付',
     enabled: false, // 后端暂未开放
+    testId: 'payment-method-wechat',
   },
   {
     id: 'balance',
     name: '余额支付',
     icon: 'balance',
-    description: '使用账户余额支付',
+    description: '使用账户余额支付，尊享会员优惠',
     enabled: true,
+    recommended: false,
+    testId: 'payment-method-balance',
   },
   {
     id: 'ikunpay',
     name: '爱坤支付',
     icon: 'card',
-    description: '第三方支付平台',
+    description: '第三方支付平台，新用户专享折扣',
     enabled: true,
+    recommended: false,
+    testId: 'payment-method-ikunpay',
   },
 ];
 
@@ -101,6 +108,7 @@ export const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
             <button
               key={method.id}
               type="button"
+              data-testid={method.testId}
               onClick={() => handleSelect(method.id as PaymentMethod)}
               disabled={disabled || !method.enabled || (isBalanceMethod && balance <= 0)}
               className={`
@@ -116,8 +124,13 @@ export const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
                 <PaymentIcon type={method.icon} />
               </div>
               <div className="flex-1 text-left">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium text-gray-900">{method.name}</span>
+                  {method.recommended && (
+                    <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full font-medium">
+                      推荐
+                    </span>
+                  )}
                   {isBalanceMethod && (
                     <span className="text-sm text-gray-500">
                       (余额: ¥{balance.toFixed(2)})

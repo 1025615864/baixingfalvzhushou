@@ -107,3 +107,47 @@ class UserTagInteraction(Base):
 
     def __repr__(self):
         return f"<UserTagInteraction user_id={self.user_id} tag={self.tag} count={self.interaction_count}>"
+
+
+class UserOnboarding(Base):
+    """用户引导状态表"""
+    __tablename__ = "user_onboarding"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, unique=True, nullable=False, index=True)
+
+    # 当前步骤 (0: 未开始, 1: 角色选择, 2: 需求匹配, 3: 功能演示, 4: 完成)
+    current_step = Column(Integer, default=0)
+
+    # 选择的角色 ID
+    role_id = Column(String(50), nullable=True)
+
+    # 角色选择时间
+    role_selected_at = Column(DateTime, nullable=True)
+
+    # 匹配的需求 ID 列表 (JSON 数组)
+    matched_needs = Column(JSON, default=list)
+
+    # 需求匹配时间
+    needs_matched_at = Column(DateTime, nullable=True)
+
+    # 已完成的功能演示 ID 列表 (JSON 数组)
+    completed_demos = Column(JSON, default=list)
+
+    # 演示开始时间
+    demo_started_at = Column(DateTime, nullable=True)
+
+    # 引导是否完成
+    completed = Column(Boolean, default=False)
+
+    # 引导完成时间
+    completed_at = Column(DateTime, nullable=True)
+
+    # 扩展属性 (JSON 对象)
+    extra_data = Column(JSON, default=dict)
+
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    def __repr__(self):
+        return f"<UserOnboarding user_id={self.user_id} step={self.current_step} completed={self.completed}>"

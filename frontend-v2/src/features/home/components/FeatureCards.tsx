@@ -4,7 +4,19 @@
  */
 
 import { Link } from 'react-router-dom';
-import { ChevronRight, MessageSquare, FileText, Search, Calculator, Shield, Users, BookOpen, Gavel } from 'lucide-react';
+import {
+  ChevronRight,
+  MessageSquare,
+  FileText,
+  Search,
+  Calculator,
+  Shield,
+  Users,
+  BookOpen,
+  Gavel,
+  Sparkles,
+  Crown,
+} from 'lucide-react';
 
 import type { FeatureCard } from '../types';
 
@@ -90,6 +102,10 @@ const iconMap: Record<string, React.ReactNode> = {
   calculator: <Calculator className="w-6 h-6" />,
   knowledge: <BookOpen className="w-6 h-6" />,
   lawyer: <Gavel className="w-6 h-6" />,
+  gift: <Sparkles className="w-6 h-6" />,
+  points: <Sparkles className="w-6 h-6" />,
+  crown: <Crown className="w-6 h-6" />,
+  vip: <Crown className="w-6 h-6" />,
 };
 
 // 默认功能卡片

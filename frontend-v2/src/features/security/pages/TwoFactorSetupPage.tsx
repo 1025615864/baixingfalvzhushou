@@ -2,10 +2,15 @@
  * TwoFactorSetupPage - 双重验证设置页面
  */
 
+import { lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QrcodeOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 
-import { TwoFactorSetup } from '../components/TwoFactorSetup';
+const LazyTwoFactorSetup = lazy(() =>
+  import('../components/TwoFactorSetup').then((module) => ({
+    default: module.TwoFactorSetup,
+  }))
+);
 
 /**
  * 双重验证设置页面
@@ -50,10 +55,12 @@ export function TwoFactorSetupPage(): JSX.Element {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-6">
           <div className="bg-white rounded-lg shadow-sm p-6">
-            <TwoFactorSetup
-              onComplete={handleComplete}
-              onCancel={handleCancel}
-            />
+            <Suspense fallback={<div className="h-96 animate-pulse rounded bg-gray-100" />}>
+              <LazyTwoFactorSetup
+                onComplete={handleComplete}
+                onCancel={handleCancel}
+              />
+            </Suspense>
           </div>
 
           {/* 安全提示 */}

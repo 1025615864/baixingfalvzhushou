@@ -37,7 +37,7 @@ export function OrderList({ onPay, onCancel }: OrderListProps): JSX.Element {
     );
   }
 
-  const orderList = orders?.items ?? [];
+  const orderList = orders ?? [];
 
   if (!orderList.length) {
     return (

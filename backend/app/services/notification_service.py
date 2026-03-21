@@ -1,13 +1,48 @@
-"""通知服务"""
+"""通知服务
+
+集成熔断器保护，防止通知服务故障导致系统崩溃。
+"""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.notification import Notification, NotificationType
+from ..utils.circuit_breaker import (
+    CircuitBreaker,
+    CircuitConfig,
+    CircuitBreakerOpen,
+    circuit_breaker_registry,
+)
+
+logger = logging.getLogger(__name__)
+
+# 通知服务熔断器配置
+# 通知服务相对不那么关键，可以设置较宽松的熔断阈值
+NOTIFICATION_CIRCUIT_CONFIG = CircuitConfig(
+    failure_threshold=5,       # 连续5次失败后打开熔断器
+    success_threshold=2,       # 半开状态下需要2次成功才能关闭
+    timeout_seconds=30.0,      # 30秒后进入半开状态
+    expected_exception=Exception,  # 捕获所有异常
+)
+
+# 全局通知服务熔断器
+_notification_circuit_breaker: Optional[CircuitBreaker] = None
+
+
+async def get_notification_circuit_breaker() -> CircuitBreaker:
+    """获取通知服务熔断器实例"""
+    global _notification_circuit_breaker
+    if _notification_circuit_breaker is None:
+        _notification_circuit_breaker = await circuit_breaker_registry.get_or_create(
+            "notification_service",
+            NOTIFICATION_CIRCUIT_CONFIG,
+        )
+    return _notification_circuit_breaker
 
 
 @dataclass

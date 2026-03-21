@@ -25,7 +25,8 @@ import type {
 
 
 // API 基础路径
-const API_BASE = '/lawfirm/consultations';
+// 注意：咨询模板实际在 /api/v1/admin/consultation-templates
+const API_BASE = '/v1/admin/consultation-templates';
 
 // ==================== 后端响应类型定义 ====================
 

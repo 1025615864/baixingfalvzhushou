@@ -443,7 +443,7 @@ export function Register(): JSX.Element {
                   type="checkbox"
                   className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded mt-0.5 cursor-pointer"
                   checked={formData.agree_terms}
-                  onChange={(e) => setFormData({ ...formData, agree_terms: e.target.checked })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, agree_terms: e.target.checked }))}
                 />
                 <span className="ml-3 text-sm text-gray-600 group-hover:text-gray-900">
                   我已阅读并同意
@@ -460,7 +460,7 @@ export function Register(): JSX.Element {
                   type="checkbox"
                   className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded mt-0.5 cursor-pointer"
                   checked={formData.agree_privacy}
-                  onChange={(e) => setFormData({ ...formData, agree_privacy: e.target.checked })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, agree_privacy: e.target.checked }))}
                 />
                 <span className="ml-3 text-sm text-gray-600 group-hover:text-gray-900">
                   我已阅读并同意
@@ -477,7 +477,7 @@ export function Register(): JSX.Element {
                   type="checkbox"
                   className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded mt-0.5 cursor-pointer"
                   checked={formData.agree_ai_disclaimer}
-                  onChange={(e) => setFormData({ ...formData, agree_ai_disclaimer: e.target.checked })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, agree_ai_disclaimer: e.target.checked }))}
                 />
                 <span className="ml-3 text-sm text-gray-600 group-hover:text-gray-900">
                   我已阅读并同意

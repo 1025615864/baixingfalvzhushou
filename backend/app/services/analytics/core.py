@@ -13,9 +13,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...models.analytics import UserBehaviorLog
+from ..business_metrics import (
+    get_business_metrics_collector,
+    ConsultationStage,
+    ModerationAction,
+)
 
 
 class AnalyticsService:
+    """用户行为分析服务
+    
+    集成业务指标收集功能，自动记录咨询转化、用户留存等业务指标。
+    """
     """用户行为分析服务"""
 
     # 行为类型常量
@@ -94,7 +103,61 @@ class AnalyticsService:
         await db.flush()
         await db.refresh(log)
 
+        # 同时记录业务指标
+        self._record_business_metrics(user_id, action, resource_type, resource_id, metadata)
+
         return log
+
+    def _record_business_metrics(
+        self,
+        user_id: int | None,
+        action: str,
+        resource_type: str | None,
+        resource_id: int | None,
+        metadata: dict[str, Any] | None,
+    ) -> None:
+        """记录业务指标
+        
+        根据用户行为自动记录相关业务指标。
+        
+        Args:
+            user_id: 用户 ID
+            action: 行为类型
+            resource_type: 资源类型
+            resource_id: 资源 ID
+            metadata: 额外元数据
+        """
+        from ..business_metrics import get_business_metrics_collector, ConsultationStage
+        
+        collector = get_business_metrics_collector()
+        
+        # 记录日活跃用户
+        if user_id and action in [self.ACTION_PAGE_VIEW, self.ACTION_CLICK, self.ACTION_SUBMIT]:
+            collector.record_daily_active_user(user_id)
+        
+        # 记录新用户
+        if action == self.ACTION_REGISTER and user_id:
+            collector.record_new_user(user_id)
+        
+        # 记录咨询转化漏斗
+        if resource_type == self.RESOURCE_CONSULTATION:
+            if action == self.ACTION_PAGE_VIEW:
+                collector.record_consultation_funnel(ConsultationStage.VIEW, user_id)
+            elif action == self.ACTION_CLICK:
+                collector.record_consultation_funnel(ConsultationStage.START, user_id)
+            elif action == self.ACTION_SUBMIT:
+                collector.record_consultation_funnel(ConsultationStage.CREATE, user_id)
+        
+        # 记录购买/支付行为
+        if action == self.ACTION_PURCHASE:
+            if metadata and metadata.get("order_no"):
+                collector.record_payment_success(
+                    order_no=metadata.get("order_no", ""),
+                    amount=metadata.get("amount", 0.0),
+                    payment_method=metadata.get("payment_method", "unknown"),
+                    order_type=metadata.get("order_type", "unknown"),
+                    user_id=user_id,
+                )
 
     async def get_user_behavior_history(
         self,

@@ -9,7 +9,6 @@ import type {
   EnterpriseInfo,
   EnterpriseOrder,
   TeamMember,
-  ContractReview,
   ComplianceTemplate,
   ComplianceReport,
   EnterpriseDocument,
@@ -34,6 +33,7 @@ import type {
   GetDocumentVersionsResponse,
   ComplianceReportStatus,
 } from '../types';
+
 
 
 // API 基础路径
@@ -107,21 +107,6 @@ interface BackendEnterpriseOrder {
   payment_method?: string;
 }
 
-/** 后端合同审查 */
-interface BackendContractReview {
-  id: number;
-  enterprise_id: number;
-  user_id: number;
-  title: string;
-  contract_type: string;
-  status: string;
-  content: string;
-  review_result?: string;
-  risk_level?: string;
-  created_at: string;
-  completed_at?: string;
-  reviewer_id?: number;
-}
 
 /** 后端合规报告 */
 interface BackendComplianceReport {
@@ -363,44 +348,29 @@ export async function apiGetEnterpriseOrders(
 
 /**
  * 获取合同审查列表
+ * 注意：后端无此API，暂不实现
  */
-export async function apiGetContractReviews(accountId: number): Promise<GetContractReviewsResponse> {
-  const response = await apiClient.get<{
-    contracts: BackendContractReview[];
-    total: number;
-  }>(`${API_BASE}/account/${accountId}/contracts`);
-  
-  return {
-    contracts: response.data.contracts.map(contract => ({
-      id: contract.id,
-      enterpriseId: contract.enterprise_id,
-      userId: contract.user_id,
-      title: contract.title,
-      contractType: contract.contract_type,
-      status: contract.status as ContractReview['status'],
-      content: contract.content,
-      reviewResult: contract.review_result,
-      riskLevel: contract.risk_level as ContractReview['riskLevel'],
-      createdAt: contract.created_at,
-      completedAt: contract.completed_at,
-      reviewerId: contract.reviewer_id,
-    })),
-    total: response.data.total,
-  };
+export function apiGetContractReviews(_accountId: number): Promise<GetContractReviewsResponse> {
+  // 后端 /enterprise 路由中无合同列表接口，暂返回空数据
+  return Promise.resolve({
+    contracts: [],
+    total: 0,
+  });
 }
 
 /**
  * 提交合同审查
+ * 注意：修正API路径和参数与后端对齐
  */
 export async function apiSubmitContractReview(
   request: SubmitContractReviewRequest
 ): Promise<void> {
-  await apiClient.post(`${API_BASE}/contracts/review`, {
+  await apiClient.post(`${API_BASE}/contract/submit`, {
     account_id: request.accountId,
+    user_id: request.userId || 0,
     title: request.title,
     contract_type: request.contractType,
     content: request.content,
-    attachments: request.attachments,
   });
 }
 
@@ -748,4 +718,42 @@ export async function apiGetDocumentVersions(
       url: v.url,
     })),
   };
+}
+
+// ==================== 元数据转换函数 ====================
+
+/**
+ * 企业元数据转换函数 (FR-004)
+ * 将后端蛇形命名转换为前端驼峰命名
+ */
+export function convertMetadata<T extends Record<string, unknown>>(
+  backendData: T
+): T {
+  const result: Partial<T> = {};
+  
+  for (const [key, value] of Object.entries(backendData)) {
+    // 蛇形转驼峰
+    const camelKey = key.replace(/_([a-z])/g, (match: string, letter: string) => letter.toUpperCase()) as keyof T;
+    result[camelKey] = value as T[keyof T];
+  }
+  
+  return result as T;
+}
+
+/**
+ * 企业请求数据转换函数
+ * 将前端驼峰命名转换为后端蛇形命名
+ */
+export function convertRequestMetadata<T extends Record<string, unknown>>(
+  frontendData: T
+): T {
+  const result: Partial<T> = {};
+  
+  for (const [key, value] of Object.entries(frontendData)) {
+    // 驼峰转蛇形
+    const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase() as keyof T;
+    result[snakeKey] = value as T[keyof T];
+  }
+  
+  return result as T;
 }

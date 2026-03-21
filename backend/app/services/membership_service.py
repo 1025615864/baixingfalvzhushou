@@ -1,9 +1,14 @@
 """会员体系服务
 
 提供会员权益配置、付费转化统计功能。
+支持新的会员等级体系：
+- 免费用户 (free): 基础功能
+- 月度会员 (monthly): ¥29/月
+- 年度会员 (annual): ¥299/年 (享8.6折)
+- 终身会员 (lifetime): ¥999 (一次购买终身权益)
 """
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from enum import Enum
 from typing import Any
 
@@ -13,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..models.system import SystemConfig
 from ..models.payment import PaymentOrder, PaymentStatus
 from ..models.user import User
+from ..models.membership import Membership
 from .quota_service import quota_service
 
 logger = logging.getLogger(__name__)
@@ -22,10 +28,41 @@ class MembershipTier(Enum):
     """会员等级"""
 
     FREE = "free"
-    BASIC = "basic"
-    STANDARD = "standard"
-    PREMIUM = "premium"
-    ENTERPRISE = "enterprise"
+    MONTHLY = "monthly"
+    ANNUAL = "annual"
+    LIFETIME = "lifetime"
+
+
+# 会员价格配置
+MEMBERSHIP_PRICING = {
+    MembershipTier.FREE.value: {
+        "name": "免费用户",
+        "monthly_price": 0,
+        "annual_price": 0,
+        "lifetime_price": 0,
+    },
+    MembershipTier.MONTHLY.value: {
+        "name": "月度会员",
+        "monthly_price": 29,
+        "annual_price": 299,
+        "annual_discount": 0.86,  # 8.6折
+        "lifetime_price": 999,
+    },
+    MembershipTier.ANNUAL.value: {
+        "name": "年度会员",
+        "monthly_price": 29,
+        "annual_price": 299,
+        "annual_discount": 0.86,
+        "lifetime_price": 999,
+    },
+    MembershipTier.LIFETIME.value: {
+        "name": "终身会员",
+        "monthly_price": 29,
+        "annual_price": 299,
+        "annual_discount": 0.86,
+        "lifetime_price": 999,
+    },
+}
 
 
 class MembershipBenefit:
@@ -35,21 +72,31 @@ class MembershipBenefit:
         self,
         tier: str,
         name: str,
-        daily_ai_chat_limit: int,
-        daily_document_limit: int,
+        daily_ai_chat_limit: int = 3,
+        unlimited_ai_chat: bool = False,
+        video_consultation_discount: float = 1.0,
+        free_video_consultations_per_month: int = 0,
         priority_support: bool = False,
-        advanced_features: bool = False,
-        api_access: bool = False,
-        custom_branding: bool = False,
+        points_multiplier: float = 1.0,
+        contract_review_per_month: int = 0,
+        unlimited_contract_review: bool = False,
+        lawyer_consultation_discount: float = 1.0,
+        can_view_lawyer_info: bool = True,
+        can_read_news: bool = True,
     ):
         self.tier = tier
         self.name = name
         self.daily_ai_chat_limit = daily_ai_chat_limit
-        self.daily_document_limit = daily_document_limit
+        self.unlimited_ai_chat = unlimited_ai_chat
+        self.video_consultation_discount = video_consultation_discount
+        self.free_video_consultations_per_month = free_video_consultations_per_month
         self.priority_support = priority_support
-        self.advanced_features = advanced_features
-        self.api_access = api_access
-        self.custom_branding = custom_branding
+        self.points_multiplier = points_multiplier
+        self.contract_review_per_month = contract_review_per_month
+        self.unlimited_contract_review = unlimited_contract_review
+        self.lawyer_consultation_discount = lawyer_consultation_discount
+        self.can_view_lawyer_info = can_view_lawyer_info
+        self.can_read_news = can_read_news
 
 
 class MembershipService:
@@ -57,62 +104,145 @@ class MembershipService:
 
     def __init__(self):
         self._benefits: dict[str, MembershipBenefit] = {}
+        self._pricing: dict[str, dict] = {}
         self._init_default_benefits()
+        self._init_pricing()
+
+    def _init_pricing(self):
+        """初始化价格配置"""
+        self._pricing = {
+            MembershipTier.FREE.value: {
+                "name": "免费用户",
+                "monthly_price": 0,
+                "annual_price": 0,
+                "lifetime_price": 0,
+                "annual_discount": 0,
+                "savings_annual": 0,
+            },
+            MembershipTier.MONTHLY.value: {
+                "name": "月度会员",
+                "monthly_price": 29,
+                "annual_price": 299,
+                "annual_discount": 0.86,
+                "lifetime_price": 999,
+                "savings_annual": 349 - 299,  # 月度按年计算 - 年度价格
+            },
+            MembershipTier.ANNUAL.value: {
+                "name": "年度会员",
+                "monthly_price": 29,
+                "annual_price": 299,
+                "annual_discount": 0.86,
+                "lifetime_price": 999,
+                "savings_annual": 0,
+            },
+            MembershipTier.LIFETIME.value: {
+                "name": "终身会员",
+                "monthly_price": 29,
+                "annual_price": 299,
+                "annual_discount": 0.86,
+                "lifetime_price": 999,
+                "savings_annual": 0,
+            },
+        }
 
     def _init_default_benefits(self):
         """初始化默认权益配置"""
         self._benefits = {
+            # 免费用户：AI咨询3次/天、查看律师信息、阅读新闻
             MembershipTier.FREE.value: MembershipBenefit(
                 tier=MembershipTier.FREE.value,
                 name="免费用户",
-                daily_ai_chat_limit=5,
-                daily_document_limit=10,
+                daily_ai_chat_limit=3,
+                unlimited_ai_chat=False,
+                video_consultation_discount=1.0,
+                free_video_consultations_per_month=0,
                 priority_support=False,
-                advanced_features=False,
-                api_access=False,
-                custom_branding=False,
+                points_multiplier=1.0,
+                contract_review_per_month=0,
+                unlimited_contract_review=False,
+                lawyer_consultation_discount=1.0,
+                can_view_lawyer_info=True,
+                can_read_news=True,
             ),
-            MembershipTier.BASIC.value: MembershipBenefit(
-                tier=MembershipTier.BASIC.value,
-                name="基础会员",
-                daily_ai_chat_limit=20,
-                daily_document_limit=30,
-                priority_support=False,
-                advanced_features=False,
-                api_access=False,
-                custom_branding=False,
-            ),
-            MembershipTier.STANDARD.value: MembershipBenefit(
-                tier=MembershipTier.STANDARD.value,
-                name="标准会员",
-                daily_ai_chat_limit=50,
-                daily_document_limit=50,
+            # 月度会员：无限AI咨询、视频咨询8折、专属客服、积分双倍
+            MembershipTier.MONTHLY.value: MembershipBenefit(
+                tier=MembershipTier.MONTHLY.value,
+                name="月度会员",
+                daily_ai_chat_limit=0,
+                unlimited_ai_chat=True,
+                video_consultation_discount=0.8,
+                free_video_consultations_per_month=0,
                 priority_support=True,
-                advanced_features=True,
-                api_access=False,
-                custom_branding=False,
+                points_multiplier=2.0,
+                contract_review_per_month=0,
+                unlimited_contract_review=False,
+                lawyer_consultation_discount=1.0,
+                can_view_lawyer_info=True,
+                can_read_news=True,
             ),
-            MembershipTier.PREMIUM.value: MembershipBenefit(
-                tier=MembershipTier.PREMIUM.value,
-                name="高级会员",
-                daily_ai_chat_limit=100,
-                daily_document_limit=100,
+            # 年度会员：所有月度权益 + 视频咨询免费3次、合同审查5份、律师咨询9折
+            MembershipTier.ANNUAL.value: MembershipBenefit(
+                tier=MembershipTier.ANNUAL.value,
+                name="年度会员",
+                daily_ai_chat_limit=0,
+                unlimited_ai_chat=True,
+                video_consultation_discount=0.0,  # 免费
+                free_video_consultations_per_month=3,
                 priority_support=True,
-                advanced_features=True,
-                api_access=True,
-                custom_branding=False,
+                points_multiplier=2.0,
+                contract_review_per_month=5,
+                unlimited_contract_review=False,
+                lawyer_consultation_discount=0.9,
+                can_view_lawyer_info=True,
+                can_read_news=True,
             ),
-            MembershipTier.ENTERPRISE.value: MembershipBenefit(
-                tier=MembershipTier.ENTERPRISE.value,
-                name="企业会员",
-                daily_ai_chat_limit=10**9,
-                daily_document_limit=10**9,
+            # 终身会员：所有权益 + 不限量视频咨询、不限量合同审查、律师咨询8折
+            MembershipTier.LIFETIME.value: MembershipBenefit(
+                tier=MembershipTier.LIFETIME.value,
+                name="终身会员",
+                daily_ai_chat_limit=0,
+                unlimited_ai_chat=True,
+                video_consultation_discount=0.0,  # 免费无限量
+                free_video_consultations_per_month=999,  # 表示无限
                 priority_support=True,
-                advanced_features=True,
-                api_access=True,
-                custom_branding=True,
+                points_multiplier=2.0,
+                contract_review_per_month=0,
+                unlimited_contract_review=True,
+                lawyer_consultation_discount=0.8,
+                can_view_lawyer_info=True,
+                can_read_news=True,
             ),
         }
+
+    def get_pricing(self, tier: str) -> dict[str, Any] | None:
+        """获取会员价格配置
+
+        Args:
+            tier: 会员等级
+
+        Returns:
+            价格配置
+        """
+        return self._pricing.get(tier)
+
+    def list_pricing(self) -> list[dict[str, Any]]:
+        """列出所有会员价格配置
+
+        Returns:
+            价格配置列表
+        """
+        return [
+            {
+                "tier": k,
+                "name": v["name"],
+                "monthly_price": v["monthly_price"],
+                "annual_price": v["annual_price"],
+                "annual_discount": v.get("annual_discount", 0),
+                "lifetime_price": v["lifetime_price"],
+                "savings_annual": v.get("savings_annual", 0),
+            }
+            for k, v in self._pricing.items()
+        ]
 
     def get_benefits(self, tier: str) -> dict[str, Any] | None:
         """获取会员权益配置
@@ -129,11 +259,16 @@ class MembershipService:
                 "tier": benefit.tier,
                 "name": benefit.name,
                 "daily_ai_chat_limit": benefit.daily_ai_chat_limit,
-                "daily_document_limit": benefit.daily_document_limit,
+                "unlimited_ai_chat": benefit.unlimited_ai_chat,
+                "video_consultation_discount": benefit.video_consultation_discount,
+                "free_video_consultations_per_month": benefit.free_video_consultations_per_month,
                 "priority_support": benefit.priority_support,
-                "advanced_features": benefit.advanced_features,
-                "api_access": benefit.api_access,
-                "custom_branding": benefit.custom_branding,
+                "points_multiplier": benefit.points_multiplier,
+                "contract_review_per_month": benefit.contract_review_per_month,
+                "unlimited_contract_review": benefit.unlimited_contract_review,
+                "lawyer_consultation_discount": benefit.lawyer_consultation_discount,
+                "can_view_lawyer_info": benefit.can_view_lawyer_info,
+                "can_read_news": benefit.can_read_news,
             }
         return None
 
@@ -148,11 +283,16 @@ class MembershipService:
                 "tier": k,
                 "name": v.name,
                 "daily_ai_chat_limit": v.daily_ai_chat_limit,
-                "daily_document_limit": v.daily_document_limit,
+                "unlimited_ai_chat": v.unlimited_ai_chat,
+                "video_consultation_discount": v.video_consultation_discount,
+                "free_video_consultations_per_month": v.free_video_consultations_per_month,
                 "priority_support": v.priority_support,
-                "advanced_features": v.advanced_features,
-                "api_access": v.api_access,
-                "custom_branding": v.custom_branding,
+                "points_multiplier": v.points_multiplier,
+                "contract_review_per_month": v.contract_review_per_month,
+                "unlimited_contract_review": v.unlimited_contract_review,
+                "lawyer_consultation_discount": v.lawyer_consultation_discount,
+                "can_view_lawyer_info": v.can_view_lawyer_info,
+                "can_read_news": v.can_read_news,
             }
             for k, v in self._benefits.items()
         ]
@@ -167,18 +307,82 @@ class MembershipService:
         Returns:
             会员等级
         """
+        # 查询会员表
+        result = await db.execute(
+            select(Membership).where(Membership.user_id == user.id)
+        )
+        membership = result.scalar_one_or_none()
+
+        if membership:
+            # 检查会员是否有效
+            if membership.level != MembershipTier.FREE.value:
+                if membership.end_date:
+                    if membership.end_date.tzinfo is None:
+                        membership.end_date = membership.end_date.replace(tzinfo=timezone.utc)
+                    if membership.end_date > datetime.now(timezone.utc):
+                        return membership.level
+                else:
+                    # 终身会员
+                    return membership.level
+
+        # 如果会员表没有记录或已过期，检查用户表的vip_expires_at字段作为兼容
         vip_expires = getattr(user, "vip_expires_at", None)
         if vip_expires and isinstance(vip_expires, datetime):
             if vip_expires.tzinfo is None:
                 vip_expires = vip_expires.replace(tzinfo=timezone.utc)
             if vip_expires > datetime.now(timezone.utc):
-                return MembershipTier.STANDARD.value
-
-        vip_level = getattr(user, "vip_level", None)
-        if vip_level:
-            return str(vip_level)
+                return MembershipTier.MONTHLY.value
 
         return MembershipTier.FREE.value
+
+    async def get_user_membership(
+        self, db: AsyncSession, user: User
+    ) -> dict[str, Any]:
+        """获取用户完整的会员信息
+
+        Args:
+            db: 数据库会话
+            user: 用户
+
+        Returns:
+            用户会员信息
+        """
+        # 查询会员表
+        result = await db.execute(
+            select(Membership).where(Membership.user_id == user.id)
+        )
+        membership = result.scalar_one_or_none()
+
+        tier = await self.get_user_tier(db, user)
+        benefits = self.get_benefits(tier)
+        pricing = self.get_pricing(tier)
+
+        # 计算会员是否有效
+        is_active = False
+        if membership:
+            if membership.level != MembershipTier.FREE.value:
+                if membership.end_date:
+                    if membership.end_date.tzinfo is None:
+                        membership.end_date = membership.end_date.replace(tzinfo=timezone.utc)
+                    if membership.end_date > datetime.now(timezone.utc):
+                        is_active = True
+                else:
+                    # 终身会员
+                    is_active = True
+
+        return {
+            "user_id": user.id,
+            "level": tier,
+            "level_name": pricing.get("name", "免费用户") if pricing else "免费用户",
+            "start_date": membership.start_date if membership else None,
+            "end_date": membership.end_date if membership else None,
+            "auto_renew": membership.auto_renew if membership else False,
+            "is_active": is_active,
+            "created_at": membership.created_at if membership else datetime.now(timezone.utc),
+            "updated_at": membership.updated_at if membership else datetime.now(timezone.utc),
+            "benefits": benefits,
+            "is_vip": is_active and tier != MembershipTier.FREE.value,
+        }
 
     async def get_user_benefits(
             self, db: AsyncSession, user: User) -> dict[str, Any]:
@@ -212,6 +416,90 @@ class MembershipService:
             },
             "is_vip": quota_info.get("is_vip_active", False),
         }
+
+    async def create_membership(
+        self,
+        db: AsyncSession,
+        user_id: int,
+        tier: str,
+        duration: str,
+    ) -> Membership:
+        """创建/更新会员订阅
+
+        Args:
+            db: 数据库会话
+            user_id: 用户ID
+            tier: 会员等级
+            duration: 订阅时长 (monthly/annual/lifetime)
+
+        Returns:
+            会员记录
+        """
+        # 查询现有会员
+        result = await db.execute(
+            select(Membership).where(Membership.user_id == user_id)
+        )
+        membership = result.scalar_one_or_none()
+
+        now = datetime.now(timezone.utc)
+
+        # 计算结束时间
+        end_date = None
+        if duration == "monthly":
+            end_date = now + timedelta(days=30)
+        elif duration == "annual":
+            end_date = now + timedelta(days=365)
+        # lifetime 为 None（终身）
+
+        if membership:
+            # 更新现有会员
+            membership.level = tier
+            membership.start_date = now
+            membership.end_date = end_date
+            membership.auto_renew = (duration == "monthly")
+            membership.updated_at = now
+        else:
+            # 创建新会员
+            membership = Membership(
+                user_id=user_id,
+                level=tier,
+                start_date=now,
+                end_date=end_date,
+                auto_renew=(duration == "monthly"),
+                created_at=now,
+                updated_at=now,
+            )
+            db.add(membership)
+
+        await db.commit()
+        await db.refresh(membership)
+
+        logger.info(f"Created/Updated membership for user {user_id}: tier={tier}, duration={duration}")
+
+        return membership
+
+    async def calculate_price(self, tier: str, duration: str) -> float:
+        """计算会员价格
+
+        Args:
+            tier: 会员等级
+            duration: 订阅时长 (monthly/annual/lifetime)
+
+        Returns:
+            价格
+        """
+        pricing = self._pricing.get(tier)
+        if not pricing:
+            return 0.0
+
+        if duration == "monthly":
+            return float(pricing["monthly_price"])
+        elif duration == "annual":
+            return float(pricing["annual_price"])
+        elif duration == "lifetime":
+            return float(pricing["lifetime_price"])
+
+        return 0.0
 
 
 class ConversionTrackingService:

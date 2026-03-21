@@ -47,7 +47,10 @@
 from __future__ import annotations
 
 from typing import Any, Optional
+
 from fastapi import HTTPException, status
+
+from .response import ErrorCode as BusinessErrorCode
 
 
 class BaseException(Exception):
@@ -283,26 +286,79 @@ class PaymentException(BusinessException):
 
     当支付流程中出现错误时抛出，如支付失败、余额不足等。
     默认HTTP状态码：400
-
-    Examples:
-        ```python
-        raise PaymentException(
-            message="支付失败，余额不足",
-            code="INSUFFICIENT_BALANCE",
-            details={"required": 100.00, "available": 50.00}
-        )
-        ```
     """
 
     def __init__(
         self,
         message: str = "支付处理失败",
-        code: Optional[str] = None,
+        error_code: BusinessErrorCode = BusinessErrorCode.PAYMENT_FAILED,
         details: Optional[dict[str, Any]] = None,
     ) -> None:
+        code = error_code.name
+        status_code_map = {
+            BusinessErrorCode.PAYMENT_FAILED: status.HTTP_400_BAD_REQUEST,
+            BusinessErrorCode.PAYMENT_AMOUNT_MISMATCH: status.HTTP_400_BAD_REQUEST,
+            BusinessErrorCode.PAYMENT_ORDER_NOT_FOUND: status.HTTP_404_NOT_FOUND,
+            BusinessErrorCode.PAYMENT_ORDER_ALREADY_PAID: status.HTTP_409_CONFLICT,
+            BusinessErrorCode.PAYMENT_ORDER_CANCELLED: status.HTTP_410_GONE,
+            BusinessErrorCode.PAYMENT_CALLBACK_INVALID: status.HTTP_400_BAD_REQUEST,
+            BusinessErrorCode.PAYMENT_CALLBACK_DUPLICATE: status.HTTP_409_CONFLICT,
+            BusinessErrorCode.PAYMENT_METHOD_NOT_SUPPORTED: status.HTTP_400_BAD_REQUEST,
+            BusinessErrorCode.PAYMENT_PROCESSING_ERROR: status.HTTP_500_INTERNAL_SERVER_ERROR,
+            BusinessErrorCode.PAYMENT_TIMEOUT: status.HTTP_504_GATEWAY_TIMEOUT,
+            BusinessErrorCode.INSUFFICIENT_BALANCE: status.HTTP_400_BAD_REQUEST,
+        }
         super().__init__(
-            message, code or "PAYMENT_ERROR", details,
-            status.HTTP_400_BAD_REQUEST
+            message=message,
+            code=code,
+            details=details,
+            status_code=status_code_map.get(error_code, status.HTTP_400_BAD_REQUEST),
+        )
+        self.error_code = error_code
+
+
+class InsufficientBalanceException(PaymentException):
+    """余额不足异常"""
+
+    def __init__(
+        self,
+        required: float = None,
+        available: float = None,
+        message: str = "余额不足",
+    ) -> None:
+        details = {}
+        if required is not None:
+            details["required"] = required
+        if available is not None:
+            details["available"] = available
+        super().__init__(
+            message=message,
+            error_code=BusinessErrorCode.INSUFFICIENT_BALANCE,
+            details=details if details else None,
+        )
+
+
+class PaymentOrderNotFoundException(PaymentException):
+    """支付订单不存在异常"""
+
+    def __init__(self, order_id: str = None, message: str = "订单不存在") -> None:
+        details = {"order_id": order_id} if order_id else None
+        super().__init__(
+            message=message,
+            error_code=BusinessErrorCode.PAYMENT_ORDER_NOT_FOUND,
+            details=details,
+        )
+
+
+class PaymentOrderAlreadyPaidException(PaymentException):
+    """订单已支付异常"""
+
+    def __init__(self, order_id: str = None, message: str = "订单已支付") -> None:
+        details = {"order_id": order_id} if order_id else None
+        super().__init__(
+            message=message,
+            error_code=BusinessErrorCode.PAYMENT_ORDER_ALREADY_PAID,
+            details=details,
         )
 
 
@@ -369,6 +425,204 @@ class ExternalServiceException(BaseException):
         super().__init__(message, code or "EXTERNAL_SERVICE_ERROR", details)
         self.service_name = service_name
         self.response_status = response_status
+
+
+# ============================================================
+# 基于 ErrorCode 的业务异常类 (集成 response.py 中的 ErrorCode)
+# ============================================================
+
+
+class UserException(BusinessException):
+    """用户相关异常基类"""
+
+    def __init__(
+        self,
+        message: str,
+        error_code: BusinessErrorCode = BusinessErrorCode.USER_NOT_FOUND,
+        details: Optional[dict[str, Any]] = None,
+    ) -> None:
+        code = error_code.name
+        status_code_map = {
+            BusinessErrorCode.USER_NOT_FOUND: status.HTTP_404_NOT_FOUND,
+            BusinessErrorCode.USER_ALREADY_EXISTS: status.HTTP_409_CONFLICT,
+            BusinessErrorCode.INVALID_CREDENTIALS: status.HTTP_401_UNAUTHORIZED,
+            BusinessErrorCode.TOKEN_EXPIRED: status.HTTP_401_UNAUTHORIZED,
+            BusinessErrorCode.TOKEN_INVALID: status.HTTP_401_UNAUTHORIZED,
+        }
+        super().__init__(
+            message=message,
+            code=code,
+            details=details,
+            status_code=status_code_map.get(error_code, status.HTTP_400_BAD_REQUEST),
+        )
+        self.error_code = error_code
+
+
+class UserNotFoundException(UserException):
+    """用户不存在异常"""
+
+    def __init__(self, user_id: int = None, message: str = "用户不存在") -> None:
+        details = {"user_id": user_id} if user_id else None
+        super().__init__(
+            message=message,
+            error_code=BusinessErrorCode.USER_NOT_FOUND,
+            details=details,
+        )
+        self.user_id = user_id
+
+
+class UserAlreadyExistsException(UserException):
+    """用户已存在异常"""
+
+    def __init__(self, identifier: str = None, message: str = "用户已存在") -> None:
+        details = {"identifier": identifier} if identifier else None
+        super().__init__(
+            message=message,
+            error_code=BusinessErrorCode.USER_ALREADY_EXISTS,
+            details=details,
+        )
+
+
+class InvalidCredentialsException(UserException):
+    """无效凭证异常"""
+
+    def __init__(self, message: str = "用户名或密码错误") -> None:
+        super().__init__(
+            message=message,
+            error_code=BusinessErrorCode.INVALID_CREDENTIALS,
+        )
+
+
+class TokenExpiredException(UserException):
+    """Token过期异常"""
+
+    def __init__(self, message: str = "登录已过期，请重新登录") -> None:
+        super().__init__(
+            message=message,
+            error_code=BusinessErrorCode.TOKEN_EXPIRED,
+        )
+
+
+# ============================================================
+# AI服务相关异常
+# ============================================================
+
+
+class AIException(BusinessException):
+    """AI服务相关异常"""
+
+    def __init__(
+        self,
+        message: str,
+        error_code: BusinessErrorCode = BusinessErrorCode.AI_SERVICE_UNAVAILABLE,
+        details: Optional[dict[str, Any]] = None,
+    ) -> None:
+        code = error_code.name
+        status_code_map = {
+            BusinessErrorCode.AI_SERVICE_UNAVAILABLE: status.HTTP_503_SERVICE_UNAVAILABLE,
+            BusinessErrorCode.AI_QUOTA_EXCEEDED: status.HTTP_429_TOO_MANY_REQUESTS,
+            BusinessErrorCode.AI_REQUEST_TOO_LONG: status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            BusinessErrorCode.AI_RESPONSE_INVALID: status.HTTP_502_BAD_GATEWAY,
+            BusinessErrorCode.AI_TIMEOUT: status.HTTP_504_GATEWAY_TIMEOUT,
+            BusinessErrorCode.AI_RATE_LIMIT_EXCEEDED: status.HTTP_429_TOO_MANY_REQUESTS,
+        }
+        super().__init__(
+            message=message,
+            code=code,
+            details=details,
+            status_code=status_code_map.get(error_code, status.HTTP_500_INTERNAL_SERVER_ERROR),
+        )
+        self.error_code = error_code
+
+
+class AIQuotaExceededException(AIException):
+    """AI配额超限异常"""
+
+    def __init__(self, quota_type: str = None, message: str = "AI配额已用完") -> None:
+        details = {"quota_type": quota_type} if quota_type else None
+        super().__init__(
+            message=message,
+            error_code=BusinessErrorCode.AI_QUOTA_EXCEEDED,
+            details=details,
+        )
+
+
+class AIRequestTooLongException(AIException):
+    """AI请求内容过长异常"""
+
+    def __init__(self, max_length: int = None, message: str = "请求内容过长") -> None:
+        details = {"max_length": max_length} if max_length else None
+        super().__init__(
+            message=message,
+            error_code=BusinessErrorCode.AI_REQUEST_TOO_LONG,
+            details=details,
+        )
+
+
+# ============================================================
+# 业务通用异常
+# ============================================================
+
+
+class ResourceNotFoundException(BusinessException):
+    """通用资源不存在异常"""
+
+    def __init__(
+        self,
+        resource_type: str = None,
+        resource_id: str = None,
+        message: str = "资源不存在",
+    ) -> None:
+        details = {}
+        if resource_type:
+            details["resource_type"] = resource_type
+        if resource_id:
+            details["resource_id"] = resource_id
+        super().__init__(
+            message=message,
+            code=BusinessErrorCode.RESOURCE_NOT_FOUND.name,
+            details=details if details else None,
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+
+class ResourceAlreadyExistsException(BusinessException):
+    """资源已存在异常"""
+
+    def __init__(
+        self,
+        resource_type: str = None,
+        identifier: str = None,
+        message: str = "资源已存在",
+    ) -> None:
+        details = {}
+        if resource_type:
+            details["resource_type"] = resource_type
+        if identifier:
+            details["identifier"] = identifier
+        super().__init__(
+            message=message,
+            code=BusinessErrorCode.RESOURCE_ALREADY_EXISTS.name,
+            details=details if details else None,
+            status_code=status.HTTP_409_CONFLICT,
+        )
+
+
+class OperationNotAllowedException(BusinessException):
+    """操作不允许异常"""
+
+    def __init__(self, message: str = "不允许的操作", details: dict = None) -> None:
+        super().__init__(
+            message=message,
+            code=BusinessErrorCode.OPERATION_NOT_ALLOWED.name,
+            details=details,
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+
+# ============================================================
+# 通用异常转换函数
+# ============================================================
 
 
 def http_exception_from_business_exception(

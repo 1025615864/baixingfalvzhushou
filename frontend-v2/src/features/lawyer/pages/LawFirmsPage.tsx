@@ -6,7 +6,10 @@
 import { useState } from 'react';
 import { Search, Plus, Pencil, Trash2, BadgeCheck, Ban, RotateCcw, Building2 } from 'lucide-react';
 
-import { Card, Input, Button, Badge } from '@/components/ui';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
 
 import {
   useLawFirms,

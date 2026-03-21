@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { Loading } from '@/shared/components/Loading';
+import { setRefreshToken, setToken } from '@/shared/lib/security/tokenStorage';
 
 import { apiHandleWechatCallback } from '../api';
 
@@ -74,10 +75,10 @@ export function WechatCallbackPage(): JSX.Element {
         if (result.success) {
           // 保存登录凭证
           if (result.accessToken) {
-            localStorage.setItem('access_token', result.accessToken);
+            setToken(result.accessToken);
           }
           if (result.refreshToken) {
-            localStorage.setItem('refresh_token', result.refreshToken);
+            setRefreshToken(result.refreshToken);
           }
           if (result.openid) {
             localStorage.setItem('wechat_openid', result.openid);

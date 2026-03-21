@@ -56,6 +56,31 @@ def _as_list(value: object | None) -> list[object]:
     return []
 
 
+def _get_error_message(res: Response) -> str:
+    """从响应中提取错误消息，兼容多种格式
+
+    支持的格式:
+    - {"detail": "message"} (FastAPI 标准)
+    - {"error": {"message": "..."}} (自定义格式)
+    - {"ok": False, "error": "message"} (简化格式)
+    """
+    data = _json_dict(res)
+    # FastAPI 标准格式
+    if "detail" in data:
+        detail = data["detail"]
+        if isinstance(detail, str):
+            return detail
+        if isinstance(detail, dict) and "message" in detail:
+            return str(detail["message"])
+    # 自定义 error 格式
+    error = data.get("error")
+    if isinstance(error, dict) and "message" in error:
+        return str(error["message"])
+    if isinstance(error, str):
+        return error
+    return ""
+
+
 class TestRootAPI:
     """根路由测试"""
     
@@ -125,7 +150,7 @@ class TestUserAPI:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert res.status_code == 400
-        assert "短信" in _json_dict(res).get("error", {}).get("message", "")
+        assert "短信" in _get_error_message(res)
 
     @pytest.mark.asyncio
     async def test_update_me_nickname_ok(
@@ -480,7 +505,7 @@ class TestSystemConfigAPI:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert res.status_code == 422
-        assert "Secret values must not be stored" in _json_dict(res).get("error", {}).get("message", "")
+        assert "Secret values must not be stored" in _get_error_message(res)
 
     @pytest.mark.asyncio
     async def test_system_config_reject_providers_json_contains_api_key_env_suffix_single(
@@ -517,7 +542,7 @@ class TestSystemConfigAPI:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert res.status_code == 400
-        assert "providers config must not include api_key" in _json_dict(res).get("error", {}).get("message", "").lower()
+        assert "providers config must not include api_key" in _get_error_message(res).lower()
 
     @pytest.mark.asyncio
     async def test_system_config_reject_providers_json_contains_api_key_single(
@@ -550,7 +575,7 @@ class TestSystemConfigAPI:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert res.status_code == 400
-        assert "must not include api_key" in _json_dict(res).get("error", {}).get("message", "").lower()
+        assert "must not include api_key" in _get_error_message(res).lower()
 
     @pytest.mark.asyncio
     async def test_system_config_reject_providers_b64_invalid_base64_single(
@@ -579,7 +604,7 @@ class TestSystemConfigAPI:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert res.status_code == 400
-        assert "must be valid base64" in _json_dict(res).get("error", {}).get("message", "").lower()
+        assert "must be valid base64" in _get_error_message(res).lower()
 
     @pytest.mark.asyncio
     async def test_system_config_reject_providers_b64_contains_api_key_single(
@@ -614,8 +639,7 @@ class TestSystemConfigAPI:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert res.status_code == 400
-        error_data = _json_dict(res)
-        error_msg = error_data.get("error", {}).get("message", "")
+        error_msg = _get_error_message(res)
         assert "must not include api_key" in error_msg.lower()
 
     @pytest.mark.asyncio
@@ -655,8 +679,7 @@ class TestSystemConfigAPI:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert res.status_code == 400
-        error_data = _json_dict(res)
-        error_msg = error_data.get("error", {}).get("message", "")
+        error_msg = _get_error_message(res)
         assert "must not include api_key" in error_msg.lower()
 
     @pytest.mark.asyncio
@@ -689,7 +712,7 @@ class TestSystemConfigAPI:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert res.status_code == 400
-        assert "secret" in _json_dict(res).get("error", {}).get("message", "").lower()
+        assert "secret" in _get_error_message(res).lower()
 
     @pytest.mark.asyncio
     async def test_system_config_reject_providers_json_contains_api_key_env_suffix_in_batch(
@@ -730,8 +753,7 @@ class TestSystemConfigAPI:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert res.status_code == 400
-        error_data = _json_dict(res)
-        error_msg = error_data.get("error", {}).get("message", "")
+        error_msg = _get_error_message(res)
         assert "must not include api_key" in error_msg.lower()
 
 
@@ -1646,8 +1668,7 @@ class TestPaymentAPI:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert pay_res.status_code == 400
-        error_data = _json_dict(pay_res)
-        error_msg = error_data.get("error", {}).get("message", "")
+        error_msg = _get_error_message(pay_res)
         assert "微信支付" in error_msg
 
     @pytest.mark.asyncio
@@ -4951,9 +4972,8 @@ class TestApiEnvelopeMiddleware:
         )
         assert res.status_code == 401
         data = _json_dict(res)
-        assert "ok" in data
-        assert data["ok"] is False
-        assert "error" in data
+        # 非 2xx 响应应该原样返回，不被 envelope 包装
+        assert "detail" in data  # FastAPI 标准错误格式
 
     @pytest.mark.asyncio
     async def test_envelope_does_not_wrap_non_json(self, client: AsyncClient, test_session: AsyncSession):

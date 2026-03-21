@@ -4,18 +4,18 @@
 
 import { useMemo } from 'react';
 import {
-  LineChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
   Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
 } from 'recharts';
 
 import type { DashboardData, QualityTrendData } from '../types';

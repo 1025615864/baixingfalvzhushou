@@ -66,6 +66,10 @@ c98c09bcd75c9923/
 *.swp
 tmp_*
 nul
+openapi_temp.json
+test_request.json
+tsc-legal-check.txt
+backend/.env.prod
 
 # IDE工具
 .codebuddy/
@@ -130,6 +134,8 @@ frontend-v2/coverage/
 frontend-v2/playwright-report/
 frontend-v2/.eslintcache
 frontend-v2/eslint_output.json
+frontend-v2/lint-output*.txt
+frontend-v2/tsc-output*.txt
 
 # IDE
 .idea/

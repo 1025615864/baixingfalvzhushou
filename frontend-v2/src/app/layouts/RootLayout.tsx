@@ -1,8 +1,16 @@
 import { Outlet, useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 
-import { Navbar } from '@/widgets/Navbar';
-import { Footer } from '@/widgets/Footer';
+const LazyNavbar = lazy(() => import('@/widgets/Navbar').then((module) => ({ default: module.Navbar })));
+const LazyFooter = lazy(() => import('@/widgets/Footer').then((module) => ({ default: module.Footer })));
+
+function NavbarFallback(): JSX.Element {
+  return <div className="h-16 lg:h-18" aria-hidden="true" />;
+}
+
+function FooterFallback(): JSX.Element {
+  return <div className="h-80" aria-hidden="true" />;
+}
 
 export function RootLayout(): JSX.Element {
   const location = useLocation();
@@ -15,15 +23,19 @@ export function RootLayout(): JSX.Element {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       {/* 导航栏 */}
-      <Navbar />
+      <Suspense fallback={<NavbarFallback />}>
+        <LazyNavbar />
+      </Suspense>
 
       {/* 主内容区域 */}
-      <main className="flex-1">
+      <main key={location.pathname} className="flex-1 w-full">
         <Outlet />
       </main>
 
       {/* 页脚 */}
-      <Footer />
+      <Suspense fallback={<FooterFallback />}>
+        <LazyFooter />
+      </Suspense>
 
       {/* 全局返回顶部按钮 */}
       <ScrollToTopButton />
@@ -39,12 +51,13 @@ function ScrollToTopButton(): JSX.Element {
 
   return (
     <button
+      type="button"
       onClick={scrollToTop}
-      className="fixed bottom-6 right-6 w-12 h-12 bg-primary-600 text-white rounded-full shadow-lg shadow-primary-500/30 hover:bg-primary-700 hover:shadow-xl hover:shadow-primary-500/40 transition-all duration-300 flex items-center justify-center group z-40"
+      className="fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary-600 text-white shadow-lg shadow-primary-500/30 transition-all duration-300 hover:scale-105 hover:bg-primary-700 hover:shadow-xl hover:shadow-primary-500/40 active:scale-95"
       aria-label="返回顶部"
     >
       <svg
-        className="w-5 h-5 transform group-hover:-translate-y-0.5 transition-transform"
+        className="w-5 h-5 transition-transform duration-200 hover:-translate-y-0.5"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"

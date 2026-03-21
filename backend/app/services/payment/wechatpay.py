@@ -378,23 +378,48 @@ class WechatPayService:
             trade_state = payment_data.get("trade_state")
 
             if trade_state == "SUCCESS":
-                # 查找订单并标记为已支付
+                # 查找订单
                 order = await PaymentCoreService.get_order_by_no(db, order_no)
-                if order and order.status == PaymentStatus.PENDING:
-                    success_time = payment_data.get("success_time")
-                    paid_at = datetime.fromisoformat(success_time.replace("Z", "+00:00")) if success_time else None
+                if not order:
+                    logger.warning(f"Order not found for WechatPay callback: {order_no}")
+                    return {"success": True, "order_no": order_no}
 
+                # 安全检查：验证回调金额与订单金额一致
+                callback_amount_cents = payment_data.get("amount", {}).get("total")  # 单位是分
+                order_amount_cents = order.amount_cents if order.amount_cents else int(order.actual_amount * 100)
+
+                if callback_amount_cents is not None and callback_amount_cents != order_amount_cents:
+                    logger.error(
+                        "WechatPay amount mismatch: order_no=%s, callback=%s cents, order=%s cents",
+                        order_no, callback_amount_cents, order_amount_cents
+                    )
+                    # 记录异常但不处理，避免重复回调
+                    return {"success": True, "order_no": order_no, "warning": "amount_mismatch_logged"}
+
+                # 检查订单是否已支付（幂等处理）
+                if order.status == PaymentStatus.PAID:
+                    logger.info(f"Order already paid (idempotent): {order_no}")
+                    return {"success": True, "order_no": order_no}
+
+                success_time = payment_data.get("success_time")
+                paid_at = datetime.fromisoformat(success_time.replace("Z", "+00:00")) if success_time else None
+
+                try:
                     await PaymentCoreService.mark_order_paid(db, order, trade_no, paid_at)
+                except ValueError as e:
+                    # 订单已被其他请求处理，这是正常的幂等情况
+                    logger.info(f"Order payment race condition handled: {order_no}, {e}")
+                    return {"success": True, "order_no": order_no}
 
-                    # 如果是充值订单，充值余额
-                    if order.order_type == "recharge":
-                        await PaymentCoreService.recharge_balance(
-                            db=db,
-                            user_id=order.user_id,
-                            amount=order.actual_amount,
-                            order_id=order.id,
-                            description=f"微信支付充值"
-                        )
+                # 如果是充值订单，充值余额
+                if order.order_type == "recharge":
+                    await PaymentCoreService.recharge_balance(
+                        db=db,
+                        user_id=order.user_id,
+                        amount=order.actual_amount,
+                        order_id=order.id,
+                        description=f"微信支付充值"
+                    )
 
                 return {"success": True, "order_no": order_no}
             else:

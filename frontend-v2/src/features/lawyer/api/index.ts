@@ -70,9 +70,10 @@ import type {
 } from '../types';
 
 
-// API 基础路径 - 修复为与后端一致
-const API_BASE = '/lawfirm/lawyers';
-const LAWFIRM_API_BASE = '/lawfirm';
+// API 基础路径 - 修正为与后端一致
+// 后端路由: /lawyers (律师管理), /lawyer/schedules (日程), /consultations (咨询)
+const API_BASE = '/lawyers';  // 修正: 后端 prefix="/lawyers"
+const LAWFIRM_API_BASE = '/lawfirm';  // 律所基础路径
 
 /** API 错误响应 */
 interface ApiErrorResponse {
@@ -80,17 +81,9 @@ interface ApiErrorResponse {
 }
 
 /**
- * 安全获取 JSON 响应
- */
-async function safeJson<T>(response: Response): Promise<T> {
-  const data = await response.json() as T;
-  return data;
-}
-
-/**
  * 获取 API 错误信息
  */
-function getErrorMessage(error: unknown, defaultMsg: string): string {
+function _getErrorMessage(error: unknown, defaultMsg: string): string {
   if (typeof error === 'object' && error !== null && 'detail' in error) {
     return (error as ApiErrorResponse).detail || defaultMsg;
   }
@@ -385,36 +378,23 @@ function transformReplyTemplate(data: ReplyTemplateResponseSnake): LawyerReplyTe
 
 /**
  * 获取律师列表
+ * 注意：修正API基础路径
  */
 export async function getLawyers(params: GetLawyersRequest = {}): Promise<GetLawyersResponse> {
-  const searchParams = new URLSearchParams();
-  if (params.page) searchParams.set('page', String(params.page));
-  if (params.pageSize) searchParams.set('page_size', String(params.pageSize));
-  if (params.firmId) searchParams.set('firm_id', params.firmId);
-  if (params.specialty) searchParams.set('specialty', params.specialty);
-  if (params.keyword) searchParams.set('keyword', params.keyword);
-
-  const url = `${API_BASE}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取律师列表失败' }));
-    throw new Error(getErrorMessage(error, '获取律师列表失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     items: LawyerResponseSnake[];
     total: number;
     page: number;
     page_size: number;
-  }>(response);
+  }>(`/lawyers`, {  // 修正: 后端 prefix="/lawyers"
+    params: {
+      ...(params.page && { page: params.page }),
+      ...(params.pageSize && { page_size: params.pageSize }),
+      ...(params.firmId && { firm_id: params.firmId }),
+      ...(params.specialty && { specialty: params.specialty }),
+      ...(params.keyword && { keyword: params.keyword }),
+    },
+  });
 
   return {
     lawyers: data.items.map(transformLawyer),
@@ -426,58 +406,34 @@ export async function getLawyers(params: GetLawyersRequest = {}): Promise<GetLaw
 
 /**
  * 获取律师详情
+ * 注意：修正API路径
  */
 export async function getLawyer(lawyerId: string): Promise<Lawyer> {
-  const response = await fetch(`${API_BASE}/${lawyerId}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取律师详情失败' }));
-    throw new Error(getErrorMessage(error, '获取律师详情失败'));
-  }
-
-  const data = await safeJson<LawyerResponseSnake>(response);
+  const { data } = await apiClient.get<LawyerResponseSnake>(`/lawyers/${lawyerId}`);
   return transformLawyer(data);
 }
 
 /**
  * 获取律师评价列表
+ * 注意：修正API路径 - 后端使用 /reviews 前缀
  */
 export async function getLawyerReviews(
   lawyerId: string,
   params: { page?: number; pageSize?: number } = {}
 ): Promise<GetLawyerReviewsResponse> {
-  const searchParams = new URLSearchParams();
-  if (params.page) searchParams.set('page', String(params.page));
-  if (params.pageSize) searchParams.set('page_size', String(params.pageSize));
-
-  const url = `${API_BASE}/${lawyerId}/reviews${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取律师评价失败' }));
-    throw new Error(getErrorMessage(error, '获取律师评价失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     items: ReviewResponseSnake[];
     total: number;
     page: number;
     page_size: number;
     average_rating: number;
-  }>(response);
+  }>(`/reviews`, {  // 修正: 后端 reviews 路由 prefix="/reviews"
+    params: {
+      lawyer_id: lawyerId,  // 添加律师ID参数
+      ...(params.page && { page: params.page }),
+      ...(params.pageSize && { page_size: params.pageSize }),
+    },
+  });
 
   return {
     reviews: data.items.map(transformReview),
@@ -511,38 +467,25 @@ export async function createReview(request: CreateReviewRequest): Promise<Create
 
 /**
  * 获取律师日程
+ * 注意：修正API路径与后端对齐 - 后端使用 /lawyer/schedules 前缀
  */
 export async function getLawyerSchedule(
   lawyerId: string,
   params: { dateFrom?: string; dateTo?: string; page?: number; pageSize?: number } = {}
 ): Promise<GetLawyerScheduleResponse> {
-  const searchParams = new URLSearchParams();
-  if (params.dateFrom) searchParams.set('date_from', params.dateFrom);
-  if (params.dateTo) searchParams.set('date_to', params.dateTo);
-  if (params.page) searchParams.set('page', String(params.page));
-  if (params.pageSize) searchParams.set('page_size', String(params.pageSize));
-
-  const url = `${LAWFIRM_API_BASE}/lawyers/${lawyerId}/schedules${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取律师日程失败' }));
-    throw new Error(getErrorMessage(error, '获取律师日程失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     items: ScheduleResponseSnake[];
     total: number;
     page: number;
     page_size: number;
-  }>(response);
+  }>(`/lawyer/schedules`, {  // 修正：后端 prefix="/lawyer/schedules"
+    params: {
+      ...(params.dateFrom && { date_from: params.dateFrom }),
+      ...(params.dateTo && { date_to: params.dateTo }),
+      ...(params.page && { page: params.page }),
+      ...(params.pageSize && { page_size: params.pageSize }),
+    },
+  });
 
   return {
     schedules: data.items.map(transformSchedule),
@@ -556,29 +499,13 @@ export async function getLawyerSchedule(
  * 获取律师可用时段
  */
 export async function getLawyerAvailableSlots(lawyerId: string, date: string): Promise<GetAvailableSlotsResponse> {
-  const searchParams = new URLSearchParams();
-  searchParams.set('date', date);
-
-  const url = `${LAWFIRM_API_BASE}/lawyers/${lawyerId}/available-slots?${searchParams.toString()}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取可用时段失败' }));
-    throw new Error(getErrorMessage(error, '获取可用时段失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     lawyer_id: number;
     date: string;
     slots: AvailableSlotResponseSnake[];
-  }>(response);
+  }>(`${LAWFIRM_API_BASE}/lawyers/${lawyerId}/available-slots`, {
+    params: { date },
+  });
 
   return {
     lawyerId: String(data.lawyer_id),
@@ -618,32 +545,18 @@ export async function createBooking(request: BookingRequest): Promise<BookingRes
  * 获取我的咨询列表
  */
 export async function getMyConsultations(params: GetMyConsultationsRequest = {}): Promise<GetMyConsultationsResponse> {
-  const searchParams = new URLSearchParams();
-  if (params.page) searchParams.set('page', String(params.page));
-  if (params.pageSize) searchParams.set('page_size', String(params.pageSize));
-  if (params.statusFilter) searchParams.set('status_filter', params.statusFilter);
-
-  const url = `${LAWFIRM_API_BASE}/consultations${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取咨询列表失败' }));
-    throw new Error(getErrorMessage(error, '获取咨询列表失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     items: ConsultationResponseSnake[];
     total: number;
     page: number;
     page_size: number;
-  }>(response);
+  }>(`${LAWFIRM_API_BASE}/consultations`, {
+    params: {
+      ...(params.page && { page: params.page }),
+      ...(params.pageSize && { page_size: params.pageSize }),
+      ...(params.statusFilter && { status_filter: params.statusFilter }),
+    },
+  });
 
   return {
     consultations: data.items.map(transformConsultation),
@@ -668,30 +581,16 @@ export async function cancelConsultation(consultationId: string): Promise<Cancel
  * 获取律师排行榜
  */
 export async function getLawyerRanking(limit: number = 10, period?: string): Promise<GetLawyerRankingResponse> {
-  const searchParams = new URLSearchParams();
-  searchParams.set('limit', String(limit));
-  if (period) searchParams.set('period', period);
-
-  const url = `${API_BASE}/ranking?${searchParams.toString()}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取排行榜失败' }));
-    throw new Error(getErrorMessage(error, '获取排行榜失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     metric: string;
     days: number;
     items: LawyerRankingItemSnake[];
-  }>(response);
+  }>(`${API_BASE}/ranking`, {
+    params: {
+      limit,
+      ...(period && { period }),
+    },
+  });
 
   return {
     metric: data.metric,
@@ -709,20 +608,7 @@ export async function getLawyerRanking(limit: number = 10, period?: string): Pro
  * 获取律师评价摘要
  */
 export async function getLawyerReviewSummary(lawyerId: string): Promise<ReviewSummary> {
-  const response = await fetch(`${API_BASE}/${lawyerId}/reviews/summary`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取评价摘要失败' }));
-    throw new Error(getErrorMessage(error, '获取评价摘要失败'));
-  }
-
-  const data = await safeJson<ReviewSummaryResponseSnake>(response);
+  const { data } = await apiClient.get<ReviewSummaryResponseSnake>(`${API_BASE}/${lawyerId}/reviews/summary`);
   return transformReviewSummary(data);
 }
 
@@ -752,20 +638,7 @@ export async function submitVerification(request: SubmitVerificationRequest): Pr
  * 获取认证状态
  */
 export async function getVerificationStatus(): Promise<VerificationStatusResponse> {
-  const response = await fetch(`${LAWFIRM_API_BASE}/verification/status`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取认证状态失败' }));
-    throw new Error(getErrorMessage(error, '获取认证状态失败'));
-  }
-
-  const data = await safeJson<VerificationStatusResponseSnake>(response);
+  const { data } = await apiClient.get<VerificationStatusResponseSnake>(`${LAWFIRM_API_BASE}/verification/status`);
   return transformVerificationStatus(data);
 }
 
@@ -775,52 +648,8 @@ export async function getVerificationStatus(): Promise<VerificationStatusRespons
  * 获取我的律师主页
  */
 export async function getMyHomepage(): Promise<LawyerHomepage> {
-  const response = await fetch(`${LAWFIRM_API_BASE}/lawyer/homepage`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取主页失败' }));
-    throw new Error(getErrorMessage(error, '获取主页失败'));
-  }
-
-  const data = await safeJson<LawyerHomepageResponseSnake>(response);
-  return {
-    id: String(data.id),
-    lawyerId: String(data.lawyer_id),
-    bannerImage: data.banner_image,
-    profileImage: data.profile_image,
-    slogan: data.slogan,
-    bio: data.bio,
-    specialtiesDisplay: data.specialties_display,
-    achievements: data.achievements,
-    education: data.education,
-    serviceAreas: data.service_areas,
-    serviceHours: data.service_hours,
-    responseTime: data.response_time,
-    contactPhone: data.contact_phone,
-    contactEmail: data.contact_email,
-    wechatQrcode: data.wechat_qrcode,
-    weiboUrl: data.weibo_url,
-    linkedinUrl: data.linkedin_url,
-    zhihuUrl: data.zhihu_url,
-    caseStudies: data.case_studies,
-    videoUrl: data.video_url,
-    videoCover: data.video_cover,
-    seoTitle: data.seo_title,
-    seoDescription: data.seo_description,
-    seoKeywords: data.seo_keywords,
-    themeColor: data.theme_color,
-    backgroundColor: data.background_color,
-    isPublished: data.is_published,
-    viewCount: data.view_count,
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
-  };
+  const { data } = await apiClient.get<LawyerHomepageResponseSnake>(`${LAWFIRM_API_BASE}/lawyer/homepage`);
+  return transformHomepage(data);
 }
 
 /**
@@ -913,20 +742,7 @@ export async function unpublishHomepage(): Promise<LawyerHomepage> {
  * 获取律师公开主页
  */
 export async function getPublicHomepage(lawyerId: string): Promise<LawyerHomepagePublic> {
-  const response = await fetch(`${LAWFIRM_API_BASE}/lawyer/homepage/lawyers/${lawyerId}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取公开主页失败' }));
-    throw new Error(getErrorMessage(error, '获取公开主页失败'));
-  }
-
-  const data = await safeJson<LawyerHomepagePublicResponseSnake>(response);
+  const { data } = await apiClient.get<LawyerHomepagePublicResponseSnake>(`${LAWFIRM_API_BASE}/lawyer/homepage/lawyers/${lawyerId}`);
   return transformHomepagePublic(data);
 }
 
@@ -940,32 +756,18 @@ export async function getPromotionLinks(params: {
   page?: number;
   pageSize?: number;
 } = {}): Promise<PromotionLinkListResponse> {
-  const searchParams = new URLSearchParams();
-  if (params.isActive !== undefined) searchParams.set('is_active', String(params.isActive));
-  if (params.page) searchParams.set('page', String(params.page));
-  if (params.pageSize) searchParams.set('page_size', String(params.pageSize));
-
-  const url = `${LAWFIRM_API_BASE}/lawyer/promotion-links${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取推广链接列表失败' }));
-    throw new Error(getErrorMessage(error, '获取推广链接列表失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     items: PromotionLinkResponseSnake[];
     total: number;
     page: number;
     page_size: number;
-  }>(response);
+  }>(`${LAWFIRM_API_BASE}/lawyer/promotion-links`, {
+    params: {
+      ...(params.isActive !== undefined && { is_active: params.isActive }),
+      ...(params.page && { page: params.page }),
+      ...(params.pageSize && { page_size: params.pageSize }),
+    },
+  });
 
   return {
     items: data.items.map(transformPromotionLink),
@@ -1022,20 +824,7 @@ export async function deletePromotionLink(linkId: string): Promise<void> {
  * 获取推广链接统计
  */
 export async function getPromotionLinkStats(linkId: string): Promise<PromotionLinkStats> {
-  const response = await fetch(`${LAWFIRM_API_BASE}/lawyer/promotion-links/stats/${linkId}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取推广统计失败' }));
-    throw new Error(getErrorMessage(error, '获取推广统计失败'));
-  }
-
-  const data = await safeJson<PromotionLinkStatsResponseSnake>(response);
+  const { data } = await apiClient.get<PromotionLinkStatsResponseSnake>(`${LAWFIRM_API_BASE}/lawyer/promotion-links/stats/${linkId}`);
   return transformPromotionLinkStats(data);
 }
 
@@ -1050,33 +839,19 @@ export async function getReplyTemplates(params: {
   page?: number;
   pageSize?: number;
 } = {}): Promise<ReplyTemplateListResponse> {
-  const searchParams = new URLSearchParams();
-  if (params.category) searchParams.set('category', params.category);
-  if (params.isActive !== undefined) searchParams.set('is_active', String(params.isActive));
-  if (params.page) searchParams.set('page', String(params.page));
-  if (params.pageSize) searchParams.set('page_size', String(params.pageSize));
-
-  const url = `${LAWFIRM_API_BASE}/lawyer/reply-templates${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取模板列表失败' }));
-    throw new Error(getErrorMessage(error, '获取模板列表失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     items: ReplyTemplateResponseSnake[];
     total: number;
     page: number;
     page_size: number;
-  }>(response);
+  }>(`${LAWFIRM_API_BASE}/lawyer/reply-templates`, {
+    params: {
+      ...(params.category && { category: params.category }),
+      ...(params.isActive !== undefined && { is_active: params.isActive }),
+      ...(params.page && { page: params.page }),
+      ...(params.pageSize && { page_size: params.pageSize }),
+    },
+  });
 
   return {
     items: data.items.map(transformReplyTemplate),
@@ -1090,20 +865,8 @@ export async function getReplyTemplates(params: {
  * 获取模板分类列表
  */
 export async function getReplyTemplateCategories(): Promise<ReplyTemplateCategoriesResponse> {
-  const response = await fetch(`${LAWFIRM_API_BASE}/lawyer/reply-templates/categories`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取分类列表失败' }));
-    throw new Error(getErrorMessage(error, '获取分类列表失败'));
-  }
-
-  return safeJson<ReplyTemplateCategoriesResponse>(response);
+  const { data } = await apiClient.get<ReplyTemplateCategoriesResponse>(`${LAWFIRM_API_BASE}/lawyer/reply-templates/categories`);
+  return data;
 }
 
 /**
@@ -1201,31 +964,19 @@ export async function getVerificationList(params: GetVerificationListParams = {}
   page: number;
   pageSize: number;
 }> {
-  const searchParams = new URLSearchParams();
-  if (params.page) searchParams.set('page', String(params.page));
-  if (params.pageSize) searchParams.set('page_size', String(params.pageSize));
-  if (params.status) searchParams.set('status', params.status);
-  if (params.keyword) searchParams.set('keyword', params.keyword);
-
-  const response = await fetch(`${LAWFIRM_API_BASE}/admin/verifications?${searchParams.toString()}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取认证列表失败' }));
-    throw new Error(getErrorMessage(error, '获取认证列表失败'));
-  }
-
-  const data = await safeJson<{
+  const { data } = await apiClient.get<{
     items: VerificationResponseSnake[];
     total: number;
     page: number;
     page_size: number;
-  }>(response);
+  }>(`${LAWFIRM_API_BASE}/admin/verifications`, {
+    params: {
+      ...(params.page && { page: params.page }),
+      ...(params.pageSize && { page_size: params.pageSize }),
+      ...(params.status && { status: params.status }),
+      ...(params.keyword && { keyword: params.keyword }),
+    },
+  });
 
   return {
     items: data.items.map(transformVerification),
@@ -1285,24 +1036,12 @@ interface GetLawFirmsParams {
  * 获取律所列表（管理员用）
  */
 export async function getLawFirms(params: GetLawFirmsParams = {}): Promise<LawFirm[]> {
-  const searchParams = new URLSearchParams();
-  if (params.includeInactive) searchParams.set('include_inactive', 'true');
-  if (params.keyword) searchParams.set('keyword', params.keyword);
-
-  const response = await fetch(`${LAWFIRM_API_BASE}/admin/firms?${searchParams.toString()}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
+  const { data } = await apiClient.get<{ items: LawFirmResponseSnake[] }>(`${LAWFIRM_API_BASE}/admin/firms`, {
+    params: {
+      ...(params.includeInactive && { include_inactive: 'true' }),
+      ...(params.keyword && { keyword: params.keyword }),
     },
-    credentials: 'include',
   });
-
-  if (!response.ok) {
-    const error = await safeJson<ApiErrorResponse>(response).catch(() => ({ detail: '获取律所列表失败' }));
-    throw new Error(getErrorMessage(error, '获取律所列表失败'));
-  }
-
-  const data = await safeJson<{ items: LawFirmResponseSnake[] }>(response);
   return (data.items ?? []).map(transformLawFirm);
 }
 

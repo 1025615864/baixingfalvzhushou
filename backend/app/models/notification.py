@@ -40,7 +40,9 @@ class Notification(Base):
     link: Mapped[str | None] = mapped_column(
         String(500), nullable=True)  # 跳转链接
     dedupe_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    read_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True)
 
     # 关联信息
     related_user_id: Mapped[int | None] = mapped_column(

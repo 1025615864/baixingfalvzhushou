@@ -12,7 +12,7 @@ import {
   useSessions,
   useCreateSession,
   useStreamMessage,
-  useAIConsultation,
+  useSession,
 } from '../hooks/useAIConsultation';
 import { ReadableMessage } from '../components/ReadableMessage';
 import { ShareDialog } from '../components/ShareDialog';
@@ -34,8 +34,8 @@ export function AIConsultationPage(): JSX.Element {
   const createSession = useCreateSession();
   const { streamState, sendStreamMessage, abortStream } = useStreamMessage();
 
-  // 获取当前会话的消息
-  const { data: currentSession } = useAIConsultation().currentSession;
+  // 使用 useSession hook 获取当前会话的消息
+  const { data: currentSession } = useSession(currentSessionId);
 
   // 自动滚动到底部
   const scrollToBottom = useCallback(() => {
@@ -100,7 +100,7 @@ export function AIConsultationPage(): JSX.Element {
     [handleSendMessage]
   );
 
-  // 处理建议操作点击
+  // 处理建议操作点击 - 优化：添加转化追踪埋点
   const handleActionClick = useCallback((action: SuggestedAction) => {
     switch (action.type) {
       case 'ask_followup':
@@ -109,8 +109,9 @@ export function AIConsultationPage(): JSX.Element {
         }
         break;
       case 'consult_lawyer':
-        // 跳转到律师咨询页面
-        window.location.href = '/lawyers';
+        // 跳转到律师咨询页面 - 添加转化追踪
+        window.location.href = '/lawyer?from=ai-consultation&action=book_lawyer';
+        // TODO: 接入正式埋点服务后在此上报转化事件
         break;
       default:
         break;
@@ -161,7 +162,7 @@ export function AIConsultationPage(): JSX.Element {
       <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
         {/* 顶部标题 */}
         <div className="p-4 border-b border-gray-200">
-          <h1 className="text-lg font-bold text-gray-900">AI 法律咨询</h1>
+          <h1 className="text-lg font-bold text-gray-900" data-testid="page-title">法律咨询</h1>
           <p className="text-xs text-gray-500 mt-1">智能助手为您解答法律问题</p>
         </div>
 
@@ -288,14 +289,15 @@ export function AIConsultationPage(): JSX.Element {
             // 消息列表
             <>
               {allMessages.map((message, index) => (
-                <ReadableMessage
-                  key={`${message.id}-${index}`}
-                  message={message}
-                  showTimestamp={true}
-                  showConfidence={message.role === 'assistant' && message.status === 'completed'}
-                  showActions={message.role === 'assistant' && index === allMessages.length - 1}
-                  onActionClick={handleActionClick}
-                />
+                <div key={`${message.id}-${index}`} data-testid="chat-message">
+                  <ReadableMessage
+                    message={message}
+                    showTimestamp={true}
+                    showConfidence={message.role === 'assistant' && message.status === 'completed'}
+                    showActions={message.role === 'assistant' && index === allMessages.length - 1}
+                    onActionClick={handleActionClick}
+                  />
+                </div>
               ))}
               <div ref={messagesEndRef} />
             </>
@@ -333,8 +335,9 @@ export function AIConsultationPage(): JSX.Element {
                 placeholder="输入您的法律问题..."
                 disabled={streamState.isStreaming}
                 rows={3}
-                className="w-full px-4 py-3 pr-32 bg-gray-50 border border-gray-200 
-                         rounded-xl resize-none focus:outline-none focus:ring-2 
+                data-testid="chat-input"
+                className="w-full px-4 py-3 pr-32 bg-gray-50 border border-gray-200
+                         rounded-xl resize-none focus:outline-none focus:ring-2
                          focus:ring-blue-500 focus:border-transparent
                          disabled:opacity-50 disabled:cursor-not-allowed
                          text-gray-800 placeholder-gray-400"
@@ -356,7 +359,8 @@ export function AIConsultationPage(): JSX.Element {
                     void handleSendMessage();
                   }}
                   disabled={!inputMessage.trim() || streamState.isStreaming}
-                  className="ml-1 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 
+                  data-testid="send-button"
+                  className="ml-1 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700
                            disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {streamState.isStreaming ? (

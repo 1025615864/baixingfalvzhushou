@@ -2,7 +2,7 @@
  * SecurityPage - 安全中心主页面
  */
 
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import {
   SafetyCertificateOutlined,
   QrcodeOutlined,
@@ -12,12 +12,37 @@ import {
   SettingOutlined,
 } from '@ant-design/icons';
 
-import { TwoFactorSetup } from '../components/TwoFactorSetup';
-import { LoginAuditTable } from '../components/LoginAuditTable';
-import { DeviceList } from '../components/DeviceList';
-import { SecurityLevel } from '../components/SecurityLevel';
-import { PasswordChange } from '../components/PasswordChange';
 import type { SecurityCheckItem } from '../types';
+
+const LazySecurityLevel = lazy(() =>
+  import('../components/SecurityLevel').then((module) => ({
+    default: module.SecurityLevel,
+  }))
+);
+
+const LazyTwoFactorSetup = lazy(() =>
+  import('../components/TwoFactorSetup').then((module) => ({
+    default: module.TwoFactorSetup,
+  }))
+);
+
+const LazyLoginAuditTable = lazy(() =>
+  import('../components/LoginAuditTable').then((module) => ({
+    default: module.LoginAuditTable,
+  }))
+);
+
+const LazyDeviceList = lazy(() =>
+  import('../components/DeviceList').then((module) => ({
+    default: module.DeviceList,
+  }))
+);
+
+const LazyPasswordChange = lazy(() =>
+  import('../components/PasswordChange').then((module) => ({
+    default: module.PasswordChange,
+  }))
+);
 
 type TabId = 'overview' | '2fa' | 'audit' | 'devices' | 'password';
 
@@ -34,6 +59,16 @@ const tabs: Tab[] = [
   { id: 'devices', label: '设备管理', icon: <DesktopOutlined /> },
   { id: 'password', label: '密码修改', icon: <LockOutlined /> },
 ];
+
+function SecuritySectionSkeleton({ rows = 3 }: { rows?: number }): JSX.Element {
+  return (
+    <div className="space-y-4">
+      {Array.from({ length: rows }).map((_, index) => (
+        <div key={index} className="h-24 animate-pulse rounded-lg bg-slate-100" />
+      ))}
+    </div>
+  );
+}
 
 /**
  * 安全中心主页面
@@ -61,8 +96,10 @@ export function SecurityPage(): JSX.Element {
       case 'overview':
         return (
           <div className="space-y-6">
-            <SecurityLevel onCheckItemClick={handleCheckItemClick} />
-            
+            <Suspense fallback={<SecuritySectionSkeleton rows={3} />}>
+              <LazySecurityLevel onCheckItemClick={handleCheckItemClick} />
+            </Suspense>
+
             {/* 快捷操作 */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">快捷操作</h3>
@@ -120,10 +157,12 @@ export function SecurityPage(): JSX.Element {
                 </div>
               </div>
               
-              <TwoFactorSetup 
-                onComplete={handleTwoFASetupComplete}
-                onCancel={() => setActiveTab('overview')}
-              />
+              <Suspense fallback={<SecuritySectionSkeleton rows={4} />}>
+                <LazyTwoFactorSetup
+                  onComplete={handleTwoFASetupComplete}
+                  onCancel={() => setActiveTab('overview')}
+                />
+              </Suspense>
             </div>
 
             {/* 2FA说明 */}
@@ -159,7 +198,9 @@ export function SecurityPage(): JSX.Element {
                 </div>
               </div>
             </div>
-            <LoginAuditTable pageSize={10} />
+            <Suspense fallback={<SecuritySectionSkeleton rows={5} />}>
+              <LazyLoginAuditTable pageSize={10} />
+            </Suspense>
           </div>
         );
 
@@ -179,17 +220,21 @@ export function SecurityPage(): JSX.Element {
                 </div>
               </div>
             </div>
-            <DeviceList />
+            <Suspense fallback={<SecuritySectionSkeleton rows={4} />}>
+              <LazyDeviceList />
+            </Suspense>
           </div>
         );
 
       case 'password':
         return (
           <div className="space-y-6">
-            <PasswordChange 
-              onSuccess={() => setActiveTab('overview')}
-              onCancel={() => setActiveTab('overview')}
-            />
+            <Suspense fallback={<SecuritySectionSkeleton rows={4} />}>
+              <LazyPasswordChange
+                onSuccess={() => setActiveTab('overview')}
+                onCancel={() => setActiveTab('overview')}
+              />
+            </Suspense>
             
             {/* 密码安全提示 */}
             <div className="bg-amber-50 rounded-lg p-6">

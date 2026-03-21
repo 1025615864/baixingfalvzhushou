@@ -128,6 +128,18 @@ export {
 export { Modal, ConfirmModal } from './Modal';
 export type { ModalProps, ConfirmModalProps } from './Modal';
 
+export { Tag } from './Tag';
+export type { TagProps } from './Tag';
+
+export { Dropdown } from './Dropdown';
+export type { DropdownProps, DropdownOption } from './Dropdown';
+
+export { Tooltip } from './Tooltip';
+export type { TooltipProps } from './Tooltip';
+
+export { Progress, CircularProgress } from './Progress';
+export type { ProgressProps, CircularProgressProps } from './Progress';
+
 // ==================== 无障碍组件 ====================
 export { SkipLink, SkipLinkContainer } from './SkipLink';
 export type { SkipLinkProps, SkipLinkItem, SkipLinkContainerProps } from './SkipLink';
@@ -157,3 +169,7 @@ export type {
   FormFieldCheckboxProps,
   SelectOption as FormFieldSelectOption,
 } from './FormField';
+
+// ==================== 页面骨架屏组件 ====================
+export { PageSkeleton } from './PageSkeleton';
+export type { PageSkeletonProps } from './PageSkeleton';

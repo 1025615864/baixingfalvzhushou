@@ -189,41 +189,11 @@ async def lifespan(app: FastAPI):
 
     redis_connected = False
 
-    async def _scheduled_news_job(session: AsyncSession) -> object:
-        from .services.news_service import news_service
-
-        return await news_service.process_scheduled_news(session)
-
-    async def _scheduled_news_job_wrapper() -> object:
-        start = time.perf_counter()
-        ok = True
-        try:
-            async with AsyncSessionLocal() as session:
-                return await _scheduled_news_job(session)
-        except Exception:
-            ok = False
-            raise
-        finally:
-            prometheus_metrics.record_job(
-                name="scheduled_news",
-                ok=bool(ok),
-                duration_seconds=max(0.0, float(time.perf_counter() - start)),
-            )
-
     if settings.redis_url:
         redis_connected = bool(await cache_service.connect(settings.redis_url))
 
     if (not settings.debug) and (not redis_connected):
         raise RuntimeError("Redis must be available when DEBUG is False. Please set REDIS_URL and ensure Redis is reachable.")
-
-    scheduled_task: asyncio.Task[None] | None = asyncio.create_task(
-        runner.run(
-            lock_key="locks:scheduled_news",
-            lock_ttl_seconds=60,
-            interval_seconds=30.0,
-            job=_scheduled_news_job_wrapper,
-        )
-    )
 
     rss_feeds_raw = os.getenv("RSS_FEEDS", "").strip()
     rss_ingest_enabled_raw = os.getenv("RSS_INGEST_ENABLED", "").strip().lower()
@@ -259,41 +229,6 @@ async def lifespan(app: FastAPI):
                 lock_ttl_seconds=60,
                 interval_seconds=rss_interval_seconds,
                 job=_rss_ingest_job_wrapper,
-            )
-        )
-
-    news_ai_enabled_raw = os.getenv("NEWS_AI_ENABLED", "").strip().lower()
-    news_ai_enabled = news_ai_enabled_raw in {"1", "true", "yes", "on"}
-    if (not settings.debug) and (not redis_connected):
-        news_ai_enabled = False
-
-    async def _news_ai_job_wrapper() -> object:
-        start = time.perf_counter()
-        ok = True
-        try:
-            async with AsyncSessionLocal() as session:
-                from .services.news_ai_pipeline_service import news_ai_pipeline_service
-
-                return await news_ai_pipeline_service.run_once(session)
-        except Exception:
-            ok = False
-            raise
-        finally:
-            prometheus_metrics.record_job(
-                name="news_ai_pipeline",
-                ok=bool(ok),
-                duration_seconds=max(0.0, float(time.perf_counter() - start)),
-            )
-
-    news_ai_task: asyncio.Task[None] | None = None
-    if news_ai_enabled:
-        news_ai_interval_seconds = float(os.getenv("NEWS_AI_INTERVAL_SECONDS", "120").strip() or "120")
-        news_ai_task = asyncio.create_task(
-            runner.run(
-                lock_key="locks:news_ai_pipeline",
-                lock_ttl_seconds=60,
-                interval_seconds=news_ai_interval_seconds,
-                job=_news_ai_job_wrapper,
             )
         )
 
@@ -453,7 +388,7 @@ async def lifespan(app: FastAPI):
     yield
 
     stop_event.set()
-    for t in (scheduled_task, rss_task, news_ai_task, wechatpay_task, settlement_task, review_sla_task):
+    for t in (rss_task, wechatpay_task, settlement_task, review_sla_task):
         if t is None:
             continue
         _ = t.cancel()
@@ -573,7 +508,7 @@ app.add_middleware(AuthContextMiddleware)
 
 app.add_middleware(RequestIdMiddleware)
 
-app.include_router(api_router, prefix="/api")
+app.include_router(api_router, prefix="/api/v1")
 app.include_router(websocket.router)
 
 
@@ -608,11 +543,7 @@ async def sitemap_xml():
         "/",
         "/chat",
         "/chat/history",
-        "/forum",
-        "/news",
-        "/news/topics",
         "/lawfirm",
-        "/search",
         "/calculator",
         "/limitations",
         "/documents",
@@ -625,44 +556,7 @@ async def sitemap_xml():
     ]
 
     try:
-        from .models.news import News, NewsTopic
-
-        async with AsyncSessionLocal() as session:
-            topics_res = await session.execute(
-                select(NewsTopic.id)
-                .where(NewsTopic.is_active == True)
-                .order_by(desc(NewsTopic.sort_order), desc(NewsTopic.id))
-            )
-            topic_rows = topics_res.all()
-            topic_ids: list[int] = []
-            for (tid,) in topic_rows:
-                try:
-                    if tid is None:
-                        continue
-                    topic_ids.append(int(tid))
-                except Exception:
-                    continue
-            for tid in topic_ids:
-                paths.append(f"/news/topics/{tid}")
-
-            news_limit = 500
-            news_res = await session.execute(
-                select(News.id)
-                .where(News.is_published == True, News.review_status == "approved")
-                .order_by(desc(News.published_at), desc(News.created_at), desc(News.id))
-                .limit(int(news_limit))
-            )
-            news_rows = news_res.all()
-            news_ids: list[int] = []
-            for (nid,) in news_rows:
-                try:
-                    if nid is None:
-                        continue
-                    news_ids.append(int(nid))
-                except Exception:
-                    continue
-            for nid in news_ids:
-                paths.append(f"/news/{nid}")
+        pass
     except Exception:
         logger.exception("failed to build dynamic sitemap urls")
 

@@ -1,0 +1,77 @@
+apisix:
+  node_listen: 8080
+  enable_admin: true
+  admin_key:
+    - name: "admin"
+      key: admin-secret-key-change-in-production
+      role: admin
+    - name: "viewer"
+      key: viewer-secret-key-change-in-production
+      role: viewer
+
+  ssl:
+    enable: true
+    ssl_protocols:
+      - TLSv1.2
+      - TLSv1.3
+
+  deployment:
+    role: traditional
+    role: traditional
+    etcd:
+      host:
+        - "http://etcd:2379"
+      prefix: /apisix
+      timeout: 30
+
+  proxy:
+    enable_http2: true
+    limit_rate:
+      - 1000
+
+etcd:
+  host: "http://etcd:2379"
+  prefix: /apisix
+  timeout: 30
+
+plugins:
+  - proxy-rewrite
+  - cors
+  - jwt-auth
+  - limit-req
+  - limit-count
+  - limit-conn
+  - rate-limit
+  - rate-limit-by-key
+  - prometheus
+  - skywalking
+  - opentelemetry
+  - key-auth
+  - hmac-auth
+  - api-breaker
+  - circuit-breaker
+  - request-id
+  - log-rotate
+  - gzip
+  - serverless-pre-function
+  - serverless-post-function
+  - ip-restriction
+  - ua-restriction
+  - referer-restriction
+  - uri-blocker
+  - response-rewrite
+  - error-log
+  - grpc-transcode
+  - http-to-dubbo
+  - multi-logger
+  - tcp-logger
+  - udp-logger
+
+plugin_attr:
+  prometheus:
+    export_uri: /apisix/prometheus
+    enable_export_server: true
+    metrics:
+      - name: http_latency
+        type: histogram
+        help: "HTTP request latency"

@@ -203,30 +203,33 @@ export default defineConfig({
     port: 5173,
     host: true,
     proxy: {
-      // API Gateway / Kong 入口（生产环境使用）
-      '/api': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-      },
-
-      // ==================== 微服务代理 ====================
+      // ==================== 微服务代理 (必须放在前面，精确匹配优先) ====================
       // 开发环境直接代理到各服务端口
 
-      // 用户服务 (8001)
+      // 用户服务 (8001) - 认证
       '/api/v1/auth': {
         target: 'http://127.0.0.1:8001',
         changeOrigin: true,
       },
+      // 用户服务 (8001) - 用户管理
       '/api/v1/users': {
         target: 'http://127.0.0.1:8001',
         changeOrigin: true,
       },
+      // 用户服务 (8001) - 用户画像
       '/api/v1/profiles': {
         target: 'http://127.0.0.1:8001',
         changeOrigin: true,
       },
+      // 用户服务 (8001) - 会员
       '/api/v1/membership': {
         target: 'http://127.0.0.1:8001',
+        changeOrigin: true,
+      },
+
+      // AI服务 (8005)
+      '/api/v1/ai': {
+        target: 'http://127.0.0.1:8005',
         changeOrigin: true,
       },
 
@@ -257,12 +260,6 @@ export default defineConfig({
       },
       '/api/v1/firms': {
         target: 'http://127.0.0.1:8004',
-        changeOrigin: true,
-      },
-
-      // AI服务 (8005)
-      '/api/v1/ai': {
-        target: 'http://127.0.0.1:8005',
         changeOrigin: true,
       },
 
@@ -308,9 +305,16 @@ export default defineConfig({
         changeOrigin: true,
       },
 
+      // ==================== 默认API代理 ====================
+      // 兜底：未匹配上面的路由走到主Backend (8080)
+      '/api': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+      },
+
       // ==================== WebSocket代理 ====================
       '/ws': {
-        target: 'ws://127.0.0.1:8000',
+        target: 'ws://127.0.0.1:8080',
         changeOrigin: true,
         ws: true,
       },

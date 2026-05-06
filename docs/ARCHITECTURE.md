@@ -631,4 +631,94 @@ python -m scripts.migrations.migrate_to_microservices --service notification
 
 ---
 
-*文档最后更新：2026-03-21*
+## 13. API Gateway (APISIX)
+
+### 13.1 架构概览
+
+```
+客户端 → APISIX Gateway → 各微服务
+         │
+         ├── JWT 认证
+         ├── 限流熔断
+         ├── 日志审计
+         └── 监控指标
+```
+
+### 13.2 APISIX 配置
+
+| 功能 | 插件 | 说明 |
+|------|------|------|
+| 认证 | jwt-auth | JWT Token 验证 |
+| 限流 | limit-req, limit-count | 滑动窗口限流 |
+| 熔断 | api-breaker, circuit-breaker | 故障自动熔断 |
+| 日志 | log-rotate | 日志滚动 |
+| 监控 | prometheus | 指标导出 |
+
+详细配置见: [API_GATEWAY_DESIGN.md](API_GATEWAY_DESIGN.md)
+
+---
+
+## 14. 服务间通信 (gRPC + Kafka)
+
+### 14.1 通信模式
+
+| 模式 | 协议 | 场景 |
+|------|------|------|
+| 同步调用 | gRPC (HTTP/2) | 实时查询、低延迟场景 |
+| 异步事件 | Kafka | 解耦、事件驱动场景 |
+
+### 14.2 gRPC 服务
+
+| 服务 | 端口 | 用途 |
+|------|------|------|
+| gRPC Gateway | 50051 | gRPC HTTP 网关 |
+
+### 14.3 Kafka Topic
+
+| Topic | 说明 | 消费者 |
+|-------|------|--------|
+| baixing.user.events | 用户事件 | Notification, Points |
+| baixing.payment.events | 支付事件 | Order, Points |
+| baixing.legal.events | 法律事件 | Notification |
+
+详细设计见: [SERVICE_COMMUNICATION_DESIGN.md](SERVICE_COMMUNICATION_DESIGN.md)
+
+---
+
+## 15. 分布式事务 (SAGA)
+
+### 15.1 SAGA 模式
+
+适用于跨多个服务的业务操作，确保最终一致性。
+
+**典型场景**: 下单 → 支付 → 积分 → 库存
+
+### 15.2 可靠消息
+
+适用于异步通知场景，确保消息可靠投递。
+
+详细设计见: [DISTRIBUTED_TRANSACTION_DESIGN.md](DISTRIBUTED_TRANSACTION_DESIGN.md)
+
+---
+
+## 16. 契约测试 (Pact)
+
+### 16.1 消费者驱动契约测试
+
+```
+UserService (Consumer) → Pact Broker ← LegalService (Provider)
+```
+
+### 16.2 集成 CI/CD
+
+| 环境 | 触发条件 | 验证 |
+|------|----------|------|
+| 开发 | PR | 本地 Pact |
+| 测试 | Merge | Broker 验证 |
+| 生产 | 部署前 | can-i-deploy |
+
+详细设计见: [CONTRACT_TESTING_DESIGN.md](CONTRACT_TESTING_DESIGN.md)
+
+---
+
+*文档最后更新：2026-03-22*

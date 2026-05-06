@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+package baixing.user;
+
+import "common.proto";
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  rpc GetUserProfile(GetUserProfileRequest) returns (UserProfile);
+  rpc UpdateUserStatus(UpdateUserStatusRequest) returns (baixing.common.Empty);
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+  rpc GetUserQuota(GetUserQuotaRequest) returns (UserQuota);
+  rpc GetLawyer(GetLawyerRequest) returns (Lawyer);
+  rpc GetLawyerSchedule(GetLawyerScheduleRequest) returns (LawyerSchedule);
+}
+
+message User {
+  string id = 1;
+  string email = 2;
+  string phone = 3;
+  string username = 4;
+  UserStatus status = 5;
+  baixing.common.Timestamp created_at = 6;
+  baixing.common.Timestamp updated_at = 7;
+}
+
+enum UserStatus {
+  USER_STATUS_UNSPECIFIED = 0;
+  USER_STATUS_ACTIVE = 1;
+  USER_STATUS_INACTIVE = 2;
+  USER_STATUS_BANNED = 3;
+}
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message GetUserResponse {
+  User user = 1;
+}
+
+message GetUserProfileRequest {
+  string user_id = 1;
+}
+
+message UserProfile {
+  string user_id = 1;
+  string nickname = 2;
+  string avatar_url = 3;
+  string bio = 4;
+  MembershipInfo membership = 5;
+}
+
+message MembershipInfo {
+  string membership_type = 1;
+  baixing.common.Timestamp expire_at = 2;
+}
+
+message UpdateUserStatusRequest {
+  string user_id = 1;
+  UserStatus status = 2;
+  string reason = 3;
+}
+
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+message ValidateTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  repeated string roles = 3;
+}
+
+message GetUserQuotaRequest {
+  string user_id = 1;
+}
+
+message UserQuota {
+  int32 consultation_quota = 1;
+  int32 consultation_used = 2;
+  int32 document_quota = 3;
+  int32 document_used = 4;
+}
+
+message GetLawyerRequest {
+  string lawyer_id = 1;
+}
+
+message Lawyer {
+  string lawyer_id = 1;
+  string name = 2;
+  string firm_id = 3;
+  string title = 4;
+  repeated string expertise = 5;
+  int32 rating = 6;
+  int32 consultation_count = 7;
+  int64 price_per_hour = 8;
+}
+
+message LawyerSchedule {
+  string lawyer_id = 1;
+  repeated TimeSlot available_slots = 2;
+}
+
+message TimeSlot {
+  string slot_id = 1;
+  baixing.common.Timestamp start_time = 2;
+  baixing.common.Timestamp end_time = 3;
+  bool is_available = 4;
+}
+
+message GetLawyerScheduleRequest {
+  string lawyer_id = 1;
+  string date = 2;
+}

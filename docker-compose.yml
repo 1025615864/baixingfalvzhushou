@@ -280,6 +280,12 @@ volumes:
   alertmanager_data:
   schemathesis_results:
     driver: local
+  etcd_data:
+    driver: local
+  kafka_data:
+    driver: local
+  pact_postgres_data:
+    driver: local
 
 networks:
   backend-network:
@@ -287,4 +293,6 @@ networks:
   frontend-network:
     driver: bridge
   monitoring-network:
+    driver: bridge
+  gateway-network:
     driver: bridge

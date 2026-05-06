@@ -1,0 +1,103 @@
+name: Contract Testing
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  pact-tests:
+    name: Pact Contract Tests
+    runs-on: ubuntu-latest
+
+    services:
+      pact-broker:
+        image: pactfoundation/pact-broker:2.105.0.0
+        ports:
+          - 9292:9292
+        env:
+          PACT_BROKER_DATABASE_URL: postgresql://postgres:@localhost:5432/pact?sslmode=disable
+          PACT_BROKER_PORT: 9292
+
+      postgres:
+        image: postgres:15
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_DB: pact
+          POSTGRES_USER: pact
+          POSTGRES_PASSWORD: ""
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r services/common/requirements.txt
+          pip install pytest pact-python pytest-asyncio
+
+      - name: Run consumer contract tests
+        env:
+          PACT_BROKER_URL: http://localhost:9292
+        run: |
+          cd services/common
+          pytest testing/ -v --tb=short
+
+      - name: Publish pacts to broker
+        if: github.ref == 'refs/heads/main'
+        env:
+          PACT_BROKER_URL: http://localhost:9292
+          GIT_SHA: ${{ github.sha }}
+        run: |
+          for pact_file in services/common/testing/pacts/*.json; do
+            if [ -f "$pact_file" ]; then
+              pact-broker publish "$pact_file" \
+                --broker-base-url $PACT_BROKER_URL \
+                --consumer-app-version $GIT_SHA
+            fi
+          done
+
+      - name: Check can-i-deploy
+        if: github.ref == 'refs/heads/main'
+        env:
+          PACT_BROKER_URL: http://localhost:9292
+        run: |
+          pact-broker can-i-deploy \
+            --pacticipant UserService \
+            --broker-base-url $PACT_BROKER_URL \
+            --to-environment production
+
+  provider-verification:
+    name: Provider Contract Verification
+    runs-on: ubuntu-latest
+    if: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r services/common/requirements.txt
+          pip install pytest pact-python
+
+      - name: Verify contracts
+        env:
+          PACT_BROKER_URL: http://localhost:9292
+          LEGAL_SERVICE_URL: http://localhost:8004
+        run: |
+          pact-verifier \
+            --provider-base-url $LEGAL_SERVICE_URL \
+            --broker-url $PACT_BROKER_URL \
+            --provider LegalService \
+            --consumer UserService

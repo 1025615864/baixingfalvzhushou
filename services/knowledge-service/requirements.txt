@@ -1,0 +1,18 @@
+# 知识库服务依赖
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+sqlalchemy>=2.0.0
+pydantic>=2.5.0
+chromadb>=0.4.0
+sentence-transformers>=2.2.0
+python-multipart>=0.0.6
+
+# OpenTelemetry 分布式追踪
+opentelemetry-api>=1.22.0
+opentelemetry-sdk>=1.22.0
+opentelemetry-exporter-otlp>=1.22.0
+opentelemetry-instrumentation-fastapi>=0.43b0
+opentelemetry-instrumentation-sqlalchemy>=0.43b0
+
+# Consul 服务注册
+python-consul>=1.1.0

@@ -1,0 +1,243 @@
+# APISIX Routes Configuration
+# Generated: 2026-03-22
+
+routes:
+  # ============ User Service Routes ============
+  - id: user-service-auth
+    uri: /api/v1/auth/*
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: user-service
+          port: 8001
+          weight: 100
+    plugins:
+      jwt-auth:
+        key: user-key
+        secret: user-jwt-secret-key-32-chars-min
+        algorithm: RS256
+      limit-req:
+        rate: 100
+        burst: 50
+        key: remote_addr
+      cors:
+        allow_origins: "*"
+        allow_methods: GET,POST,PUT,DELETE,OPTIONS
+        allow_headers: "*"
+        allow_credentials: false
+        max_age: 5
+    metadata:
+      desc: "User authentication routes"
+
+  - id: user-service-users
+    uri: /api/v1/users/*
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: user-service
+          port: 8001
+          weight: 100
+    plugins:
+      jwt-auth:
+        key: user-key
+      limit-req:
+        rate: 200
+        burst: 100
+        key: remote_addr
+    metadata:
+      desc: "User management routes"
+
+  - id: user-service-membership
+    uri: /api/v1/membership/*
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: user-service
+          port: 8001
+          weight: 100
+    plugins:
+      jwt-auth:
+        key: user-key
+    metadata:
+      desc: "Membership routes"
+
+  # ============ Payment Service Routes ============
+  - id: payment-service
+    uri: /api/v1/payment/*
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: payment-channel-service
+          port: 8002
+          weight: 100
+    plugins:
+      jwt-auth:
+        key: user-key
+      limit-req:
+        rate: 50
+        burst: 25
+        key: remote_addr
+      api-breaker:
+        break_response_code: 503
+        unhealthy:
+          http_status: 500
+          failures: 3
+        healthy:
+          http_status: 200
+          successes: 1
+      request-id:
+        header_name: X-Request-ID
+        property_name: request_id
+        generator: "uuid"
+    metadata:
+      desc: "Payment routes"
+
+  # ============ Legal Service Routes ============
+  - id: legal-service
+    uri: /api/v1/legal/*
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: legal-service
+          port: 8004
+          weight: 100
+    plugins:
+      jwt-auth:
+        key: user-key
+      limit-req:
+        rate: 100
+        burst: 50
+    metadata:
+      desc: "Legal service routes"
+
+  # ============ AI Service Routes ============
+  - id: ai-service
+    uri: /api/v1/ai/*
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: ai-service
+          port: 8005
+          weight: 100
+    plugins:
+      jwt-auth:
+        key: user-key
+      proxy-rewrite:
+        headers:
+          X-Request-ID: $request_id
+      limit-req:
+        rate: 100
+        burst: 50
+    metadata:
+      desc: "AI service routes"
+
+  # ============ News Service Routes ============
+  - id: news-service
+    uri: /api/v1/news/*
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: news-service
+          port: 8006
+          weight: 100
+    plugins:
+      jwt-auth:
+        key: user-key
+    metadata:
+      desc: "News service routes"
+
+  # ============ Community Service Routes ============
+  - id: community-service
+    uri: /api/v1/community/*
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: community-service
+          port: 8007
+          weight: 100
+    plugins:
+      jwt-auth:
+        key: user-key
+    metadata:
+      desc: "Community forum routes"
+
+  # ============ Points Service Routes ============
+  - id: points-service
+    uri: /api/v1/points/*
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: points-service
+          port: 8008
+          weight: 100
+    plugins:
+      jwt-auth:
+        key: user-key
+    metadata:
+      desc: "Points service routes"
+
+  # ============ Notification Service Routes ============
+  - id: notification-service
+    uri: /api/v1/notifications/*
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: notification-service
+          port: 8009
+          weight: 100
+    plugins:
+      jwt-auth:
+        key: user-key
+    metadata:
+      desc: "Notification routes"
+
+  # ============ Recommendation Service Routes ============
+  - id: recommendation-service
+    uri: /api/v1/recommendations/*
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: recommendation-service
+          port: 8010
+          weight: 100
+    plugins:
+      jwt-auth:
+        key: user-key
+    metadata:
+      desc: "Recommendation routes"
+
+  # ============ Search Service Routes ============
+  - id: search-service
+    uri: /api/v1/search/*
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: search-service
+          port: 8011
+          weight: 100
+    plugins:
+      jwt-auth:
+        key: user-key
+    metadata:
+      desc: "Search service routes"
+
+  # ============ Backend Legacy Service Routes ============
+  - id: backend-service
+    uri: /api/v1/*
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: backend
+          port: 8080
+          weight: 100
+    plugins:
+      jwt-auth:
+        key: user-key
+      limit-req:
+        rate: 200
+        burst: 100
+      proxy-rewrite:
+        headers:
+          X-Request-ID: $request_id
+    metadata:
+      desc: "Legacy backend service (fallback)"

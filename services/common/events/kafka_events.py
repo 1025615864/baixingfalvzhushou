@@ -1,228 +1,136 @@
-"""Kafka 事件定义
-
-定义服务间通信的事件结构。
-"""
-from __future__ import annotations
-
-from dataclasses import dataclass, field
+from dataclasses import dataclass, asdict
 from datetime import datetime
-from enum import Enum
-from typing import Any, Optional
+from typing import Optional, Any, Dict
 import json
-
-
-class EventType(str, Enum):
-    # 用户事件
-    USER_REGISTERED = "user.registered"
-    USER_LOGIN = "user.login"
-    USER_PROFILE_UPDATED = "user.profile_updated"
-
-    # 支付事件
-    PAYMENT_COMPLETED = "payment.completed"
-    PAYMENT_REFUNDED = "payment.refunded"
-    PAYMENT_FAILED = "payment.failed"
-    SETTLEMENT_COMPLETED = "settlement.completed"
-
-    # 咨询事件
-    CONSULTATION_CREATED = "legal.consultation.created"
-    CONSULTATION_COMPLETED = "legal.consultation.completed"
-    LAWYER_VERIFIED = "legal.lawyer.verified"
-
-    # 积分事件
-    POINTS_CHANGED = "points.changed"
-    POINTS_EXPIRED = "points.expired"
-
-    # 通知事件
-    NOTIFICATION_PUSH = "notification.push"
-    NOTIFICATION_EMAIL = "notification.email"
+import uuid
 
 
 @dataclass
-class DomainEvent:
-    """领域事件基类"""
-
-    event_id: str = field(default="")
-    event_type: str = ""
-    occurred_at: datetime = field(default_factory=datetime.utcnow)
-    version: str = "1.0"
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "event_id": self.event_id,
-            "event_type": self.event_type,
-            "occurred_at": self.occurred_at.isoformat(),
-            "version": self.version,
-            "metadata": self.metadata,
-        }
+class BaseEvent:
+    event_id: str
+    event_type: str
+    timestamp: str
+    version: str
+    source: str
 
     def to_json(self) -> str:
-        return json.dumps(self.to_dict(), default=str)
+        return json.dumps(asdict(self))
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "DomainEvent":
-        return cls(
-            event_id=data.get("event_id", ""),
-            event_type=data.get("event_type", ""),
-            occurred_at=datetime.fromisoformat(data["occurred_at"])
-                if "occurred_at" in data else datetime.utcnow(),
-            version=data.get("version", "1.0"),
-            metadata=data.get("metadata", {}),
+    def from_json(cls, data: str) -> "BaseEvent":
+        return cls(**json.loads(data))
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class UserEvent(BaseEvent):
+    user_id: str
+    payload: Dict[str, Any]
+
+    def __init__(
+        self,
+        event_type: str,
+        user_id: str,
+        payload: Dict[str, Any],
+        source: str,
+    ):
+        super().__init__(
+            event_id=str(uuid.uuid4()),
+            event_type=event_type,
+            timestamp=datetime.utcnow().isoformat(),
+            version="1.0",
+            source=source,
         )
-
-
-# ==================== 用户事件 ====================
-
-@dataclass
-class UserRegisteredEvent(DomainEvent):
-    """用户注册事件"""
-
-    event_type: str = EventType.USER_REGISTERED.value
-    user_id: int = 0
-    phone: str = ""
-    email: str = ""
-
-    def to_dict(self) -> dict[str, Any]:
-        data = super().to_dict()
-        data.update({
-            "user_id": self.user_id,
-            "phone": self.phone,
-            "email": self.email,
-        })
-        return data
-
-
-# ==================== 支付事件 ====================
-
-@dataclass
-class PaymentCompletedEvent(DomainEvent):
-    """支付完成事件"""
-
-    event_type: str = EventType.PAYMENT_COMPLETED.value
-    order_id: str = ""
-    user_id: int = 0
-    amount: float = 0.0
-    payment_method: str = ""
-    trade_no: str = ""
-
-    def to_dict(self) -> dict[str, Any]:
-        data = super().to_dict()
-        data.update({
-            "order_id": self.order_id,
-            "user_id": self.user_id,
-            "amount": self.amount,
-            "payment_method": self.payment_method,
-            "trade_no": self.trade_no,
-        })
-        return data
+        self.user_id = user_id
+        self.payload = payload
 
 
 @dataclass
-class PaymentRefundedEvent(DomainEvent):
-    """退款完成事件"""
+class PaymentEvent(BaseEvent):
+    payment_id: str
+    user_id: str
+    amount: int
+    status: str
+    payload: Dict[str, Any]
 
-    event_type: str = EventType.PAYMENT_REFUNDED.value
-    order_id: str = ""
-    user_id: int = 0
-    refund_amount: float = 0.0
-    refund_reason: str = ""
-
-    def to_dict(self) -> dict[str, Any]:
-        data = super().to_dict()
-        data.update({
-            "order_id": self.order_id,
-            "user_id": self.user_id,
-            "refund_amount": self.refund_amount,
-            "refund_reason": self.refund_reason,
-        })
-        return data
-
-
-# ==================== 咨询事件 ====================
-
-@dataclass
-class ConsultationCompletedEvent(DomainEvent):
-    """咨询完成事件"""
-
-    event_type: str = EventType.CONSULTATION_COMPLETED.value
-    consultation_id: int = 0
-    user_id: int = 0
-    lawyer_id: int = 0
-    duration_minutes: int = 0
-
-    def to_dict(self) -> dict[str, Any]:
-        data = super().to_dict()
-        data.update({
-            "consultation_id": self.consultation_id,
-            "user_id": self.user_id,
-            "lawyer_id": self.lawyer_id,
-            "duration_minutes": self.duration_minutes,
-        })
-        return data
+    def __init__(
+        self,
+        event_type: str,
+        payment_id: str,
+        user_id: str,
+        amount: int,
+        status: str,
+        payload: Dict[str, Any],
+        source: str,
+    ):
+        super().__init__(
+            event_id=str(uuid.uuid4()),
+            event_type=event_type,
+            timestamp=datetime.utcnow().isoformat(),
+            version="1.0",
+            source=source,
+        )
+        self.payment_id = payment_id
+        self.user_id = user_id
+        self.amount = amount
+        self.status = status
+        self.payload = payload
 
 
 @dataclass
-class LawyerVerifiedEvent(DomainEvent):
-    """律师认证通过事件"""
+class OrderEvent(BaseEvent):
+    order_id: str
+    user_id: str
+    amount: int
+    status: str
+    items: list
 
-    event_type: str = EventType.LAWYER_VERIFIED.value
-    lawyer_id: int = 0
-    lawyer_name: str = ""
-
-    def to_dict(self) -> dict[str, Any]:
-        data = super().to_dict()
-        data.update({
-            "lawyer_id": self.lawyer_id,
-            "lawyer_name": self.lawyer_name,
-        })
-        return data
-
-
-# ==================== 积分事件 ====================
-
-@dataclass
-class PointsChangedEvent(DomainEvent):
-    """积分变动事件"""
-
-    event_type: str = EventType.POINTS_CHANGED.value
-    user_id: int = 0
-    change: int = 0
-    balance: int = 0
-    source: str = ""
-    reference_id: str = ""
-
-    def to_dict(self) -> dict[str, Any]:
-        data = super().to_dict()
-        data.update({
-            "user_id": self.user_id,
-            "change": self.change,
-            "balance": self.balance,
-            "source": self.source,
-            "reference_id": self.reference_id,
-        })
-        return data
+    def __init__(
+        self,
+        event_type: str,
+        order_id: str,
+        user_id: str,
+        amount: int,
+        status: str,
+        items: list,
+        source: str,
+    ):
+        super().__init__(
+            event_id=str(uuid.uuid4()),
+            event_type=event_type,
+            timestamp=datetime.utcnow().isoformat(),
+            version="1.0",
+            source=source,
+        )
+        self.order_id = order_id
+        self.user_id = user_id
+        self.amount = amount
+        self.status = status
+        self.items = items
 
 
-# ==================== Topic 定义 ====================
+class UserEventTypes:
+    USER_REGISTERED = "user.registered"
+    USER_UPDATED = "user.updated"
+    USER_STATUS_CHANGED = "user.status_changed"
+    USER_LOGIN = "user.login"
+    USER_LOGOUT = "user.logout"
+    MEMBERSHIP_ACTIVATED = "user.membership_activated"
+    QUOTA_CHANGED = "user.quota_changed"
 
-class Topic:
-    """Kafka Topic 定义"""
 
-    USER = "domain.user"
-    PAYMENT = "domain.payment"
-    LEGAL = "domain.legal"
-    POINTS = "domain.points"
-    NOTIFICATION = "domain.notification"
+class PaymentEventTypes:
+    PAYMENT_CREATED = "payment.created"
+    PAYMENT_SUCCESS = "payment.success"
+    PAYMENT_FAILED = "payment.failed"
+    PAYMENT_REFUNDED = "payment.refunded"
+    PAYMENT_PENDING = "payment.pending"
 
-    @classmethod
-    def for_event(cls, event_type: str) -> str:
-        """根据事件类型获取Topic"""
-        prefix = event_type.split(".")[0]
-        topic_map = {
-            "user": cls.USER,
-            "payment": cls.PAYMENT,
-            "legal": cls.LEGAL,
-            "points": cls.POINTS,
-            "notification": cls.NOTIFICATION,
-        }
-        return topic_map.get(prefix, cls.USER)
+
+class OrderEventTypes:
+    ORDER_CREATED = "order.created"
+    ORDER_PAID = "order.paid"
+    ORDER_COMPLETED = "order.completed"
+    ORDER_CANCELLED = "order.cancelled"

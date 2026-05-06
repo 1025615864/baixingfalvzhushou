@@ -1,0 +1,16 @@
+conf:
+  etcd:
+    endpoints:
+      - "http://etcd:2379"
+    username: ""
+    password: ""
+
+server:
+  listen:
+    host: 0.0.0.0
+    port: 9000
+  allow_list:
+    - 0.0.0.0/0
+
+plugin:
+  data_loader: etcd

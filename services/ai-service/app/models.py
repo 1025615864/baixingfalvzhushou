@@ -31,7 +31,7 @@ class AIMessage(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     model: Mapped[str] = mapped_column(String(50), nullable=True)
     tokens_used: Mapped[int] = mapped_column(Integer, default=0)
-    metadata: Mapped[dict] = mapped_column(JSON, default=dict)
+    msg_metadata: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
     def __repr__(self) -> str:

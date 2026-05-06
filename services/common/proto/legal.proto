@@ -1,0 +1,164 @@
+syntax = "proto3";
+
+package baixing.legal;
+
+import "common.proto";
+
+service LegalService {
+  rpc GetLawyer(GetLawyerRequest) returns (LawyerResponse);
+  rpc BatchGetLawyers(BatchGetLawyersRequest) returns (BatchLawyersResponse);
+  rpc SearchLawyers(SearchLawyersRequest) returns (SearchLawyersResponse);
+  rpc GetLawyerSchedule(GetLawyerScheduleRequest) returns (LawyerScheduleResponse);
+  rpc CheckAvailability(CheckAvailabilityRequest) returns (CheckAvailabilityResponse);
+  rpc GetLawyerStats(GetLawyerStatsRequest) returns (LawyerStatsResponse);
+  rpc GetConsultation(GetConsultationRequest) returns (ConsultationResponse);
+  rpc GetUserConsultations(GetUserConsultationsRequest) returns (UserConsultationsResponse);
+  rpc GetAppointment(GetAppointmentRequest) returns (AppointmentResponse);
+  rpc GetUserAppointments(GetUserAppointmentsRequest) returns (UserAppointmentsResponse);
+  rpc HealthCheck(baixing.common.Empty) returns (HealthCheckResponse);
+}
+
+message GetLawyerRequest {
+  string lawyer_id = 1;
+}
+
+message LawyerResponse {
+  string lawyer_id = 1;
+  string name = 2;
+  string firm_id = 3;
+  string title = 4;
+  repeated string expertise = 5;
+  int32 rating = 6;
+  int32 consultation_count = 7;
+  int64 price_per_hour = 8;
+  string city = 9;
+  string status = 10;
+}
+
+message BatchGetLawyersRequest {
+  repeated string lawyer_ids = 1;
+}
+
+message BatchLawyersResponse {
+  repeated LawyerResponse lawyers = 1;
+}
+
+message SearchLawyersRequest {
+  string query = 1;
+  string city = 2;
+  string specialty = 3;
+  int32 page = 4;
+  int32 page_size = 5;
+}
+
+message SearchLawyersResponse {
+  repeated LawyerResponse lawyers = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message GetLawyerScheduleRequest {
+  string lawyer_id = 1;
+  string date = 2;
+}
+
+message TimeSlot {
+  string slot_id = 1;
+  baixing.common.Timestamp start_time = 2;
+  baixing.common.Timestamp end_time = 3;
+  bool is_available = 4;
+}
+
+message LawyerScheduleResponse {
+  string lawyer_id = 1;
+  repeated TimeSlot available_slots = 2;
+}
+
+message CheckAvailabilityRequest {
+  string lawyer_id = 1;
+  string date = 2;
+}
+
+message CheckAvailabilityResponse {
+  string lawyer_id = 1;
+  string date = 2;
+  bool is_available = 3;
+  repeated TimeSlot slots = 4;
+}
+
+message GetLawyerStatsRequest {
+  string lawyer_id = 1;
+}
+
+message LawyerStatsResponse {
+  string lawyer_id = 1;
+  int32 total_consultations = 2;
+  int32 completed_consultations = 3;
+  int32 average_rating = 4;
+  int32 response_time_minutes = 5;
+}
+
+message GetConsultationRequest {
+  string consultation_id = 1;
+}
+
+message ConsultationResponse {
+  string consultation_id = 1;
+  string user_id = 2;
+  string lawyer_id = 3;
+  string category = 4;
+  string title = 5;
+  string status = 6;
+  baixing.common.Timestamp created_at = 7;
+  baixing.common.Timestamp updated_at = 8;
+}
+
+message GetUserConsultationsRequest {
+  string user_id = 1;
+  int32 page = 2;
+  int32 page_size = 3;
+  string status = 4;
+}
+
+message UserConsultationsResponse {
+  repeated ConsultationResponse consultations = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message GetAppointmentRequest {
+  string appointment_id = 1;
+}
+
+message AppointmentResponse {
+  string appointment_id = 1;
+  string consultation_id = 2;
+  string user_id = 3;
+  string lawyer_id = 4;
+  string appointment_type = 5;
+  baixing.common.Timestamp scheduled_at = 6;
+  string status = 7;
+  int64 price = 8;
+}
+
+message GetUserAppointmentsRequest {
+  string user_id = 1;
+  int32 page = 2;
+  int32 page_size = 3;
+  string status = 4;
+}
+
+message UserAppointmentsResponse {
+  repeated AppointmentResponse appointments = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message HealthCheckResponse {
+  string status = 1;
+  string version = 2;
+  int64 uptime_seconds = 3;
+}

@@ -1,51 +1,36 @@
-"""帖子路由"""
+"""帖子路由 - Thin Router"""
 from typing import Optional, List
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
 
 from ..database import get_db
-from ..models import Post
+from ..schemas import (
+    PostCreateRequest,
+    PostUpdateRequest,
+    PostResponse,
+    PostListResponse,
+    LikeResponse,
+    FavoriteResponse,
+)
+from ..services import PostService, ModerationService
+from ..middleware import AuthMiddleware, AuthUser
+from ..clients import user_service_client
+from ..events import event_bus
+from ..cache import post_cache
 
 router = APIRouter()
 
-
-class PostResponse(BaseModel):
-    id: int
-    user_id: int
-    title: str
-    content: str
-    category: Optional[str] = None
-    status: str
-    view_count: int = 0
-    like_count: int = 0
-    comment_count: int = 0
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
+auth_middleware = AuthMiddleware(user_client=user_service_client)
+moderation_service = ModerationService()
 
 
-class PostListResponse(BaseModel):
-    items: List[PostResponse]
-    total: int
-    page: int
-    page_size: int
-
-
-class PostCreateRequest(BaseModel):
-    user_id: int
-    title: str
-    content: str
-    category: Optional[str] = "general"
-
-
-class PostUpdateRequest(BaseModel):
-    title: Optional[str] = None
-    content: Optional[str] = None
-    category: Optional[str] = None
+async def get_post_service(db: AsyncSession = Depends(get_db)) -> PostService:
+    return PostService(
+        db=db,
+        user_client=user_service_client,
+        event_bus=event_bus,
+        cache=post_cache
+    )
 
 
 @router.get("/", response_model=PostListResponse)
@@ -53,24 +38,15 @@ async def list_posts(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     category: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
+    sort_by: str = Query("latest", pattern="^(latest|hot|featured)$"),
+    service: PostService = Depends(get_post_service)
 ):
-    """获取帖子列表"""
-    query = select(Post).where(Post.status == "published")
-    
-    if category:
-        query = query.where(Post.category == category)
-    
-    count_query = select(func.count()).select_from(query.subquery())
-    total_result = await db.execute(count_query)
-    total = total_result.scalar() or 0
-    
-    query = query.order_by(desc(Post.created_at))
-    query = query.offset((page - 1) * page_size).limit(page_size)
-    
-    result = await db.execute(query)
-    posts = result.scalars().all()
-    
+    posts, total = await service.list_posts(
+        page=page,
+        page_size=page_size,
+        category=category,
+        sort_by=sort_by
+    )
     return PostListResponse(
         items=[PostResponse.model_validate(p) for p in posts],
         total=total,
@@ -79,104 +55,152 @@ async def list_posts(
     )
 
 
+@router.get("/search/", response_model=PostListResponse)
+async def search_posts(
+    q: str = Query(..., min_length=2, description="搜索关键词"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    category: Optional[str] = None,
+    service: PostService = Depends(get_post_service)
+):
+    posts, total = await service.search_posts(
+        keyword=q,
+        page=page,
+        page_size=page_size,
+        category=category
+    )
+    return PostListResponse(
+        items=[PostResponse.model_validate(p) for p in posts],
+        total=total,
+        page=page,
+        page_size=page_size
+    )
+
+
+@router.get("/cursor/", response_model=PostListResponse)
+async def list_posts_cursor(
+    cursor: Optional[str] = Query(None, description="游标（上一页最后一条的ID）"),
+    limit: int = Query(20, ge=1, le=50),
+    category: Optional[str] = None,
+    sort_by: str = Query("latest", pattern="^(latest|hot|featured)$"),
+    service: PostService = Depends(get_post_service)
+):
+    posts, next_cursor, has_more = await service.list_posts_cursor(
+        cursor=cursor,
+        limit=limit,
+        category=category,
+        sort_by=sort_by
+    )
+    return PostListResponse(
+        items=[PostResponse.model_validate(p) for p in posts],
+        total=0,
+        page=0,
+        page_size=limit
+    )
+
+
 @router.get("/{post_id}", response_model=PostResponse)
-async def get_post(post_id: int, db: AsyncSession = Depends(get_db)):
-    """获取帖子详情"""
-    result = await db.execute(select(Post).where(Post.id == post_id))
-    post = result.scalar_one_or_none()
-    
+async def get_post(
+    post_id: int,
+    service: PostService = Depends(get_post_service)
+):
+    post = await service.get_post(post_id)
     if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    
-    post.view_count += 1
-    await db.commit()
-    
+        raise HTTPException(status_code=404, detail="帖子不存在")
     return PostResponse.model_validate(post)
 
 
 @router.post("/", response_model=PostResponse)
 async def create_post(
-    request: PostCreateRequest,
-    db: AsyncSession = Depends(get_db)
+    request: Request,
+    post_data: PostCreateRequest,
+    service: PostService = Depends(get_post_service)
 ):
-    """创建帖子"""
-    post = Post(
-        user_id=request.user_id,
-        title=request.title,
-        content=request.content,
-        category=request.category,
-        status="published",
+    current_user = await auth_middleware.get_current_user(request)
+    post = await service.create_post(
+        user_id=current_user.id,
+        title=post_data.title,
+        content=post_data.content,
+        category=post_data.category,
+        tags=post_data.tags,
+        moderation_service=moderation_service
     )
-    db.add(post)
-    await db.commit()
-    await db.refresh(post)
-    
     return PostResponse.model_validate(post)
 
 
 @router.patch("/{post_id}", response_model=PostResponse)
 async def update_post(
     post_id: int,
-    request: PostUpdateRequest,
-    db: AsyncSession = Depends(get_db)
+    request: Request,
+    post_data: PostUpdateRequest,
+    service: PostService = Depends(get_post_service)
 ):
-    """更新帖子"""
-    result = await db.execute(select(Post).where(Post.id == post_id))
-    post = result.scalar_one_or_none()
-    
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    
-    if request.title is not None:
-        post.title = request.title
-    if request.content is not None:
-        post.content = request.content
-    if request.category is not None:
-        post.category = request.category
-    
-    await db.commit()
-    await db.refresh(post)
-    
+    current_user = await auth_middleware.get_current_user(request)
+    post = await service.update_post(
+        post_id=post_id,
+        current_user=current_user,
+        title=post_data.title,
+        content=post_data.content,
+        category=post_data.category
+    )
     return PostResponse.model_validate(post)
 
 
 @router.delete("/{post_id}")
-async def delete_post(post_id: int, db: AsyncSession = Depends(get_db)):
-    """删除帖子"""
-    result = await db.execute(select(Post).where(Post.id == post_id))
-    post = result.scalar_one_or_none()
-    
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    
-    post.status = "deleted"
-    await db.commit()
-    
+async def delete_post(
+    post_id: int,
+    request: Request,
+    service: PostService = Depends(get_post_service)
+):
+    current_user = await auth_middleware.get_current_user(request)
+    await service.delete_post(post_id, current_user)
     return {"success": True}
 
 
-@router.post("/{post_id}/like")
-async def like_post(post_id: int, db: AsyncSession = Depends(get_db)):
-    """点赞帖子"""
-    result = await db.execute(select(Post).where(Post.id == post_id))
-    post = result.scalar_one_or_none()
-    
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    
-    post.like_count += 1
-    await db.commit()
-    
-    return {"success": True, "like_count": post.like_count}
+@router.post("/{post_id}/like", response_model=LikeResponse)
+async def like_post(
+    post_id: int,
+    request: Request,
+    service: PostService = Depends(get_post_service)
+):
+    current_user = await auth_middleware.get_current_user(request)
+    result = await service.like_post(post_id, current_user.id)
+    return LikeResponse(**result)
+
+
+@router.post("/{post_id}/favorite", response_model=FavoriteResponse)
+async def favorite_post(
+    post_id: int,
+    request: Request,
+    service: PostService = Depends(get_post_service)
+):
+    current_user = await auth_middleware.get_current_user(request)
+    result = await service.favorite_post(post_id, current_user.id)
+    return FavoriteResponse(**result)
+
+
+@router.get("/user/{user_id}", response_model=PostListResponse)
+async def get_user_posts(
+    user_id: int,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    service: PostService = Depends(get_post_service)
+):
+    posts, total = await service.get_user_posts(
+        user_id=user_id,
+        page=page,
+        page_size=page_size
+    )
+    return PostListResponse(
+        items=[PostResponse.model_validate(p) for p in posts],
+        total=total,
+        page=page,
+        page_size=page_size
+    )
 
 
 @router.get("/categories/", response_model=List[str])
-async def list_categories(db: AsyncSession = Depends(get_db)):
-    """获取所有分类"""
-    result = await db.execute(
-        select(Post.category)
-        .where(Post.status == "published")
-        .distinct()
-    )
-    categories = result.scalars().all()
-    return list(categories)
+async def list_categories(
+    service: PostService = Depends(get_post_service)
+):
+    return ["general", "marriage", "labor", "traffic", "property", "contract", "criminal", "intellectual", "corporate"]

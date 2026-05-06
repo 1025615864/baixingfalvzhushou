@@ -3,7 +3,7 @@ from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
-from .settings import get_settings
+from .config.settings import get_settings
 
 settings = get_settings()
 
@@ -28,5 +28,42 @@ class Base(DeclarativeBase):
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """获取数据库会话"""
+    async with AsyncSessionLocal() as session:
+        yield session
+
+
+class TransactionManager:
+    """事务管理器"""
+
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def __aenter__(self):
+        return self.session
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            await self.session.rollback()
+            return False
+        await self.session.commit()
+        return True
+
+
+class ReadOnlyTransactionManager:
+    """只读事务管理器"""
+
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def __aenter__(self):
+        return self.session
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.session.rollback()
+        return True
+
+
+async def get_read_only_session() -> AsyncGenerator[AsyncSession, None]:
+    """获取只读数据库会话"""
     async with AsyncSessionLocal() as session:
         yield session

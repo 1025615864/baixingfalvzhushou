@@ -1,0 +1,137 @@
+replicaCount: 3
+
+image:
+  repository: apache/kafka
+  tag: 3.7.0
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  ports:
+    - name: plaintext
+      port: 9092
+      targetPort: 9092
+    - name: external
+      port: 9094
+      targetPort: 9094
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+persistence:
+  enabled: true
+  size: 50Gi
+  storageClass: standard-ssd
+  accessMode: ReadWriteOnce
+
+replicaCount: 3
+
+config:
+  logRetentionHours: 168
+  logRetentionBytes: 10737418240
+  numPartitions: 6
+  defaultReplicationFactor: 3
+  minInsyncReplicas: 2
+
+topics:
+  - name: baixing.user.events
+    partitions: 6
+    replicationFactor: 3
+    config:
+      retention.ms: 604800000
+  - name: baixing.payment.events
+    partitions: 6
+    replicationFactor: 3
+    config:
+      retention.ms: 2592000000
+  - name: baixing.legal.events
+    partitions: 6
+    replicationFactor: 3
+    config:
+      retention.ms: 604800000
+  - name: baixing.news.events
+    partitions: 6
+    replicationFactor: 3
+    config:
+      retention.ms: 259200000
+  - name: baixing.chat.events
+    partitions: 6
+    replicationFactor: 3
+    config:
+      retention.ms: 86400000
+
+zookeeper:
+  enabled: true
+  replicaCount: 3
+  image:
+    repository: bitnami/zookeeper
+    tag: 2.8
+  auth:
+    enabled: false
+  persistence:
+    enabled: true
+    size: 5Gi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app: kafka
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9090"
+  prometheus.io/path: "/metrics"
+
+livenessProbe:
+  exec:
+    command:
+      - sh
+      - -c
+      - "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 5
+
+readinessProbe:
+  exec:
+    command:
+      - sh
+      - -c
+      - "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+securityContext:
+  runAsNonRoot: false
+  fsGroup: 1000
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - kafka
+          topologyKey: kubernetes.io/hostname

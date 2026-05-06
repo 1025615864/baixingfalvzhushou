@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gateway
+  labels:
+    app.kubernetes.io/name: gateway
+    app.kubernetes.io/managed-by: Helm
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: messaging
+  labels:
+    app.kubernetes.io/name: messaging
+    app.kubernetes.io/managed-by: Helm
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: testing
+  labels:
+    app.kubernetes.io/name: testing
+    app.kubernetes.io/managed-by: Helm

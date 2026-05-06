@@ -2,16 +2,28 @@
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
-from .settings import get_settings
+from .config.settings import get_settings
 
 settings = get_settings()
 
-engine = create_async_engine(
-    settings.database_url,
-    pool_size=settings.db_pool_size,
-    max_overflow=settings.db_max_overflow,
-    pool_pre_ping=True
-)
+is_sqlite = settings.database_url.startswith("sqlite")
+
+if is_sqlite:
+    engine = create_async_engine(
+        settings.database_url,
+        echo=False,
+        connect_args={"check_same_thread": False},
+    )
+else:
+    engine = create_async_engine(
+        settings.database_url,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+        pool_timeout=30,
+    )
+
 AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 

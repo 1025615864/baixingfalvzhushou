@@ -1,0 +1,194 @@
+replicaCount: 2
+
+image:
+  repository: apache/apisix
+  tag: 3.9-debian
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 9080
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 9443
+      protocol: TCP
+    - name: admin
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+config:
+  apisix:
+    node_listen: 9080
+    enable_admin: true
+    enable_dev_loop_mp: false
+    ssl:
+      enable: true
+      protocols:
+        - TLSv1.2
+        - TLSv1.3
+    proxy:
+      enable_http2: true
+    nginx_config:
+      error_log_level: warn
+      worker_rlimit_nofile: 20480
+
+plugins:
+  - name: proxy-rewrite
+    enabled: true
+  - name: cors
+    enabled: true
+  - name: jwt-auth
+    enabled: true
+  - name: limit-req
+    enabled: true
+  - name: limit-count
+    enabled: true
+  - name: prometheus
+    enabled: true
+  - name: api-breaker
+    enabled: true
+  - name: circuit-breaker
+    enabled: true
+  - name: request-id
+    enabled: true
+  - name: key-auth
+    enabled: true
+  - name: hmac-auth
+    enabled: true
+
+etcd:
+  enabled: true
+  replicaCount: 3
+  image:
+    repository: bitnami/etcd
+    tag: 3.5
+  auth:
+    rbac:
+      create: true
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+dashboard:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: apache/apisix-dashboard
+    tag: 3.0
+  service:
+    type: ClusterIP
+    port: 9000
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+  hosts:
+    - host: api.baixing.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: apisix
+          port: 80
+  tls:
+    - secretName: baixing-api-tls
+      hosts:
+        - api.baixing.local
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9091"
+  prometheus.io/path: "/apisix/prometheus"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+  allowPrivilegeEscalation: false
+
+livenessProbe:
+  httpGet:
+    path: /apisix/health
+    port: 9080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /apisix/health
+    port: 9080
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - apisix
+          topologyKey: kubernetes.io/hostname
+
+tolerations:
+  - key: "node-role"
+    operator: "Equal"
+    value: "gateway"
+    effect: "NoSchedule"
+
+env:
+  LOG_LEVEL: warn
+  GRACEFUL_SHUTDOWN_TIMEOUT: 10s
+  NETTY_WORKER_THREADS: 16

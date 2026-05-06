@@ -1,0 +1,211 @@
+# Docker Compose 配置 - 带 SASL/SSL 的 Kafka
+version: '3.8'
+
+services:
+  # ============ etcd (APISIX 的配置存储) ============
+  etcd:
+    image: bitnami/etcd:3.5
+    container_name: baixing-etcd
+    hostname: etcd
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_ADVERTISE_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_INITIAL_CLUSTER_STATE=new
+      - ETCD_INITIAL_CLUSTER_TOKEN=baixing-etcd-cluster
+    volumes:
+      - etcd-data:/bitnami/etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - baixing-network
+
+  # ============ APISIX Gateway ============
+  apisix:
+    image: apache/apisix:3.9-debian
+    container_name: baixing-apisix
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+      - "9090:9090"
+      - "9091:9091"
+    environment:
+      - APISIX_DEFER_INIT=true
+    volumes:
+      - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ./apisix/routes.yaml:/usr/local/apisix/conf/apisix.yaml:ro
+      - ./apisix/ssl:/usr/local/apisix/conf/ssl:ro
+    depends_on:
+      etcd:
+        condition: service_healthy
+    healthcheck:
+      test: ["curl", "-f", "http://localhost:8080/apisix/admin/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - baixing-network
+
+  # ============ APISIX Dashboard ============
+  apisix-dashboard:
+    image: apache/apisix-dashboard:3.0
+    container_name: baixing-apisix-dashboard
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./apisix/dashboard/conf.yaml:/usr/local/apisix-dashboard/conf/conf.yaml:ro
+    depends_on:
+      - etcd
+    networks:
+      - baixing-network
+
+  # ============ Kafka (开发环境 - 无认证) ============
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: baixing-kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - baixing-network
+
+  # ============ Kafka SASL/SSL (生产环境配置示例) ============
+  # 注意：生产环境使用以下配置
+  # kafka-secure:
+  #   image: apache/kafka:3.7.0
+  #   ports:
+  #     - "9093:9093"
+  #   environment:
+  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SASL_PLAINTEXT:SASL_PLAINTEXT,SSL:SASL_SSL
+  #     KAFKA_SASL_ENABLED_MECHANISMS: SCRAM-SHA-512
+  #     KAFKA_SASL_JAAS_CONFIG: org.apache.kafka.common.security.scram.ScramLoginModule required username="kafkauser" password="kafkauser_password";
+  #     KAFKA_SSL_CLIENT_AUTH: required
+  #     KAFKA_SSL_KEYSTORE_LOCATION: /opt/kafka/config/certs/keystore.jks
+  #     KAFKA_SSL_KEYSTORE_PASSWORD: keystore_password
+  #     KAFKA_SSL_TRUSTSTORE_LOCATION: /opt/kafka/config/certs/truststore.jks
+  #     KAFKA_SSL_TRUSTSTORE_PASSWORD: truststore_password
+
+  # ============ Kafka UI ============
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: baixing-kafka-ui
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: baixing
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - baixing-network
+
+  # ============ Pact Broker ============
+  pact-postgres:
+    image: postgres:15
+    container_name: baixing-pact-postgres
+    environment:
+      POSTGRES_DB: pact
+      POSTGRES_USER: pact
+      POSTGRES_PASSWORD: pact_password
+    volumes:
+      - pact-postgres-data:/var/lib/postgresql/data
+    networks:
+      - baixing-network
+
+  pact-broker:
+    image: pactfoundation/pact-broker:2.105.0.0
+    container_name: baixing-pact-broker
+    ports:
+      - "9292:9292"
+    environment:
+      PACT_BROKER_DATABASE_URL: postgresql://pact:pact_password@pact-postgres:5432/pact
+      PACT_BROKER_PORT: 9292
+      PACT_BROKER_LOG_LEVEL: INFO
+      PACT_BROKER_BASE_URL: http://localhost:9292
+      PACT_BROKER_S3: false
+      PACT_BROKER_ALLOW_PUBLIC_READ: true
+    depends_on:
+      - pact-postgres
+    networks:
+      - baixing-network
+
+  # ============ Consul (服务发现) ============
+  consul:
+    image: hashicorp/consul:1.17
+    container_name: baixing-consul
+    ports:
+      - "8500:8500"
+    environment:
+      CONSUL_BIND_INTERFACE: eth0
+      CONSUL_CLIENT_INTERFACE: eth0
+      CONSUL_HTTP_TOKEN: consul-token
+    command: agent -server -ui -bootstrap-expect=1 -client=0.0.0.0
+    volumes:
+      - consul-data:/consul/data
+    networks:
+      - baixing-network
+
+  # ============ Jaeger (链路追踪) ============
+  jaeger:
+    image: jaegertracing/all-in-one:1.53
+    container_name: baixing-jaeger
+    ports:
+      - "16686:16686"  # UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+      SPAN_STORAGE_TYPE: badger
+    volumes:
+      - jaeger-data:/tmp
+    networks:
+      - baixing-network
+
+volumes:
+  etcd-data:
+    driver: local
+  kafka-data:
+    driver: local
+  pact-postgres-data:
+    driver: local
+  consul-data:
+    driver: local
+  jaeger-data:
+    driver: local
+
+networks:
+  baixing-network:
+    name: baixing-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

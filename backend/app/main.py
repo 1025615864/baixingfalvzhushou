@@ -26,7 +26,18 @@ from .middleware.rate_limit import RateLimitMiddleware
 from .middleware.metrics_middleware import MetricsMiddleware
 from .middleware.envelope_middleware import EnvelopeMiddleware
 from .utils.periodic_task_runner import PeriodicLockedRunner
-# from .routers import ai  # AI module disabled - needs langchain dependencies
+
+try:
+    from services.common.tracing import init_telemetry
+except ImportError:
+    def init_telemetry(*args, **kwargs):
+        pass
+
+try:
+    from services.common.discovery import get_consul_registry
+except ImportError:
+    def get_consul_registry(*args, **kwargs):
+        return None
 
 settings = get_settings()
 
@@ -181,6 +192,31 @@ def _ai_metrics_extra_lines() -> list[str]:
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     _ = app
+
+    consul = get_consul_registry()
+
+    otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+    init_telemetry(
+        service_name="baixing-backend",
+        service_version="1.0.0",
+        otlp_endpoint=otlp_endpoint if otlp_endpoint else None,
+    )
+    logger.info("OpenTelemetry链路追踪已初始化")
+
+    if consul and os.getenv("CONSUL_ENABLED", "").lower() in {"1", "true", "yes"}:
+        host = os.getenv("SERVICE_HOST", "localhost")
+        port = int(os.getenv("SERVICE_PORT", "8080"))
+        await consul.register_service(
+            service_name="baixing-backend",
+            service_id=f"baixing-backend-{port}",
+            host=host,
+            port=port,
+            metadata={"version": "1.0.0", "environment": os.getenv("ENV", "development")},
+            tags=["http", "api"],
+            health_check_url=f"http://{host}:{port}/health",
+        )
+        logger.info(f"服务已注册到Consul: baixing-backend:{port}")
+
     await init_db()
 
     stop_event = asyncio.Event()
@@ -349,6 +385,11 @@ async def lifespan(app: FastAPI):
         logger.info("AI助手模块未启用")
     
     yield
+
+    if consul and os.getenv("CONSUL_ENABLED", "").lower() in {"1", "true", "yes"}:
+        port = int(os.getenv("SERVICE_PORT", "8080"))
+        await consul.deregister_service(f"baixing-backend-{port}")
+        logger.info("服务已从Consul注销")
 
     stop_event.set()
     for t in (wechatpay_task, settlement_task, review_sla_task):

@@ -560,6 +560,58 @@ class BatchImportRequest(BaseModel):
     items: list[BatchImportItem]
 
 
+@router.post("/rag/query")
+async def rag_query(
+    question: str = Query(..., description="查询问题"),
+    top_k: int = Query(5, ge=1, le=20, description="返回数量"),
+):
+    """
+    RAG查询接口（内部服务调用）
+
+    用于AI服务从知识库检索相关法条。
+    无需认证，供内部服务使用。
+    """
+    from ..services.rag_knowledge import rag_service
+    from ..services.knowledge_service import get_knowledge_service
+    from ..database import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as db:
+        service = await get_knowledge_service()
+        knowledge_items = await service.list_knowledge(
+            db, page=1, page_size=100, is_active=True
+        )
+
+        rag_service.retrieval_optimizer._index.clear()
+        chunks = []
+        for item in knowledge_items[0]:
+            keywords = rag_service.retrieval_optimizer._extract_keywords(item.content)
+            for keyword in keywords:
+                if keyword not in rag_service.retrieval_optimizer._index:
+                    rag_service.retrieval_optimizer._index[keyword] = []
+                rag_service.retrieval_optimizer._index[keyword].append({
+                    "id": item.id,
+                    "content": item.content,
+                    "title": item.title,
+                    "article_number": item.article_number,
+                    "category": item.category,
+                })
+
+        result = await rag_service.query(
+            question=question,
+            top_k=top_k,
+            use_rerank=True,
+            use_cache=True,
+            deduplicate=True,
+        )
+
+        return {
+            "question": result["question"],
+            "context": result["context"],
+            "retrieved_documents": result["retrieved_documents"],
+            "sources": result["sources"],
+        }
+
+
 @router.post("/laws/batch-import-legacy")
 async def batch_import_knowledge_legacy(
     data: BatchImportRequest,

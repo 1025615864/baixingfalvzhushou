@@ -2,7 +2,7 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
-from .settings import get_settings
+from .config.settings import get_settings
 
 settings = get_settings()
 
@@ -23,3 +23,9 @@ AsyncSessionLocal = async_sessionmaker(
 
 class Base(DeclarativeBase):
     pass
+
+
+def import_audit_log_model():
+    """延迟导入审计日志模型以避免循环依赖"""
+    from services.common.models.audit_log import AuditLog
+    return AuditLog

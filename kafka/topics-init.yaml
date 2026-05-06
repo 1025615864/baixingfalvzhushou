@@ -1,0 +1,57 @@
+# Kafka Topics 初始化配置
+# 用于 docker-compose kafka-init 容器
+
+version: '3.8'
+
+services:
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: baixing-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      # 等待 Kafka 就绪
+      echo 'Waiting for Kafka to be ready...'
+      cub kafka-ready -b kafka:9092 1 40
+
+      # 创建所有需要的 topics
+      echo 'Creating topics...'
+
+      # 用户事件
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --replication-factor 1 --partitions 3 --topic baixing.user.events
+
+      # 支付事件
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --replication-factor 1 --partitions 3 --topic baixing.payment.events
+
+      # 法律服务事件
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --replication-factor 1 --partitions 3 --topic baixing.legal.events
+
+      # AI 服务事件
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --replication-factor 1 --partitions 3 --topic baixing.ai.events
+
+      # 搜索服务事件
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --replication-factor 1 --partitions 3 --topic baixing.search.events
+
+      # 新闻服务事件
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --replication-factor 1 --partitions 3 --topic baixing.news.events
+
+      # 推荐服务事件
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --replication-factor 1 --partitions 3 --topic baixing.recommendation.events
+
+      # 社区服务事件
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --replication-factor 1 --partitions 3 --topic baixing.community.events
+
+      # 通知服务 DLQ (死信队列)
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --replication-factor 1 --partitions 3 --topic baixing.notification.dlq
+
+      # 列出所有 topics
+      echo 'Listing all topics:'
+      kafka-topics --list --bootstrap-server kafka:9092
+
+      echo 'Kafka topics initialized successfully!'
+      "
+    networks:
+      - baixing-network

@@ -1,40 +1,29 @@
-"""评论路由"""
-from typing import List
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+"""评论路由 - Thin Router"""
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
 
 from ..database import get_db
-from ..models import Comment
+from ..schemas import (
+    CommentCreateRequest,
+    CommentResponse,
+    CommentListResponse,
+)
+from ..services import CommentService
+from ..middleware import AuthMiddleware
+from ..clients import user_service_client
+from ..events import event_bus
 
 router = APIRouter()
 
-
-class CommentResponse(BaseModel):
-    id: int
-    post_id: int
-    user_id: int
-    content: str
-    parent_id: int | None
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
+auth_middleware = AuthMiddleware(user_client=user_service_client)
 
 
-class CommentListResponse(BaseModel):
-    items: List[CommentResponse]
-    total: int
-    page: int
-    page_size: int
-
-
-class CommentCreateRequest(BaseModel):
-    user_id: int
-    content: str
-    parent_id: int | None = None
+async def get_comment_service(db: AsyncSession = Depends(get_db)) -> CommentService:
+    return CommentService(
+        db=db,
+        user_client=user_service_client,
+        event_bus=event_bus
+    )
 
 
 @router.get("/{post_id}/comments", response_model=CommentListResponse)
@@ -42,21 +31,24 @@ async def list_comments(
     post_id: int,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    db: AsyncSession = Depends(get_db)
+    nested: bool = Query(True),
+    service: CommentService = Depends(get_comment_service)
 ):
-    """获取帖子评论列表"""
-    query = select(Comment).where(Comment.post_id == post_id)
-    
-    count_query = select(func.count()).select_from(query.subquery())
-    total_result = await db.execute(count_query)
-    total = total_result.scalar() or 0
-    
-    query = query.order_by(desc(Comment.created_at))
-    query = query.offset((page - 1) * page_size).limit(page_size)
-    
-    result = await db.execute(query)
-    comments = result.scalars().all()
-    
+    comments, total = await service.get_comments(
+        post_id=post_id,
+        page=page,
+        page_size=page_size,
+        nested=nested
+    )
+
+    if nested:
+        return CommentListResponse(
+            items=[CommentResponse(**c) for c in comments],
+            total=total,
+            page=page,
+            page_size=page_size
+        )
+
     return CommentListResponse(
         items=[CommentResponse.model_validate(c) for c in comments],
         total=total,
@@ -68,33 +60,38 @@ async def list_comments(
 @router.post("/{post_id}/comments", response_model=CommentResponse)
 async def create_comment(
     post_id: int,
-    request: CommentCreateRequest,
-    db: AsyncSession = Depends(get_db)
+    request: Request,
+    comment_data: CommentCreateRequest,
+    service: CommentService = Depends(get_comment_service)
 ):
-    """创建评论"""
-    comment = Comment(
+    current_user = await auth_middleware.get_current_user(request)
+    comment = await service.create_comment(
         post_id=post_id,
-        user_id=request.user_id,
-        content=request.content,
-        parent_id=request.parent_id,
+        user_id=current_user.id,
+        content=comment_data.content,
+        parent_id=comment_data.parent_id,
+        reply_to_user_id=comment_data.reply_to_user_id
     )
-    db.add(comment)
-    await db.commit()
-    await db.refresh(comment)
-    
     return CommentResponse.model_validate(comment)
 
 
 @router.delete("/{comment_id}")
-async def delete_comment(comment_id: int, db: AsyncSession = Depends(get_db)):
-    """删除评论"""
-    result = await db.execute(select(Comment).where(Comment.id == comment_id))
-    comment = result.scalar_one_or_none()
-    
-    if not comment:
-        raise HTTPException(status_code=404, detail="Comment not found")
-    
-    await db.delete(comment)
-    await db.commit()
-    
+async def delete_comment(
+    comment_id: int,
+    request: Request,
+    service: CommentService = Depends(get_comment_service)
+):
+    current_user = await auth_middleware.get_current_user(request)
+    await service.delete_comment(comment_id, current_user)
     return {"success": True}
+
+
+@router.post("/{comment_id}/like")
+async def like_comment(
+    comment_id: int,
+    request: Request,
+    service: CommentService = Depends(get_comment_service)
+):
+    current_user = await auth_middleware.get_current_user(request)
+    result = await service.like_comment(comment_id, current_user.id)
+    return result

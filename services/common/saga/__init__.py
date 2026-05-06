@@ -8,6 +8,12 @@ from .orchestrator import (
     StepStatus,
     create_saga,
 )
+from .persistence import (
+    SagaPersistence,
+    PostgresSagaPersistence,
+    RedisSagaPersistence,
+    HybridSagaPersistence,
+)
 
 __all__ = [
     "SagaOrchestrator",
@@ -17,4 +23,8 @@ __all__ = [
     "SagaStatus",
     "StepStatus",
     "create_saga",
+    "SagaPersistence",
+    "PostgresSagaPersistence",
+    "RedisSagaPersistence",
+    "HybridSagaPersistence",
 ]

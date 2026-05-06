@@ -22,6 +22,7 @@ from .auth import (
     check_permission,
 )
 from .audit_middleware import AuditContext, get_audit_context
+from .telemetry import OpenTelemetryMiddleware, setup_telemetry
 
 __all__ = [
     "RateLimiter",
@@ -44,4 +45,6 @@ __all__ = [
     "check_permission",
     "AuditContext",
     "get_audit_context",
+    "OpenTelemetryMiddleware",
+    "setup_telemetry",
 ]

@@ -1,302 +1,206 @@
 """Saga 状态持久化
 
-支持：
-- PostgreSQL 存储
+与 orchestrator 中的 SagaExecutionLog 保持一致，支持：
+- PostgreSQL 持久化
 - Redis 缓存
-- 自动恢复
+- 状态查询与恢复
 """
 
-import asyncio
-import logging
-from typing import Optional, Dict, Any, List
-from datetime import datetime
-from dataclasses import dataclass, asdict
 import json
+import logging
+from datetime import datetime
+from typing import Optional, List, Dict, Any
 
-from sqlalchemy import Column, String, Text, Integer, DateTime, JSON, create_engine
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
-
-Base = declarative_base()
-
-
-class SagaStateModel(Base):
-    """Saga 状态数据库模型"""
-
-    __tablename__ = "saga_states"
-
-    id = Column(String(64), primary_key=True)
-    saga_id = Column(String(64), unique=True, nullable=False, index=True)
-    saga_name = Column(String(128), nullable=False)
-    status = Column(String(32), nullable=False)
-    current_step = Column(String(64), nullable=True)
-    steps = Column(JSON, nullable=False, default=list)
-    completed_steps = Column(JSON, nullable=False, default=list)
-    skipped_steps = Column(JSON, nullable=False, default=list)
-    step_results = Column(JSON, nullable=True)
-    error = Column(Text, nullable=True)
-    started_at = Column(DateTime, nullable=False)
-    completed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    version = Column(Integer, default=1)
 
 
 class SagaPersistence:
     """Saga 持久化基类"""
 
-    async def save_state(self, state: "SagaState") -> None:
+    async def save_state(self, saga_id: str, **kwargs) -> None:
         raise NotImplementedError
 
-    async def get_state(self, saga_id: str) -> Optional["SagaState"]:
+    async def get_state(self, saga_id: str) -> Optional[Dict[str, Any]]:
         raise NotImplementedError
 
-    async def list_sagas(
-        self, status: Optional[str] = None, limit: int = 100
-    ) -> List["SagaState"]:
+    async def list_sagas(self, status: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
+        raise NotImplementedError
+
+    async def update_status(self, saga_id: str, status: str, **kwargs) -> bool:
         raise NotImplementedError
 
 
 class PostgresSagaPersistence(SagaPersistence):
     """PostgreSQL Saga 持久化"""
 
-    def __init__(
-        self,
-        database_url: str,
-        pool_size: int = 10,
-        max_overflow: int = 20,
-    ):
-        self.database_url = database_url
-        self._engine = create_async_engine(
-            database_url,
-            pool_size=pool_size,
-            max_overflow=max_overflow,
-            echo=False,
-        )
-        self._session_factory = sessionmaker(
-            self._engine, class_=AsyncSession, expire_on_commit=False
-        )
+    def __init__(self, session_factory):
+        self._session_factory = session_factory
 
-    async def initialize(self):
-        """初始化数据库表"""
-        async with self._engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("Saga persistence database initialized")
-
-    async def close(self):
-        """关闭数据库连接"""
-        await self._engine.dispose()
-
-    async def save_state(self, state: "SagaState") -> None:
+    async def save_state(self, saga_id: str, **kwargs) -> None:
         """保存 Saga 状态"""
-        async with self._session_factory() as session:
-            import uuid
+        from .orchestrator import SagaExecutionLog
 
-            saga = SagaStateModel(
-                id=str(uuid.uuid4()),
-                saga_id=state.saga_id,
-                saga_name=getattr(state, "saga_name", "unknown"),
-                status=state.status.value if hasattr(state.status, "value") else state.status,
-                current_step=state.current_step,
-                steps=state.steps,
-                completed_steps=state.completed_steps,
-                skipped_steps=getattr(state, "skipped_steps", []),
-                step_results=json.dumps(state.to_dict()) if hasattr(state, "to_dict") else None,
-                error=state.error,
-                started_at=datetime.fromisoformat(state.started_at) if isinstance(state.started_at, str) else state.started_at,
-                completed_at=datetime.fromisoformat(state.completed_at) if state.completed_at and isinstance(state.completed_at, str) else state.completed_at,
+        db: AsyncSession = self._session_factory()
+        try:
+            log = SagaExecutionLog(
+                id=saga_id,
+                saga_type=kwargs.get("saga_type", "unknown"),
+                status=kwargs.get("status", "running"),
+                correlation_id=kwargs.get("correlation_id"),
+                current_step=kwargs.get("current_step", 0),
+                total_steps=kwargs.get("total_steps", 0),
+                steps_log=kwargs.get("steps_log"),
+                error_message=kwargs.get("error_message"),
+                metadata=kwargs.get("metadata"),
+                started_at=kwargs.get("started_at"),
+                completed_at=kwargs.get("completed_at"),
             )
+            db.add(log)
+            await db.commit()
+            logger.info(f"Saga state saved: {saga_id}")
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Failed to save saga state {saga_id}: {e}")
+            raise
+        finally:
+            await db.close()
 
-            session.add(saga)
-            try:
-                await session.commit()
-                logger.info(f"Saga state saved: {state.saga_id}")
-            except Exception as e:
-                await session.rollback()
-                await self._update_state(session, state)
-                logger.warning(f"Saga state updated: {state.saga_id}")
-
-    async def _update_state(self, session: AsyncSession, state: "SagaState") -> None:
-        """更新已存在的 Saga 状态"""
-        from sqlalchemy import update
-
-        stmt = (
-            update(SagaStateModel)
-            .where(SagaStateModel.saga_id == state.saga_id)
-            .values(
-                status=state.status.value if hasattr(state.status, "value") else state.status,
-                current_step=state.current_step,
-                steps=state.steps,
-                completed_steps=state.completed_steps,
-                skipped_steps=getattr(state, "skipped_steps", []),
-                step_results=json.dumps(state.to_dict()) if hasattr(state, "to_dict") else None,
-                error=state.error,
-                completed_at=datetime.fromisoformat(state.completed_at) if state.completed_at and isinstance(state.completed_at, str) else state.completed_at,
-                updated_at=datetime.utcnow(),
-            )
-        )
-        await session.execute(stmt)
-        await session.commit()
-
-    async def get_state(self, saga_id: str) -> Optional["SagaState"]:
+    async def get_state(self, saga_id: str) -> Optional[Dict[str, Any]]:
         """获取 Saga 状态"""
-        from ..saga.orchestrator import SagaState, SagaStatus
+        from .orchestrator import SagaExecutionLog
 
-        async with self._session_factory() as session:
-            result = await session.get(SagaStateModel, saga_id)
-            if not result:
-                for col in [SagaStateModel.id, SagaStateModel.saga_id]:
-                    query = f"SELECT * FROM saga_states WHERE {col.name} = :saga_id"
-                    row = await session.execute(query, {"saga_id": saga_id})
-                    result = row.fetchone()
-                    if result:
-                        break
-
-            if not result:
-                return None
-
-            return SagaState(
-                saga_id=result.saga_id,
-                status=SagaStatus(result.status),
-                steps=result.steps or [],
-                completed_steps=result.completed_steps or [],
-                skipped_steps=result.skipped_steps or [],
-                current_step=result.current_step,
-                error=result.error,
-                started_at=result.started_at.isoformat() if result.started_at else None,
-                completed_at=result.completed_at.isoformat() if result.completed_at else None,
+        db: AsyncSession = self._session_factory()
+        try:
+            result = await db.execute(
+                select(SagaExecutionLog).where(SagaExecutionLog.id == saga_id)
             )
+            log = result.scalar_one_or_none()
+            if not log:
+                return None
+            return {
+                "id": log.id,
+                "saga_type": log.saga_type,
+                "status": log.status,
+                "correlation_id": log.correlation_id,
+                "current_step": log.current_step,
+                "total_steps": log.total_steps,
+                "steps_log": log.steps_log,
+                "error_message": log.error_message,
+                "metadata": log.metadata,
+                "started_at": log.started_at.isoformat() if log.started_at else None,
+                "completed_at": log.completed_at.isoformat() if log.completed_at else None,
+            }
+        finally:
+            await db.close()
 
     async def list_sagas(
         self, status: Optional[str] = None, limit: int = 100
-    ) -> List[SagaState]:
+    ) -> List[Dict[str, Any]]:
         """列出 Saga 状态"""
-        from ..saga.orchestrator import SagaState, SagaStatus
+        from .orchestrator import SagaExecutionLog
 
-        async with self._session_factory() as session:
-            query = "SELECT * FROM saga_states"
-            params = {}
-
+        db: AsyncSession = self._session_factory()
+        try:
+            query = select(SagaExecutionLog).order_by(SagaExecutionLog.created_at.desc()).limit(limit)
             if status:
-                query += " WHERE status = :status"
-                params["status"] = status
+                query = query.where(SagaExecutionLog.status == status)
 
-            query += " ORDER BY created_at DESC LIMIT :limit"
-            params["limit"] = limit
+            result = await db.execute(query)
+            logs = result.scalars().all()
 
-            result = await session.execute(query, params)
-            rows = result.fetchall()
+            return [
+                {
+                    "id": log.id,
+                    "saga_type": log.saga_type,
+                    "status": log.status,
+                    "correlation_id": log.correlation_id,
+                    "current_step": log.current_step,
+                    "total_steps": log.total_steps,
+                    "error_message": log.error_message,
+                    "started_at": log.started_at.isoformat() if log.started_at else None,
+                    "completed_at": log.completed_at.isoformat() if log.completed_at else None,
+                }
+                for log in logs
+            ]
+        finally:
+            await db.close()
 
-            states = []
-            for row in rows:
-                states.append(
-                    SagaState(
-                        saga_id=row.saga_id,
-                        status=SagaStatus(row.status),
-                        steps=row.steps or [],
-                        completed_steps=row.completed_steps or [],
-                        skipped_steps=row.skipped_steps or [],
-                        current_step=row.current_step,
-                        error=row.error,
-                        started_at=row.started_at.isoformat() if row.started_at else None,
-                        completed_at=row.completed_at.isoformat() if row.completed_at else None,
-                    )
-                )
+    async def update_status(self, saga_id: str, status: str, **kwargs) -> bool:
+        """更新 Saga 状态"""
+        from .orchestrator import SagaExecutionLog
 
-            return states
+        db: AsyncSession = self._session_factory()
+        try:
+            update_data = {"status": status}
+            if "error_message" in kwargs:
+                update_data["error_message"] = kwargs["error_message"]
+            if "current_step" in kwargs:
+                update_data["current_step"] = kwargs["current_step"]
+            if "completed_at" in kwargs:
+                update_data["completed_at"] = kwargs["completed_at"]
 
-    async def get_active_sagas(self) -> List[SagaState]:
-        """获取活跃的 Sagas"""
-        return await self.list_sagas(status="running")
-
-    async def get_failed_sagas(self) -> List[SagaState]:
-        """获取失败的 Sagas (用于补偿)"""
-        return await self.list_sagas(status="failed")
+            stmt = update(SagaExecutionLog).where(SagaExecutionLog.id == saga_id).values(**update_data)
+            result = await db.execute(stmt)
+            await db.commit()
+            return result.rowcount > 0
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Failed to update saga status {saga_id}: {e}")
+            return False
+        finally:
+            await db.close()
 
 
 class RedisSagaPersistence:
     """Redis Saga 缓存 - 用于快速访问"""
 
-    def __init__(self, redis_url: str, key_prefix: str = "saga:"):
-        self.redis_url = redis_url
+    def __init__(self, redis_client, key_prefix: str = "saga:"):
+        self._redis = redis_client
         self.key_prefix = key_prefix
-        self._redis = None
 
-    async def connect(self):
-        """连接 Redis"""
-        import redis.asyncio as redis
-
-        self._redis = redis.from_url(self.redis_url)
-        logger.info("Saga Redis cache connected")
-
-    async def close(self):
-        """关闭 Redis 连接"""
-        if self._redis:
-            await self._redis.close()
-
-    async def save_state(self, state: "SagaState", ttl: int = 86400) -> None:
+    async def save_state(self, saga_id: str, state: Dict[str, Any], ttl: int = 86400) -> None:
         """保存 Saga 状态到 Redis"""
-        if not self._redis:
-            await self.connect()
+        key = f"{self.key_prefix}{saga_id}"
+        await self._redis.setex(key, ttl, json.dumps(state))
 
-        key = f"{self.key_prefix}{state.saga_id}"
-        data = json.dumps(state.to_dict())
-
-        await self._redis.setex(key, ttl, data)
-        logger.debug(f"Saga state cached: {state.saga_id}")
-
-    async def get_state(self, saga_id: str) -> Optional["SagaState"]:
+    async def get_state(self, saga_id: str) -> Optional[Dict[str, Any]]:
         """从 Redis 获取 Saga 状态"""
-        if not self._redis:
-            await self.connect()
-
-        from ..saga.orchestrator import SagaState
-
         key = f"{self.key_prefix}{saga_id}"
         data = await self._redis.get(key)
-
-        if not data:
-            return None
-
-        return SagaState(**json.loads(data))
+        if data:
+            return json.loads(data)
+        return None
 
 
 class HybridSagaPersistence(SagaPersistence):
     """混合持久化 - Redis 缓存 + PostgreSQL 持久化"""
 
-    def __init__(
-        self,
-        postgres_url: str,
-        redis_url: str,
-        redis_ttl: int = 3600,
-    ):
-        self.postgres = PostgresSagaPersistence(postgres_url)
-        self.redis = RedisSagaPersistence(redis_url)
-        self.redis_ttl = redis_ttl
+    def __init__(self, postgres_persistence: PostgresSagaPersistence, redis_persistence: RedisSagaPersistence):
+        self.postgres = postgres_persistence
+        self.redis = redis_persistence
 
-    async def initialize(self):
-        await self.postgres.initialize()
-        await self.redis.connect()
+    async def save_state(self, saga_id: str, **kwargs) -> None:
+        await self.postgres.save_state(saga_id, **kwargs)
+        state = await self.postgres.get_state(saga_id)
+        if state:
+            await self.redis.save_state(saga_id, state)
 
-    async def close(self):
-        await self.postgres.close()
-        await self.redis.close()
-
-    async def save_state(self, state: "SagaState") -> None:
-        await self.postgres.save_state(state)
-        await self.redis.save_state(state, ttl=self.redis_ttl)
-
-    async def get_state(self, saga_id: str) -> Optional["SagaState"]:
+    async def get_state(self, saga_id: str) -> Optional[Dict[str, Any]]:
         cached = await self.redis.get_state(saga_id)
         if cached:
             return cached
-
         return await self.postgres.get_state(saga_id)
 
-    async def list_sagas(
-        self, status: Optional[str] = None, limit: int = 100
-    ) -> List["SagaState"]:
+    async def list_sagas(self, status: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
         return await self.postgres.list_sagas(status, limit)
+
+    async def update_status(self, saga_id: str, status: str, **kwargs) -> bool:
+        result = await self.postgres.update_status(saga_id, status, **kwargs)
+        if result:
+            state = await self.postgres.get_state(saga_id)
+            if state:
+                await self.redis.save_state(saga_id, state)
+        return result

@@ -1,5 +1,14 @@
-"""gRPC client utilities for microservices communication"""
+"""gRPC 客户端包"""
+from .client import (
+    GrpcClient,
+    grpc_pool,
+    GrpcChannelPool,
+)
+from .error_handler import GrpcErrorHandler
 
-from .client import GrpcClient, GrpcClientPool, GrpcConfig, grpc_pool
-
-__all__ = ["GrpcClient", "GrpcClientPool", "GrpcConfig", "grpc_pool"]
+__all__ = [
+    "GrpcClient",
+    "grpc_pool",
+    "GrpcChannelPool",
+    "GrpcErrorHandler",
+]

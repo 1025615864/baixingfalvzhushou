@@ -72,14 +72,17 @@ class Settings(BaseSettings):
     jwt_rsa_private_key: str = Field(
         default="",
         validation_alias=AliasChoices("JWT_RSA_PRIVATE_KEY", "JWT_PRIVATE_KEY"),
+        json_schema_extra={"writeOnly": True},
     )
     jwt_rsa_public_key: str = Field(
         default="",
         validation_alias=AliasChoices("JWT_RSA_PUBLIC_KEY", "JWT_PUBLIC_KEY"),
+        json_schema_extra={"writeOnly": True},
     )
     secret_key: str = Field(
         default_factory=lambda: _generate_test_secret() if _running_tests() else "",
         validation_alias=AliasChoices("SECRET_KEY", "JWT_SECRET_KEY"),
+        json_schema_extra={"writeOnly": True},
     )
     algorithm: str = Field(
         default_factory=lambda: "HS256" if _running_tests() else "RS256"
@@ -94,20 +97,24 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices(
             "PAYMENT_WEBHOOK_SECRET", "PAYMENT_CALLBACK_SECRET"),
+        json_schema_extra={"writeOnly": True},
     )
 
     # 支付宝配置
     alipay_app_id: str = Field(
         default="",
         validation_alias=AliasChoices("ALIPAY_APP_ID", "PAY_ALIPAY_APP_ID"),
+        json_schema_extra={"writeOnly": True},
     )
     alipay_private_key: str = Field(
         default="",
         validation_alias=AliasChoices("ALIPAY_PRIVATE_KEY", "PAY_ALIPAY_PRIVATE_KEY"),
+        json_schema_extra={"writeOnly": True},
     )
     alipay_public_key: str = Field(
         default="",
         validation_alias=AliasChoices("ALIPAY_PUBLIC_KEY", "PAY_ALIPAY_PUBLIC_KEY"),
+        json_schema_extra={"writeOnly": True},
     )
     alipay_gateway_url: str = Field(
         default="https://openapi.alipay.com/gateway.do",
@@ -126,10 +133,12 @@ class Settings(BaseSettings):
     ikunpay_pid: str = Field(
         default="",
         validation_alias=AliasChoices("IKUNPAY_PID", "PAY_IKUNPAY_PID"),
+        json_schema_extra={"writeOnly": True},
     )
     ikunpay_key: str = Field(
         default="",
         validation_alias=AliasChoices("IKUNPAY_KEY", "PAY_IKUNPAY_KEY"),
+        json_schema_extra={"writeOnly": True},
     )
     ikunpay_gateway_url: str = Field(
         default="https://ikunpay.com/submit.php",
@@ -175,18 +184,22 @@ class Settings(BaseSettings):
     wechatpay_mch_id: str = Field(
         default="",
         validation_alias=AliasChoices("WECHATPAY_MCH_ID", "WECHAT_MCH_ID"),
+        json_schema_extra={"writeOnly": True},
     )
     wechatpay_mch_serial_no: str = Field(
         default="",
         validation_alias=AliasChoices("WECHATPAY_MCH_SERIAL_NO", "WECHAT_MCH_SERIAL_NO"),
+        json_schema_extra={"writeOnly": True},
     )
     wechatpay_private_key: str = Field(
         default="",
         validation_alias=AliasChoices("WECHATPAY_PRIVATE_KEY", "WECHAT_PRIVATE_KEY"),
+        json_schema_extra={"writeOnly": True},
     )
     wechatpay_api_v3_key: str = Field(
         default="",
         validation_alias=AliasChoices("WECHATPAY_API_V3_KEY", "WECHAT_API_V3_KEY"),
+        json_schema_extra={"writeOnly": True},
     )
     wechatpay_certificates_url: str = Field(
         default="https://api.mch.weixin.qq.com/v3/certificates",
@@ -201,6 +214,7 @@ class Settings(BaseSettings):
     card_encryption_key: str = Field(
         default="",
         validation_alias=AliasChoices("CARD_ENCRYPTION_KEY", "BANK_CARD_KEY"),
+        json_schema_extra={"writeOnly": True},
     )
 
     # ==========================================
@@ -221,11 +235,15 @@ class Settings(BaseSettings):
     # ==========================================
     # AI配置
     # ==========================================
-    openai_api_key: str = ""
+    openai_api_key: str = Field(
+        default="",
+        json_schema_extra={"writeOnly": True},
+    )
     openai_base_url: str = "https://api.openai.com/v1"
     openai_transcribe_api_key: str = Field(
         default="",
         validation_alias=AliasChoices("OPENAI_TRANSCRIBE_API_KEY"),
+        json_schema_extra={"writeOnly": True},
     )
     openai_transcribe_base_url: str = Field(
         default="",
@@ -317,7 +335,8 @@ class Settings(BaseSettings):
     csrf_secret_key: str = Field(
         default="",
         validation_alias=AliasChoices("CSRF_SECRET_KEY"),
-        description="专用CSRF密钥，与JWT密钥分离，提升安全性"
+        description="专用CSRF密钥，与JWT密钥分离，提升安全性",
+        json_schema_extra={"writeOnly": True},
     )
     csrf_enabled: bool = Field(default=True, validation_alias=AliasChoices("CSRF_ENABLED"))
     csrf_token_expire_hours: int = Field(

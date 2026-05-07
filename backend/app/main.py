@@ -231,150 +231,38 @@ async def lifespan(app: FastAPI):
     if (not settings.debug) and (not redis_connected):
         raise RuntimeError("Redis must be available when DEBUG is False. Please set REDIS_URL and ensure Redis is reachable.")
 
-    settlement_enabled_raw = os.getenv("SETTLEMENT_JOB_ENABLED", "").strip().lower()
-    settlement_enabled_flag = settlement_enabled_raw in {"1", "true", "yes", "on"}
-    settlement_enabled = bool(settlement_enabled_flag) or bool(settings.debug)
-    if (not settings.debug) and (not redis_connected):
-        settlement_enabled = False
-
-    async def _settlement_job_wrapper() -> object:
-        start = time.perf_counter()
-        ok = True
-        try:
-            async with AsyncSessionLocal() as session:
-                from .services.settlement_service import settlement_service
-
-                return await settlement_service.settle_due_income_records(session)
-        except Exception:
-            ok = False
-            raise
-        finally:
-            prometheus_metrics.record_job(
-                name="settlement",
-                ok=bool(ok),
-                duration_seconds=max(0.0, float(time.perf_counter() - start)),
-            )
+    cfg = services.periodic_jobs.PeriodicJobsConfig
 
     settlement_task: asyncio.Task[None] | None = None
-    if settlement_enabled:
-        settlement_interval_seconds = float(
-            os.getenv("SETTLEMENT_JOB_INTERVAL_SECONDS", "3600").strip() or "3600"
-        )
+    if cfg.is_settlement_enabled(settings.debug, redis_connected):
         settlement_task = asyncio.create_task(
             runner.run(
                 lock_key="locks:settlement",
                 lock_ttl_seconds=60,
-                interval_seconds=settlement_interval_seconds,
-                job=_settlement_job_wrapper,
+                interval_seconds=cfg.SETTLEMENT_INTERVAL_SECONDS,
+                job=services.periodic_jobs.settlement_job_wrapper,
             )
         )
 
-    wechatpay_refresh_enabled_raw = os.getenv("WECHATPAY_CERT_REFRESH_ENABLED", "").strip().lower()
-    wechatpay_refresh_enabled = wechatpay_refresh_enabled_raw in {"1", "true", "yes", "on"}
-    if (not settings.debug) and (not redis_connected):
-        wechatpay_refresh_enabled = False
-
-    async def _wechatpay_platform_certs_refresh_job_wrapper() -> object:
-        start = time.perf_counter()
-        ok = True
-        try:
-            async with AsyncSessionLocal() as session:
-                if not (
-                    settings.wechatpay_mch_id
-                    and settings.wechatpay_mch_serial_no
-                    and settings.wechatpay_private_key
-                    and settings.wechatpay_api_v3_key
-                ):
-                    return {"skipped": True, "reason": "wechatpay config missing"}
-
-                from .models.system import SystemConfig
-                from .utils.wechatpay_v3 import fetch_platform_certificates, dump_platform_certs_json
-
-                certs = await fetch_platform_certificates(
-                    certificates_url=settings.wechatpay_certificates_url,
-                    mch_id=settings.wechatpay_mch_id,
-                    mch_serial_no=settings.wechatpay_mch_serial_no,
-                    mch_private_key_pem=settings.wechatpay_private_key,
-                    api_v3_key=settings.wechatpay_api_v3_key,
-                )
-                raw = dump_platform_certs_json(certs)
-
-                res = await session.execute(
-                    select(SystemConfig).where(SystemConfig.key == "WECHATPAY_PLATFORM_CERTS_JSON")
-                )
-                row = res.scalar_one_or_none()
-                if row is None:
-                    row = SystemConfig(
-                        key="WECHATPAY_PLATFORM_CERTS_JSON",
-                        value=raw,
-                        category="payment",
-                        description="WeChatPay platform certificates cache",
-                    )
-                    session.add(row)
-                else:
-                    row.value = raw
-                    row.category = "payment"
-                    if not (row.description or "").strip():
-                        row.description = "WeChatPay platform certificates cache"
-                    session.add(row)
-
-                await session.commit()
-                return {"ok": True, "count": len(certs)}
-        except Exception:
-            ok = False
-            raise
-        finally:
-            prometheus_metrics.record_job(
-                name="wechatpay_platform_certs_refresh",
-                ok=bool(ok),
-                duration_seconds=max(0.0, float(time.perf_counter() - start)),
-            )
-
     wechatpay_task: asyncio.Task[None] | None = None
-    if wechatpay_refresh_enabled:
-        interval_seconds = float(os.getenv("WECHATPAY_CERT_REFRESH_INTERVAL_SECONDS", "86400").strip() or "86400")
+    if cfg.is_wechatpay_refresh_enabled(settings.debug, redis_connected):
         wechatpay_task = asyncio.create_task(
             runner.run(
                 lock_key="locks:wechatpay_platform_certs",
                 lock_ttl_seconds=120,
-                interval_seconds=interval_seconds,
-                job=_wechatpay_platform_certs_refresh_job_wrapper,
+                interval_seconds=cfg.WECHATPAY_CERT_REFRESH_INTERVAL_SECONDS,
+                job=lambda: services.periodic_jobs.wechatpay_platform_certs_refresh_job_wrapper(settings),
             )
         )
 
-    review_sla_enabled_raw = os.getenv("REVIEW_TASK_SLA_JOB_ENABLED", "").strip().lower()
-    review_sla_enabled_flag = review_sla_enabled_raw in {"1", "true", "yes", "on"}
-    review_sla_enabled = bool(review_sla_enabled_flag) or bool(settings.debug)
-    if (not settings.debug) and (not redis_connected):
-        review_sla_enabled = False
-
-    async def _review_task_sla_job_wrapper() -> object:
-        start = time.perf_counter()
-        ok = True
-        try:
-            async with AsyncSessionLocal() as session:
-                from .services.review_task_sla_service import scan_and_notify_review_task_sla
-
-                return await scan_and_notify_review_task_sla(session)
-        except Exception:
-            ok = False
-            raise
-        finally:
-            prometheus_metrics.record_job(
-                name="review_task_sla",
-                ok=bool(ok),
-                duration_seconds=max(0.0, float(time.perf_counter() - start)),
-            )
-
     review_sla_task: asyncio.Task[None] | None = None
-    if review_sla_enabled:
-        interval_seconds = float(os.getenv("REVIEW_TASK_SLA_SCAN_INTERVAL_SECONDS", "60").strip() or "60")
+    if cfg.is_review_sla_enabled(settings.debug, redis_connected):
         review_sla_task = asyncio.create_task(
             runner.run(
                 lock_key="locks:review_task_sla",
                 lock_ttl_seconds=60,
-                interval_seconds=interval_seconds,
-                job=_review_task_sla_job_wrapper,
+                interval_seconds=cfg.REVIEW_TASK_SLA_SCAN_INTERVAL_SECONDS,
+                job=services.periodic_jobs.review_task_sla_job_wrapper,
             )
         )
 

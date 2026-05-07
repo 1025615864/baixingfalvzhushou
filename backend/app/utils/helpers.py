@@ -139,9 +139,6 @@ def _parse_dt_param(
     except (ValueError, TypeError) as e:
         import logging
         logging.getLogger(__name__).warning(f"Failed to parse datetime for field {field}: {e}")
-        from fastapi import HTTPException, status
-
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"invalid {field}",
-        )
+        
+        # 抛出 ValueError 而不是 HTTPException，避免与 Web 框架耦合
+        raise ValueError(f"Invalid datetime format for field {field}")

@@ -1,9 +1,12 @@
 """限流中间件 - 分级限流
 
 提供统一的限流中间件，所有服务可复用。
+Redis 故障时自动降级为内存限流。
 """
 import os
 import time
+import asyncio
+from collections import defaultdict
 from typing import Optional, Tuple
 from fastapi import Request, HTTPException, status
 import redis.asyncio as redis
@@ -18,6 +21,41 @@ REGISTER_IP_LIMIT = (5, 3600)
 REGISTER_PHONE_LIMIT = (3, 86400)
 
 
+class _MemoryRateLimiter:
+    """内存限流器 - Redis 故障时的降级方案"""
+
+    def __init__(self):
+        self._counters: dict[str, list[float]] = defaultdict(list)
+        self._lock = asyncio.Lock()
+
+    async def check(self, key: str, limit: int, window: int) -> Tuple[bool, Optional[int], int]:
+        """检查限流
+        Returns:
+            (allowed, retry_after_seconds, limit)
+        """
+        now = time.time()
+        cutoff = now - window
+
+        async with self._lock:
+            # 清理过期记录
+            self._counters[key] = [t for t in self._counters[key] if t > cutoff]
+
+            current = len(self._counters[key])
+            if current >= limit:
+                # 计算最早过期时间
+                oldest = min(self._counters[key]) if self._counters[key] else now
+                retry_after = max(1, int(oldest + window - now))
+                return False, retry_after, limit
+
+            self._counters[key].append(now)
+            return True, None, limit
+
+    async def close(self):
+        """清理内存"""
+        async with self._lock:
+            self._counters.clear()
+
+
 class RateLimiter:
     """统一限流器"""
 
@@ -28,6 +66,7 @@ class RateLimiter:
         self.redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
         self._client: Optional[redis.Redis] = None
         self._enabled = os.getenv("RATE_LIMIT_ENABLED", "true").lower() in {"1", "true", "yes"}
+        self._memory_limiter = _MemoryRateLimiter()
 
     async def _get_client(self) -> Optional[redis.Redis]:
         if not self._enabled:
@@ -44,6 +83,7 @@ class RateLimiter:
         if self._client:
             await self._client.close()
             self._client = None
+        await self._memory_limiter.close()
 
     def _get_rule(self, path: str, rules: dict = None) -> Tuple[int, int]:
         rules = rules or DEFAULT_RATE_LIMIT_RULES
@@ -62,25 +102,25 @@ class RateLimiter:
         key = f"rate:{path}:{user_id}"
 
         client = await self._get_client()
-        if not client:
-            return True, None, limit
+        if client:
+            try:
+                current = await client.get(key)
+                if current is None:
+                    await client.setex(key, window, 1)
+                    return True, limit - 1, limit
 
-        try:
-            current = await client.get(key)
-            if current is None:
-                await client.setex(key, window, 1)
-                return True, limit - 1, limit
+                count = int(current)
+                if count >= limit:
+                    ttl = await client.ttl(key)
+                    return False, ttl, limit
 
-            count = int(current)
-            if count >= limit:
-                ttl = await client.ttl(key)
-                return False, ttl, limit
+                await client.incr(key)
+                return True, limit - count - 1, limit
+            except Exception:
+                pass
 
-            await client.incr(key)
-            return True, limit - count - 1, limit
-
-        except Exception:
-            return True, None, limit
+        # Redis 不可用时降级为内存限流
+        return await self._memory_limiter.check(key, limit, window)
 
     async def check_ip_rate_limit(
         self,
@@ -93,25 +133,25 @@ class RateLimiter:
         key = f"ip_rate:{path}:{ip}"
 
         client = await self._get_client()
-        if not client:
-            return True, None, limit
+        if client:
+            try:
+                current = await client.get(key)
+                if current is None:
+                    await client.setex(key, window, 1)
+                    return True, limit - 1, limit
 
-        try:
-            current = await client.get(key)
-            if current is None:
-                await client.setex(key, window, 1)
-                return True, limit - 1, limit
+                count = int(current)
+                if count >= limit:
+                    ttl = await client.ttl(key)
+                    return False, ttl, limit
 
-            count = int(current)
-            if count >= limit:
-                ttl = await client.ttl(key)
-                return False, ttl, limit
+                await client.incr(key)
+                return True, limit - count - 1, limit
+            except Exception:
+                pass
 
-            await client.incr(key)
-            return True, limit - count - 1, limit
-
-        except Exception:
-            return True, None, limit
+        # Redis 不可用时降级为内存限流
+        return await self._memory_limiter.check(key, limit, window)
 
     async def check_resource_rate_limit(
         self,
@@ -124,25 +164,25 @@ class RateLimiter:
         key = f"resource_rate:{path}:{resource_id}"
 
         client = await self._get_client()
-        if not client:
-            return True, None, limit
+        if client:
+            try:
+                current = await client.get(key)
+                if current is None:
+                    await client.setex(key, window, 1)
+                    return True, limit - 1, limit
 
-        try:
-            current = await client.get(key)
-            if current is None:
-                await client.setex(key, window, 1)
-                return True, limit - 1, limit
+                count = int(current)
+                if count >= limit:
+                    ttl = await client.ttl(key)
+                    return False, ttl, limit
 
-            count = int(current)
-            if count >= limit:
-                ttl = await client.ttl(key)
-                return False, ttl, limit
+                await client.incr(key)
+                return True, limit - count - 1, limit
+            except Exception:
+                pass
 
-            await client.incr(key)
-            return True, limit - count - 1, limit
-
-        except Exception:
-            return True, None, limit
+        # Redis 不可用时降级为内存限流
+        return await self._memory_limiter.check(key, limit, window)
 
     async def get_remaining(
         self,
@@ -154,16 +194,17 @@ class RateLimiter:
         key = f"rate:{path}:{user_id}"
 
         client = await self._get_client()
-        if not client:
-            return limit
+        if client:
+            try:
+                current = await client.get(key)
+                if current is None:
+                    return limit
+                return max(0, limit - int(current))
+            except Exception:
+                pass
 
-        try:
-            current = await client.get(key)
-            if current is None:
-                return limit
-            return max(0, limit - int(current))
-        except Exception:
-            return None
+        # Redis 不可用时使用内存限流器估算
+        return limit
 
 
 rate_limiter = RateLimiter()

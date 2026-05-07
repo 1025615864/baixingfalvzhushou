@@ -124,6 +124,104 @@ services:
     networks:
       - backend-network
 
+  # 新闻服务
+  news-service:
+    build:
+      context: ./services/news-service
+      dockerfile: Dockerfile
+    container_name: baixing_news_service
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/news_service
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/0
+      ENABLE_KAFKA: "true"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      CORS_ALLOWED_ORIGINS: '["http://localhost:3000","http://localhost:5173"]'
+      DEBUG: "true"
+    ports:
+      - "8006:8006"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - backend-network
+
+  # 搜索服务
+  search-service:
+    build:
+      context: ./services/search-service
+      dockerfile: Dockerfile
+    container_name: baixing_search_service
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/search_service
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/0
+      ENABLE_KAFKA: "true"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      CORS_ALLOWED_ORIGINS: '["http://localhost:3000","http://localhost:5173"]'
+      DEBUG: "true"
+      NEWS_SERVICE_URL: http://news-service:8006
+      COMMUNITY_SERVICE_URL: http://community-service:8007
+      LEGAL_SERVICE_URL: http://legal-service:8008
+      KNOWLEDGE_SERVICE_URL: http://knowledge-service:8081
+    ports:
+      - "8009:8009"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8009/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - backend-network
+
+  # 推荐服务
+  recommendation-service:
+    build:
+      context: ./services/recommendation-service
+      dockerfile: Dockerfile
+    container_name: baixing_recommendation_service
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/recommendation_service
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/0
+      ENABLE_KAFKA: "true"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      CORS_ALLOWED_ORIGINS: '["http://localhost:3000","http://localhost:5173"]'
+      DEBUG: "true"
+      NEWS_SERVICE_URL: http://news-service:8006
+      COMMUNITY_SERVICE_URL: http://community-service:8007
+      LEGAL_SERVICE_URL: http://legal-service:8008
+      KNOWLEDGE_SERVICE_URL: http://knowledge-service:8081
+    ports:
+      - "8010:8010"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8010/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - backend-network
+
 volumes:
   kafka_data:
   zookeeper_data:

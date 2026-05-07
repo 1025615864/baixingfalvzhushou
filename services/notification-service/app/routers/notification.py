@@ -4,10 +4,9 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
 
 from ..database import get_db
-from ..models import Notification, NotificationSettings
+from ..services import notification_service, template_service
 
 router = APIRouter()
 
@@ -38,150 +37,152 @@ class NotificationCreateRequest(BaseModel):
     content: Optional[str] = None
 
 
-@router.get("/", response_model=NotificationListResponse)
-async def list_notifications(
-    user_id: int,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    db: AsyncSession = Depends(get_db)
-):
-    """获取用户通知列表"""
-    query = select(Notification).where(Notification.user_id == user_id)
-    
-    count_query = select(func.count()).select_from(query.subquery())
-    total_result = await db.execute(count_query)
-    total = total_result.scalar() or 0
-    
-    unread_query = select(func.count()).where(
-        Notification.user_id == user_id,
-        Notification.is_read == False
-    )
-    unread_result = await db.execute(unread_query)
-    unread_count = unread_result.scalar() or 0
-    
-    query = query.order_by(desc(Notification.created_at))
-    query = query.offset((page - 1) * page_size).limit(page_size)
-    
-    result = await db.execute(query)
-    notifications = result.scalars().all()
-    
-    return NotificationListResponse(
-        items=[NotificationResponse.model_validate(n) for n in notifications],
-        total=total,
-        unread_count=unread_count
-    )
-
-
-@router.post("/", response_model=NotificationResponse)
-async def create_notification(
-    request: NotificationCreateRequest,
-    db: AsyncSession = Depends(get_db)
-):
-    """创建通知（内部使用）"""
-    notification = Notification(
-        user_id=request.user_id,
-        type=request.type,
-        title=request.title,
-        content=request.content,
-        is_read=False,
-    )
-    db.add(notification)
-    await db.commit()
-    await db.refresh(notification)
-    
-    return NotificationResponse.model_validate(notification)
-
-
-@router.patch("/{notification_id}/read")
-async def mark_as_read(
-    notification_id: int,
-    db: AsyncSession = Depends(get_db)
-):
-    """标记通知为已读"""
-    result = await db.execute(
-        select(Notification).where(Notification.id == notification_id)
-    )
-    notification = result.scalar_one_or_none()
-    
-    if not notification:
-        raise HTTPException(status_code=404, detail="Notification not found")
-    
-    notification.is_read = True
-    await db.commit()
-    
-    return {"success": True}
-
-
-@router.patch("/read-all")
-async def mark_all_as_read(user_id: int, db: AsyncSession = Depends(get_db)):
-    """标记所有通知为已读"""
-    result = await db.execute(
-        select(Notification).where(
-            Notification.user_id == user_id,
-            Notification.is_read == False
-        )
-    )
-    notifications = result.scalars().all()
-    
-    for n in notifications:
-        n.is_read = True
-    
-    await db.commit()
-    
-    return {"success": True, "count": len(notifications)}
-
-
-@router.delete("/{notification_id}")
-async def delete_notification(
-    notification_id: int,
-    db: AsyncSession = Depends(get_db)
-):
-    """删除通知"""
-    result = await db.execute(
-        select(Notification).where(Notification.id == notification_id)
-    )
-    notification = result.scalar_one_or_none()
-    
-    if not notification:
-        raise HTTPException(status_code=404, detail="Notification not found")
-    
-    await db.delete(notification)
-    await db.commit()
-    
-    return {"success": True}
-
-
 class SettingsResponse(BaseModel):
     email_enabled: bool
     sms_enabled: bool
     push_enabled: bool
+    quiet_hours_start: Optional[str] = None
+    quiet_hours_end: Optional[str] = None
 
 
 class SettingsUpdateRequest(BaseModel):
     email_enabled: Optional[bool] = None
     sms_enabled: Optional[bool] = None
     push_enabled: Optional[bool] = None
+    quiet_hours_start: Optional[str] = None
+    quiet_hours_end: Optional[str] = None
+
+
+@router.get("/", response_model=NotificationListResponse)
+async def list_notifications(
+    user_id: int,
+    unread_only: bool = Query(False),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取用户通知列表"""
+    notifications, total, unread_count = await notification_service.list_notifications(
+        db, user_id, page=page, page_size=page_size, unread_only=unread_only
+    )
+
+    return NotificationListResponse(
+        items=[NotificationResponse.model_validate(n) for n in notifications],
+        total=total,
+        unread_count=unread_count,
+    )
+
+
+@router.post("/", response_model=NotificationResponse)
+async def create_notification(
+    request: NotificationCreateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """创建通知（内部使用）"""
+    notification = await notification_service.create_notification(
+        db,
+        user_id=request.user_id,
+        type=request.type,
+        title=request.title,
+        content=request.content,
+    )
+
+    return NotificationResponse.model_validate(notification)
+
+
+@router.post("/batch")
+async def create_batch_notifications(
+    user_ids: List[int],
+    type: str,
+    title: str,
+    content: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """批量创建通知（系统通知）"""
+    count = await notification_service.create_batch_notifications(
+        db,
+        user_ids=user_ids,
+        type=type,
+        title=title,
+        content=content,
+    )
+
+    return {"success": True, "count": count}
+
+
+@router.get("/unread-count")
+async def get_unread_count(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取未读通知数量"""
+    count = await notification_service.get_unread_count(db, user_id)
+    return {"user_id": user_id, "unread_count": count}
+
+
+@router.get("/{notification_id}", response_model=NotificationResponse)
+async def get_notification(
+    notification_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取通知详情"""
+    notification = await notification_service.get_notification(db, notification_id)
+    if not notification:
+        raise HTTPException(status_code=404, detail="Notification not found")
+
+    return NotificationResponse.model_validate(notification)
+
+
+@router.patch("/{notification_id}/read")
+async def mark_as_read(
+    notification_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """标记通知为已读"""
+    success = await notification_service.mark_as_read(db, notification_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Notification not found")
+
+    return {"success": True}
+
+
+@router.patch("/read-all")
+async def mark_all_as_read(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """标记所有通知为已读"""
+    count = await notification_service.mark_all_as_read(db, user_id)
+    return {"success": True, "count": count}
+
+
+@router.delete("/{notification_id}")
+async def delete_notification(
+    notification_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """删除通知"""
+    success = await notification_service.delete_notification(db, notification_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Notification not found")
+
+    return {"success": True}
 
 
 @router.get("/settings", response_model=SettingsResponse)
-async def get_settings(user_id: int, db: AsyncSession = Depends(get_db)):
+async def get_settings(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+):
     """获取通知设置"""
-    result = await db.execute(
-        select(NotificationSettings).where(NotificationSettings.user_id == user_id)
-    )
-    settings = result.scalar_one_or_none()
-    
-    if not settings:
-        return SettingsResponse(
-            email_enabled=True,
-            sms_enabled=True,
-            push_enabled=True
-        )
-    
+    settings = await notification_service.get_settings(db, user_id)
+
     return SettingsResponse(
         email_enabled=settings.email_enabled,
         sms_enabled=settings.sms_enabled,
-        push_enabled=settings.push_enabled
+        push_enabled=settings.push_enabled,
+        quiet_hours_start=settings.quiet_hours_start,
+        quiet_hours_end=settings.quiet_hours_end,
     )
 
 
@@ -189,29 +190,35 @@ async def get_settings(user_id: int, db: AsyncSession = Depends(get_db)):
 async def update_settings(
     user_id: int,
     request: SettingsUpdateRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """更新通知设置"""
-    result = await db.execute(
-        select(NotificationSettings).where(NotificationSettings.user_id == user_id)
-    )
-    settings = result.scalar_one_or_none()
-    
-    if not settings:
-        settings = NotificationSettings(user_id=user_id)
-        db.add(settings)
-    
-    if request.email_enabled is not None:
-        settings.email_enabled = request.email_enabled
-    if request.sms_enabled is not None:
-        settings.sms_enabled = request.sms_enabled
-    if request.push_enabled is not None:
-        settings.push_enabled = request.push_enabled
-    
-    await db.commit()
-    
+    updates = request.model_dump(exclude_unset=True)
+    settings = await notification_service.update_settings(db, user_id, updates)
+
     return SettingsResponse(
         email_enabled=settings.email_enabled,
         sms_enabled=settings.sms_enabled,
-        push_enabled=settings.push_enabled
+        push_enabled=settings.push_enabled,
+        quiet_hours_start=settings.quiet_hours_start,
+        quiet_hours_end=settings.quiet_hours_end,
     )
+
+
+@router.post("/template/{template_name}/render")
+async def render_template(
+    template_name: str,
+    variables: dict,
+):
+    """渲染通知模板"""
+    result = template_service.render(template_name, variables)
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Template '{template_name}' not found")
+
+    return result
+
+
+@router.get("/templates")
+async def list_templates():
+    """列出所有通知模板"""
+    return {"templates": template_service.list_templates()}

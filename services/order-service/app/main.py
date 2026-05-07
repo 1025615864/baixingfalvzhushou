@@ -3,6 +3,10 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.database import engine
+from app.models.order import Base as OrderBase
 
 try:
     from services.common.security import get_cors_config
@@ -41,33 +45,37 @@ async def lifespan(app: FastAPI):
         otlp_endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
     )
 
+    # 数据库初始化
+    async with engine.begin() as conn:
+        await conn.run_sync(OrderBase.metadata.create_all)
+
     consul = get_consul_registry()
     if consul and os.getenv("CONSUL_ENABLED", "").lower() in {"1", "true", "yes"}:
         host = os.getenv("SERVICE_HOST", "localhost")
-        port = int(os.getenv("SERVICE_PORT", "8000"))
+        port = int(os.getenv("SERVICE_PORT", "8014"))
         await consul.register_service(
             service_name="order-service",
             service_id=f"order-service-{port}",
             host=host,
             port=port,
             metadata={"version": "1.0.0"},
-            tags=["http", "saga"],
+            tags=["http", "saga", "orders"],
             health_check_url=f"http://{host}:{port}/health",
         )
 
     if os.getenv("ENABLE_SAGA_PERSISTENCE", "false").lower() == "true":
-        from .sagas import init_saga_persistence
+        from app.sagas import init_saga_persistence
         await init_saga_persistence()
         logger.info("Order service Saga persistence initialized")
 
     yield
 
     if consul and os.getenv("CONSUL_ENABLED", "").lower() in {"1", "true", "yes"}:
-        port = int(os.getenv("SERVICE_PORT", "8000"))
+        port = int(os.getenv("SERVICE_PORT", "8014"))
         await consul.deregister_service(f"order-service-{port}")
 
     if os.getenv("ENABLE_SAGA_PERSISTENCE", "false").lower() == "true":
-        from .sagas import close_saga_persistence
+        from app.sagas import close_saga_persistence
         await close_saga_persistence()
 
     logger.info("Order service shutting down...")
@@ -83,9 +91,9 @@ def create_app() -> FastAPI:
     )
 
     cors_config = get_cors_config()
-    from fastapi.middleware.cors import CORSMiddleware
     app.add_middleware(CORSMiddleware, **cors_config)
 
+    # 健康检查
     @app.get("/health")
     async def health_check():
         return {"status": "healthy", "service": "order-service"}
@@ -97,6 +105,10 @@ def create_app() -> FastAPI:
     @app.get("/health/live")
     async def liveness_check():
         return {"status": "alive"}
+
+    # 注册路由
+    from app.routers.orders import router as orders_router
+    app.include_router(orders_router)
 
     return app
 

@@ -1,0 +1,320 @@
+# APISIX 限流与网关配置
+
+> 适用版本: APISIX 3.x+
+> 更新日期: 2026-05-06
+
+---
+
+## 1. 全局限流插件
+
+### 1.1 请求限流 (limit-req)
+
+```yaml
+# apisix/conf/apisix.yaml
+routes:
+  - uri: /api/v1/auth/register
+    methods: ["POST"]
+    plugins:
+      limit-req:
+        rate: 5          # 每秒请求数
+        burst: 10        # 突发请求数
+        key: "remote_addr"
+        rejected_code: 429
+        rejected_msg: "注册请求过于频繁，请稍后重试"
+    upstream:
+      type: roundrobin
+      nodes:
+        "user-service:8001": 1
+
+  - uri: /api/v1/auth/login
+    methods: ["POST"]
+    plugins:
+      limit-req:
+        rate: 10
+        burst: 20
+        key: "remote_addr"
+        rejected_code: 429
+        rejected_msg: "登录请求过于频繁，请稍后重试"
+    upstream:
+      type: roundrobin
+      nodes:
+        "user-service:8001": 1
+
+  - uri: /api/v1/ai/chat
+    methods: ["POST"]
+    plugins:
+      limit-req:
+        rate: 20
+        burst: 30
+        key: "arg_user_id"
+        rejected_code: 429
+        rejected_msg: "AI 请求过于频繁，请稍后重试"
+    upstream:
+      type: roundrobin
+      nodes:
+        "ai-service:8005": 1
+
+  - uri: /api/v1/search
+    methods: ["GET"]
+    plugins:
+      limit-req:
+        rate: 30
+        burst: 50
+        key: "remote_addr"
+        rejected_code: 429
+        rejected_msg: "搜索请求过于频繁，请稍后重试"
+    upstream:
+      type: roundrobin
+      nodes:
+        "search-service:8011": 1
+```
+
+### 1.2 并发限流 (limit-count)
+
+```yaml
+routes:
+  - uri: /api/v1/upload/*
+    methods: ["POST", "PUT"]
+    plugins:
+      limit-count:
+        count: 100        # 时间窗口内最大请求数
+        time_window: 60   # 时间窗口(秒)
+        key: "remote_addr"
+        rejected_code: 429
+        rejected_msg: "文件上传请求过多，请稍后重试"
+        policy: "local"
+```
+
+### 1.3 并发连接限流 (limit-conn)
+
+```yaml
+routes:
+  - uri: /ws/*
+    plugins:
+      limit-conn:
+        conn: 100         # 最大并发连接数
+        burst: 50         # 突发连接数
+        default_conn_delay: 0.1
+        rejected_code: 429
+        rejected_msg: "连接数过多，请稍后重试"
+        key: "remote_addr"
+```
+
+---
+
+## 2. 路由与上游配置
+
+### 2.1 后端服务路由
+
+```yaml
+routes:
+  # 用户服务
+  - uri: /api/v1/users/*
+    upstream:
+      type: roundrobin
+      service_name: user-service
+      discovery_type: consul
+      discovery_args:
+        service_name: user-service
+        group: api-services
+
+  # 法律服务
+  - uri: /api/v1/legal/*
+    upstream:
+      type: roundrobin
+      service_name: legal-service
+      discovery_type: consul
+      discovery_args:
+        service_name: legal-service
+        group: api-services
+
+  # AI 服务
+  - uri: /api/v1/ai/*
+    upstream:
+      type: roundrobin
+      service_name: ai-service
+      discovery_type: consul
+      discovery_args:
+        service_name: ai-service
+        group: api-services
+
+  # 订单服务
+  - uri: /api/v1/orders/*
+    upstream:
+      type: roundrobin
+      service_name: order-service
+      discovery_type: consul
+      discovery_args:
+        service_name: order-service
+        group: api-services
+
+  # 支付服务
+  - uri: /api/v1/payments/*
+    upstream:
+      type: roundrobin
+      service_name: payment-channel-service
+      discovery_type: consul
+      discovery_args:
+        service_name: payment-channel-service
+        group: api-services
+```
+
+### 2.2 支付回调特殊路由 (绕过限流)
+
+```yaml
+routes:
+  - uri: /api/v1/callbacks/alipay
+    methods: ["POST"]
+    plugins:
+      ip-restriction:
+        whitelist:
+          - "103.52.76.0/24"
+          - "103.52.77.0/24"
+          - "110.76.16.0/24"
+    upstream:
+      type: roundrobin
+      service_name: payment-channel-service
+      discovery_type: consul
+      discovery_args:
+        service_name: payment-channel-service
+
+  - uri: /api/v1/callbacks/wechat
+    methods: ["POST"]
+    plugins:
+      ip-restriction:
+        whitelist:
+          - "203.205.219.0/24"
+          - "203.205.220.0/24"
+          - "203.205.221.0/24"
+    upstream:
+      type: roundrobin
+      service_name: payment-channel-service
+      discovery_type: consul
+      discovery_args:
+        service_name: payment-channel-service
+```
+
+---
+
+## 3. 安全插件
+
+### 3.1 CORS 配置
+
+```yaml
+global_rules:
+  cors:
+    plugins:
+      cors:
+        allow_origins: "https://www.baixingfalv.com,https://m.baixingfalv.com"
+        allow_methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS"
+        allow_headers: "Authorization,Content-Type,X-Request-ID,X-Trace-ID"
+        max_age: 3600
+        allow_credentials: true
+```
+
+### 3.2 JWT 认证
+
+```yaml
+routes:
+  - uri: /api/v1/*
+    plugins:
+      jwt-auth:
+        header: Authorization
+        query: token
+        cookie: jwt_token
+    upstream:
+      type: roundrobin
+      service_name: backend-bff
+      discovery_type: consul
+```
+
+### 3.3 IP 黑名单
+
+```yaml
+global_rules:
+  ip-blacklist:
+    plugins:
+      ip-restriction:
+        blacklist:
+          - "192.168.1.100"
+          - "10.0.0.0/8"
+```
+
+---
+
+## 4. 监控与日志
+
+### 4.1 Prometheus 指标
+
+```yaml
+plugins:
+  - prometheus
+
+plugin_attr:
+  prometheus:
+    export_addr:
+      ip: "0.0.0.0"
+      port: 9091
+    export_uri: "/apisix/prometheus/metrics"
+    metric_prefix: "apisix_"
+    enable_status: true
+    enable_latency_histogram: true
+```
+
+### 4.2 访问日志
+
+```yaml
+nginx_config:
+  http:
+    access_log: "/var/log/apisix/access.log main"
+    log_format:
+      main: |
+        {"time":"$time_iso8601",
+         "remote_addr":"$remote_addr",
+         "method":"$request_method",
+         "uri":"$uri",
+         "status":"$status",
+         "request_time":"$request_time",
+         "upstream_response_time":"$upstream_response_time",
+         "upstream_addr":"$upstream_addr",
+         "http_referer":"$http_referer",
+         "http_user_agent":"$http_user_agent",
+         "trace_id":"$http_x_trace_id",
+         "request_id":"$http_x_request_id"}
+```
+
+---
+
+## 5. 服务发现 (Consul)
+
+```yaml
+discovery:
+  consul:
+    host:
+      - "http://consul:8500"
+    prefix: "/apisix/services/"
+    timeout:
+      connect: 2000
+      read: 5000
+    weight: 100
+    health_check:
+      timeout: 5
+      interval: 10
+      healthy: 3
+      unhealthy: 3
+```
+
+---
+
+## 6. 部署检查清单
+
+- [ ] APISIX Dashboard 已配置管理员密码
+- [ ] SSL 证书已配置 (Let's Encrypt 或商业证书)
+- [ ] etcd 集群已部署 (3 节点)
+- [ ] Prometheus 已配置抓取 APISIX 指标
+- [ ] Grafana Dashboard 已导入
+- [ ] 限流阈值已根据实际 QPS 调整
+- [ ] IP 白名单已配置支付回调
+- [ ] 日志格式已配置 JSON 格式
+- [ ] CORS 域名已正确配置
+- [ ] 健康检查端点已验证

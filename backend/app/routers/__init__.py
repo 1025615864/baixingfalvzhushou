@@ -1,101 +1,92 @@
-"""API路由"""
+"""API路由 - BFF 聚合层
+
+⚠️ Backend 作为 BFF 层，不再直接包含业务逻辑。
+⚠️ 业务逻辑已迁移到对应微服务，此处仅负责路由转发和数据聚合。
+"""
 
 import logging
-
-from .settlement import router as settlement_router
 from fastapi import APIRouter
 
 logger = logging.getLogger(__name__)
 
-from . import admin_v1
-
-from . import (
-    analytics,
-    calendar,
-    channel_tracking,
-    cross_domain,
-    document,
-    home,
-    knowledge,
-    lawfirm,
-    upload,
-    feedback,
-    reviews,
-    faq,
-    admin_monitor,
-    vertical_channel,
-    integration,
-    moderation,
-    knowledge_admin,
-    promotion,
-    enterprise,
-    wechat,
-    wechat_pay,
-    membership,
-    security,
-    ab_testing,
-    funnel_analysis,
-    video_consultation)
-
-from . import admin
-
-try:
-    from . import system
-except Exception:
-    logger.exception("Failed to import system router")
-    system = None
-
 api_router = APIRouter()
-legacy_api_router = APIRouter()
 
-api_router.include_router(admin_v1.router)
+# ==========================================
+# 微服务代理路由（业务逻辑在微服务中）
+# ==========================================
+try:
+    from .microservice_proxy import MICROSERVICES, create_proxy_router
 
-if system is not None:
-    system_router = getattr(system, "router", None)
-    if system_router is not None:
-        api_router.include_router(system_router)
+    for service_name in MICROSERVICES.keys():
+        router = create_proxy_router(service_name)
+        api_router.include_router(router)
+        logger.info(f"BFF代理路由已注册: {service_name}-service")
+except ImportError:
+    logger.warning("微服务代理模块未加载")
 
-api_router.include_router(lawfirm.router)
-api_router.include_router(admin.router)
-api_router.include_router(upload.router)
-api_router.include_router(knowledge.router)
+# ==========================================
+# 本地保留路由（BFF 职责范围内）
+# ==========================================
 
-api_router.include_router(document.router)
-api_router.include_router(calendar.router)
-api_router.include_router(feedback.router)
-
-api_router.include_router(settlement_router)
-api_router.include_router(reviews.router)
-api_router.include_router(analytics.router)
-api_router.include_router(faq.router)
-api_router.include_router(admin_monitor.router)
+# 管理后台（本地管理功能）
+try:
+    from . import admin_v1
+    api_router.include_router(admin_v1.router)
+except ImportError:
+    logger.warning("admin_v1路由未加载")
 
 try:
-    from . import system_admin
-except Exception:
-    logger.exception("Failed to import system_admin router")
-    system_admin = None
+    from . import admin
+    api_router.include_router(admin.router)
+except ImportError:
+    logger.warning("admin路由未加载")
 
-if system_admin is not None:
-    system_admin_router = getattr(system_admin, "router", None)
-    if system_admin_router is not None:
-        api_router.include_router(system_admin_router)
+try:
+    from . import admin_monitor
+    api_router.include_router(admin_monitor.router)
+except ImportError:
+    logger.warning("admin_monitor路由未加载")
 
-__all__ = ["api_router", "legacy_api_router"]
+# 首页聚合（可能聚合多个微服务数据）
+try:
+    from . import home
+    api_router.include_router(home.router)
+except ImportError:
+    logger.warning("home路由未加载")
 
-api_router.include_router(vertical_channel.router)
-api_router.include_router(integration.router)
-api_router.include_router(moderation.router)
-api_router.include_router(knowledge_admin.router)
-api_router.include_router(promotion.router)
-api_router.include_router(enterprise.router)
-api_router.include_router(wechat.router)
-api_router.include_router(wechat_pay.router)
-api_router.include_router(membership.router)
-api_router.include_router(security.router)
-api_router.include_router(ab_testing.router)
-api_router.include_router(funnel_analysis.router)
-api_router.include_router(channel_tracking.router)
-api_router.include_router(home.router)
-api_router.include_router(cross_domain.router)
-api_router.include_router(video_consultation.router)
+# 文件上传（本地处理）
+try:
+    from . import upload
+    api_router.include_router(upload.router)
+except ImportError:
+    logger.warning("upload路由未加载")
+
+# 跨域处理
+try:
+    from . import cross_domain
+    api_router.include_router(cross_domain.router)
+except ImportError:
+    logger.warning("cross_domain路由未加载")
+
+# AB测试、埋点分析（本地BFF功能）
+try:
+    from . import ab_testing
+    api_router.include_router(ab_testing.router)
+except ImportError:
+    logger.warning("ab_testing路由未加载")
+
+# 安全相关（认证、授权网关）
+try:
+    from . import security
+    api_router.include_router(security.router)
+except ImportError:
+    logger.warning("security路由未加载")
+
+# WebSocket（实时通信基础设施）
+try:
+    from . import websocket
+    api_router.include_router(websocket.router)
+except ImportError:
+    logger.warning("websocket路由未加载")
+
+__all__ = ["api_router"]

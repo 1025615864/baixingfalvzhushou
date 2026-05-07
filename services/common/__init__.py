@@ -4,6 +4,7 @@
 
 模块列表:
 - api: API 错误处理、统一响应格式
+- cache: 缓存优化、多级缓存
 - client: HTTP 客户端、Kafka 客户端
 - config: 配置加载器、Consul KV 版本控制
 - discovery: Consul 服务注册与发现
@@ -12,11 +13,11 @@
 - middleware: 认证、限流、审计、遥测中间件
 - migrations: Alembic 数据库迁移
 - models: 审计日志、Saga 日志、Outbox 消息等共享模型
-- monitoring: 事务监控、告警
+- monitoring: 事务监控、Prometheus 指标、告警
 - outbox: Outbox 模式实现
 - saga: Saga 分布式事务编排器、持久化
-- security: JWT 密钥管理、密码策略、密钥管理
-- services: 审计服务
+- security: JWT 密钥管理、密码策略、密钥管理、数据安全
+- services: 审计服务、存储服务、内容安全、内容质量、国际化
 - testing: 共享测试工具、Pact 契约测试
 - tracing: OpenTelemetry 链路追踪
 - vector: pgvector 向量存储
@@ -34,11 +35,14 @@
     from services.common.grpc import GrpcClient, grpc_pool
     from services.common.discovery import get_discovery, ConsulServiceRegistration
     from services.common.testing import MockKafkaProducer, MockRedis
+    from services.common.cache import CacheOptimizer
+    from services.common.services import StorageProvider, TranslationManager, ContentSafetyChecker
 """
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 __all__ = [
     "api",
+    "cache",
     "client",
     "config",
     "discovery",

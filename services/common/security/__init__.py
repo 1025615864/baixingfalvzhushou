@@ -11,6 +11,7 @@ from .secrets import (
     get_redis_url,
     get_jwt_secret,
 )
+from .data_security import DataSecurityManager, EncryptionService
 
 __all__ = [
     "JWTKeyManager",
@@ -26,4 +27,6 @@ __all__ = [
     "get_database_url",
     "get_redis_url",
     "get_jwt_secret",
+    "DataSecurityManager",
+    "EncryptionService",
 ]

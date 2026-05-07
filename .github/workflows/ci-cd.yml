@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: Microservices CI/CD Pipeline
 
 on:
   push:
@@ -177,6 +177,227 @@ jobs:
           name: backend-coverage
         continue-on-error: true
 
+  # ============ 微服务测试（并行）===========
+  test-news-service:
+    name: News Service Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/news-service
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5433:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Run contract tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5433/test_db
+        run: pytest tests/test_contracts.py -v --tb=short
+
+  test-search-service:
+    name: Search Service Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/search-service
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Run contract tests
+        run: pytest tests/test_contracts.py -v --tb=short
+
+  test-recommendation-service:
+    name: Recommendation Service Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/recommendation-service
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5434:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Run contract tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5434/test_db
+        run: pytest tests/test_contracts.py -v --tb=short
+
+  test-legal-service:
+    name: Legal Service Tests
+    runs-on: ubuntu-latest
+    needs: backend-lint
+    defaults:
+      run:
+        working-directory: ./services/legal-service
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5435:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6380:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: ./services/legal-service/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Run contract tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5435/test_db
+          REDIS_URL: redis://localhost:6380/0
+        run: pytest tests/test_contracts.py -v --tb=short
+
+  test-community-service:
+    name: Community Service Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./services/community-service
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5436:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6381:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: ./services/community-service/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Run contract tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5436/test_db
+          REDIS_URL: redis://localhost:6381/0
+        run: pytest tests/test_pact_contracts.py -v --tb=short
+
   # ============ 安全扫描 ============
   security-scan:
     name: Security Scan
@@ -205,7 +426,25 @@ jobs:
   docker-build:
     name: Docker Build Test
     runs-on: ubuntu-latest
-    needs: [frontend-build, backend-test]
+    needs: [frontend-build, backend-test, test-news-service, test-search-service, test-recommendation-service, test-legal-service, test-community-service]
+    strategy:
+      matrix:
+        service:
+          - context: ./frontend-v2
+            tag: baixing-frontend
+          - context: ./backend
+            tag: baixing-backend
+          - context: ./services/news-service
+            tag: baixing-news
+          - context: ./services/search-service
+            tag: baixing-search
+          - context: ./services/recommendation-service
+            tag: baixing-recommendation
+          - context: ./services/legal-service
+            tag: baixing-legal
+          - context: ./services/community-service
+            tag: baixing-community
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -213,23 +452,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build frontend Docker image
+      - name: Build ${{ matrix.service.tag }} Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./frontend-v2
+          context: ${{ matrix.service.context }}
           push: false
-          tags: baixing-frontend:test
+          tags: ${{ matrix.service.tag }}:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Build backend Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          push: false
-          tags: baixing-backend:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        continue-on-error: true
 
   # ============ 部署到测试环境 (develop分支) ============
   deploy-staging:
@@ -238,6 +469,7 @@ jobs:
     needs: [frontend-build, backend-test, docker-build]
     if: github.ref == 'refs/heads/develop'
     environment: staging
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -327,6 +559,7 @@ jobs:
     needs: [frontend-build, backend-test, docker-build, security-scan]
     if: github.ref == 'refs/heads/main'
     environment: production
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

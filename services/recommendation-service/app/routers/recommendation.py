@@ -1,111 +1,91 @@
 """推荐路由"""
 from typing import List, Optional
-import httpx
-from fastapi import APIRouter, Query
-from pydantic import BaseModel
 
-from ..config.settings import get_settings
+from fastapi import APIRouter, Query, Depends
 
-settings = get_settings()
+from app.services.recommendation_service import recommendation_service
+from app.database import get_db, AsyncSession
+
 router = APIRouter()
 
 
-class RecommendationItem(BaseModel):
-    id: int
-    type: str
-    title: str
-    description: str
-    url: str
-
-
-class RecommendationResponse(BaseModel):
-    items: List[RecommendationItem]
-
-
-async def _fetch_from_service(url: str, params: dict = None) -> dict:
-    """从其他服务获取数据"""
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(url, params=params)
-            if response.status_code == 200:
-                return response.json()
-    except Exception:
-        pass
-    return {}
-
-
-@router.get("/lawyers", response_model=RecommendationResponse)
+@router.get("/lawyers")
 async def recommend_lawyers(
     user_id: int = Query(..., description="用户ID"),
-    limit: int = Query(10, ge=1, le=50)
+    limit: int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
 ):
     """推荐律师"""
-    return RecommendationResponse(items=[
-        RecommendationItem(
-            id=i,
-            type="lawyer",
-            title=f"推荐律师 {i}",
-            description="资深律师，专业可靠",
-            url=f"/lawyer/{i}"
-        )
-        for i in range(1, min(limit + 1, 4))
-    ])
+    items = await recommendation_service.recommend_lawyers(db, user_id, limit)
+    return {"items": items}
 
 
-@router.get("/news", response_model=RecommendationResponse)
+@router.get("/news")
 async def recommend_news(
     user_id: int = Query(..., description="用户ID"),
-    limit: int = Query(10, ge=1, le=50)
+    limit: int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
 ):
     """推荐新闻"""
-    url = f"{settings.news_service_url}/api/v1/news"
-    data = await _fetch_from_service(url, {"page_size": limit})
-    
-    items = []
-    if "items" in data:
-        for news in data["items"][:limit]:
-            items.append(RecommendationItem(
-                id=news.get("id", 0),
-                type="news",
-                title=news.get("title", ""),
-                description=news.get("summary", ""),
-                url=f"/news/{news.get('id')}"
-            ))
-    
-    return RecommendationResponse(items=items)
+    items = await recommendation_service.recommend_news(db, user_id, limit)
+    return {"items": items}
 
 
-@router.get("/posts", response_model=RecommendationResponse)
+@router.get("/posts")
 async def recommend_posts(
     user_id: int = Query(..., description="用户ID"),
-    limit: int = Query(10, ge=1, le=50)
+    limit: int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
 ):
     """推荐帖子"""
-    url = f"{settings.community_service_url}/api/v1/community/posts"
-    data = await _fetch_from_service(url, {"page_size": limit})
-    
-    items = []
-    if "items" in data:
-        for post in data["items"][:limit]:
-            items.append(RecommendationItem(
-                id=post.get("id", 0),
-                type="post",
-                title=post.get("title", ""),
-                description=post.get("content", "")[:100],
-                url=f"/forum/post/{post.get('id')}"
-            ))
-    
-    return RecommendationResponse(items=items)
+    items = await recommendation_service.recommend_posts(db, user_id, limit)
+    return {"items": items}
 
 
-@router.get("/feed", response_model=RecommendationResponse)
+@router.get("/feed")
 async def get_personalized_feed(
     user_id: int = Query(..., description="用户ID"),
-    limit: int = Query(20, ge=1, le=50)
+    limit: int = Query(20, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
 ):
     """个性化推荐信息流（混合推荐）"""
-    news = await recommend_news(user_id=user_id, limit=limit // 2)
-    posts = await recommend_posts(user_id=user_id, limit=limit // 2)
-    
-    items = (news.items + posts.items)[:limit]
-    return RecommendationResponse(items=items)
+    items = await recommendation_service.get_personalized_feed(db, user_id, limit)
+    return {"items": items}
+
+
+@router.post("/user/{user_id}/features")
+async def update_user_features(
+    user_id: int,
+    features: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """更新用户特征"""
+    user_feature = await recommendation_service.update_user_features(
+        db, user_id, features
+    )
+    return {
+        "user_id": user_feature.user_id,
+        "features": user_feature.features,
+        "updated_at": user_feature.updated_at.isoformat(),
+    }
+
+
+@router.post("/items/{item_type}/{item_id}/features")
+async def update_item_features(
+    item_type: str,
+    item_id: int,
+    features: dict,
+    score: float = 0.0,
+    db: AsyncSession = Depends(get_db),
+):
+    """更新物品特征"""
+    item_feature = await recommendation_service.update_item_features(
+        db, item_type, item_id, features, score
+    )
+    return {
+        "item_type": item_feature.item_type,
+        "item_id": item_feature.item_id,
+        "features": item_feature.features,
+        "score": item_feature.score,
+        "updated_at": item_feature.updated_at.isoformat(),
+    }

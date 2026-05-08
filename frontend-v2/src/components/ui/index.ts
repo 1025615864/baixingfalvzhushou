@@ -108,6 +108,7 @@ export type {
 } from './Input';
 
 export { Badge } from './Badge';
+export { Form, FormField, TextArea, Select, Checkbox, DatePicker, Button } from './Form';
 
 // ==================== Tabs组件 ====================
 export { Tabs, TabsList, TabsTrigger, TabsContent } from './Tabs';

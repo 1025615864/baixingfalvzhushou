@@ -1,0 +1,40 @@
+[Unit]
+Description=Baixing Legal Assistant - Backend (BFF)
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=baixing
+Group=baixing
+WorkingDirectory=/opt/baixing-assistant/backend
+
+# 环境变量
+EnvironmentFile=/opt/baixing-assistant/.env
+Environment=PYTHONUNBUFFERED=1
+
+# 启动命令
+ExecStart=/opt/baixing-assistant/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+ExecReload=/bin/kill -HUP $MAINPID
+
+# 重启策略
+Restart=always
+RestartSec=5
+
+# 资源限制
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# 安全加固
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/baixing-assistant/backend/logs
+
+# 日志
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=baixing-backend
+
+[Install]
+WantedBy=multi-user.target

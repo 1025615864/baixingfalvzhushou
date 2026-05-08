@@ -104,11 +104,13 @@ routes:
 
 ## 2. 路由与上游配置
 
-### 2.1 后端服务路由
+### 2.1 后端服务路由（完整微服务路由表）
 
 ```yaml
 routes:
-  # 用户服务
+  # ========================================
+  # 用户与认证
+  # ========================================
   - uri: /api/v1/users/*
     upstream:
       type: roundrobin
@@ -118,7 +120,9 @@ routes:
         service_name: user-service
         group: api-services
 
+  # ========================================
   # 法律服务
+  # ========================================
   - uri: /api/v1/legal/*
     upstream:
       type: roundrobin
@@ -128,7 +132,9 @@ routes:
         service_name: legal-service
         group: api-services
 
+  # ========================================
   # AI 服务
+  # ========================================
   - uri: /api/v1/ai/*
     upstream:
       type: roundrobin
@@ -138,7 +144,9 @@ routes:
         service_name: ai-service
         group: api-services
 
-  # 订单服务
+  # ========================================
+  # 订单服务 (8004)
+  # ========================================
   - uri: /api/v1/orders/*
     upstream:
       type: roundrobin
@@ -148,7 +156,105 @@ routes:
         service_name: order-service
         group: api-services
 
+  # ========================================
+  # 通知服务 (8005)
+  # ========================================
+  - uri: /api/v1/notifications/*
+    upstream:
+      type: roundrobin
+      service_name: notification-service
+      discovery_type: consul
+      discovery_args:
+        service_name: notification-service
+        group: api-services
+
+  # ========================================
+  # 社区服务 (8007)
+  # ========================================
+  - uri: /api/v1/community/*
+    upstream:
+      type: roundrobin
+      service_name: community-service
+      discovery_type: consul
+      discovery_args:
+        service_name: community-service
+        group: api-services
+
+  # ========================================
+  # 新闻服务 (8006)
+  # ========================================
+  - uri: /api/v1/news/*
+    upstream:
+      type: roundrobin
+      service_name: news-service
+      discovery_type: consul
+      discovery_args:
+        service_name: news-service
+        group: api-services
+
+  # ========================================
+  # 搜索服务 (8009)
+  # ========================================
+  - uri: /api/v1/search/*
+    upstream:
+      type: roundrobin
+      service_name: search-service
+      discovery_type: consul
+      discovery_args:
+        service_name: search-service
+        group: api-services
+
+  # ========================================
+  # 推荐服务 (8010)
+  # ========================================
+  - uri: /api/v1/recommendation/*
+    upstream:
+      type: roundrobin
+      service_name: recommendation-service
+      discovery_type: consul
+      discovery_args:
+        service_name: recommendation-service
+        group: api-services
+
+  # ========================================
+  # 积分服务 (8012)
+  # ========================================
+  - uri: /api/v1/points/*
+    upstream:
+      type: roundrobin
+      service_name: points-service
+      discovery_type: consul
+      discovery_args:
+        service_name: points-service
+        group: api-services
+
+  # ========================================
+  # 知识库服务 (8081)
+  # ========================================
+  - uri: /api/v1/knowledge/*
+    upstream:
+      type: roundrobin
+      service_name: knowledge-service
+      discovery_type: consul
+      discovery_args:
+        service_name: knowledge-service
+        group: api-services
+
+  # ========================================
+  # 档案服务 (8013)
+  # ========================================
+  - uri: /api/v1/archive/*
+    upstream:
+      type: roundrobin
+      service_name: archive-service
+      discovery_type: consul
+      discovery_args:
+        service_name: archive-service
+        group: api-services
+
+  # ========================================
   # 支付服务
+  # ========================================
   - uri: /api/v1/payments/*
     upstream:
       type: roundrobin

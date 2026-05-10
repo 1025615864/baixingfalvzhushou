@@ -160,6 +160,8 @@ try:
 except ImportError:
     email_service = None
 
+EmailOptimizer = OptimizedEmailService
+
 optimized_email_service = OptimizedEmailService()
 
 

@@ -295,13 +295,13 @@ class TestUserPasswordChange:
         """测试成功修改密码"""
         # Arrange
         from app.utils.security import create_access_token, hash_password
-        test_user.hashed_password = hash_password("oldpass123")
+        test_user.hashed_password = hash_password(TEST_PASSWORD)
         await db.commit()
 
         token = create_access_token(data={"sub": str(test_user.id)})
         headers = {"Authorization": f"Bearer {token}"}
         password_data = {
-            "old_password": "oldpass123",
+            "old_password": TEST_PASSWORD,
             "new_password": "newpass123"
         }
 
@@ -319,7 +319,7 @@ class TestUserPasswordChange:
         """测试使用错误的旧密码修改"""
         # Arrange
         from app.utils.security import create_access_token, hash_password
-        test_user.hashed_password = hash_password("oldpass123")
+        test_user.hashed_password = hash_password(TEST_PASSWORD)
         await db.commit()
 
         token = create_access_token(data={"sub": str(test_user.id)})
@@ -341,14 +341,14 @@ class TestUserPasswordChange:
         """测试新密码与旧密码相同"""
         # Arrange
         from app.utils.security import create_access_token, hash_password
-        test_user.hashed_password = hash_password("samepass123")
+        test_user.hashed_password = hash_password(TEST_PASSWORD)
         await db.commit()
 
         token = create_access_token(data={"sub": str(test_user.id)})
         headers = {"Authorization": f"Bearer {token}"}
         password_data = {
-            "old_password": "samepass123",
-            "new_password": "samepass123"
+            "old_password": TEST_PASSWORD,
+            "new_password": TEST_PASSWORD
         }
 
         # Act

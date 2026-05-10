@@ -28,7 +28,7 @@ MICROSERVICES: dict[str, dict[str, Any]] = {
     "points": {"prefix": "/points", "url": "${POINTS_SERVICE_URL:-http://points-service:8012}"},
     "archive": {"prefix": "/archive", "url": "${ARCHIVE_SERVICE_URL:-http://archive-service:8013}"},
     "knowledge": {"prefix": "/knowledge", "url": "${KNOWLEDGE_SERVICE_URL:-http://knowledge-service:8081}"},
-    "ai": {"prefix": "/ai", "url": "${AI_SERVICE_URL:-http://ai-service:8005}"},
+    "ai": {"prefix": "/ai", "url": "${AI_SERVICE_URL:-http://localhost:8005}"},
 }
 
 # 超时配置（秒）

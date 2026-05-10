@@ -207,11 +207,11 @@ export default defineConfig({
       // Docker 容器内通过服务名 backend 访问后端
       // 本地开发时通过环境变量 VITE_BACKEND_URL 或默认 localhost:8000 访问
       '/api': {
-        target: process.env.VITE_BACKEND_URL || 'http://backend:8000',
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:8000',
         changeOrigin: true,
       },
       '/ws': {
-        target: (process.env.VITE_WS_URL || 'ws://backend:8000').replace('http', 'ws'),
+        target: (process.env.VITE_WS_URL || 'ws://localhost:8000').replace('http', 'ws'),
         changeOrigin: true,
         ws: true,
       },

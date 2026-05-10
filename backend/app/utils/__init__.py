@@ -17,8 +17,7 @@ from .helpers import *
 from .validators import *
 from .permissions import *
 from .deps import *
-from .content_filter import *
-from . import content_filter
+from .content_filter import *  # noqa: F401,F403
 from .verification import *
 from .periodic_task_runner import *
 from .service_governance import *

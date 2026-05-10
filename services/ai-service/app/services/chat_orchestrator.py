@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ChatRequest:
-    user_id: int
-    message: str
+    user_id: int = 0
+    message: str = ""
     session_id: Optional[str] = None
 
 

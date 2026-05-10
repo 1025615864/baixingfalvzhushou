@@ -380,17 +380,6 @@ export function ChatPage(): JSX.Element {
     let sessionId = currentSessionId;
 
     try {
-      if (!sessionId) {
-        const sessionResult = await apiCreateSession({
-          title: content.slice(0, 30),
-          initialMessage: content,
-          category: 'legal',
-        });
-        sessionId = sessionResult.sessionId;
-        setCurrentSessionId(sessionId);
-        void loadSessions();
-      }
-
       const controller = apiSendMessageStream(
         {
           sessionId,
@@ -414,6 +403,33 @@ export function ChatPage(): JSX.Element {
                   : m
               )
             );
+          } else if (chunk.type === 'metadata' && chunk.data) {
+            try {
+              const parsed = JSON.parse(chunk.data);
+              if (parsed.sessionId && !sessionId) {
+                sessionId = parsed.sessionId;
+                setCurrentSessionId(parsed.sessionId);
+                void loadSessions();
+              }
+              if (parsed.stage) {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMessageId
+                      ? { ...m, content: m.content || `正在${parsed.stage}...` }
+                      : m
+                  )
+                );
+              }
+            } catch { /* ignore parse errors */ }
+          } else if (chunk.type === 'done' && chunk.data) {
+            try {
+              const parsed = JSON.parse(chunk.data);
+              if (parsed.sessionId && !sessionId) {
+                sessionId = parsed.sessionId;
+                setCurrentSessionId(parsed.sessionId);
+                void loadSessions();
+              }
+            } catch { /* ignore */ }
           }
         },
         (error: AIConsultationError) => {

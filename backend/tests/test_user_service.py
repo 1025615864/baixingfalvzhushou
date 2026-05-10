@@ -18,6 +18,7 @@ from app.services.user_service import UserService, user_service
 from app.models.user import User
 from app.schemas.user import UserCreate, UserUpdate
 from app.utils.security import hash_password, verify_password
+from tests.conftest import TEST_PASSWORD
 
 
 @pytest.mark.asyncio
@@ -28,7 +29,7 @@ async def test_get_user_by_id_success(db: AsyncSession):
         username="testuser1",
         email="test1@example.com",
         nickname="测试用户1",
-        hashed_password=hash_password("password123")
+        hashed_password=hash_password(TEST_PASSWORD)
     )
     db.add(user)
     await db.commit()
@@ -62,7 +63,7 @@ async def test_get_user_by_username_success(db: AsyncSession):
         username="testuser2",
         email="test2@example.com",
         nickname="测试用户2",
-        hashed_password=hash_password("password123")
+        hashed_password=hash_password(TEST_PASSWORD)
     )
     db.add(user)
     await db.commit()
@@ -94,7 +95,7 @@ async def test_get_user_by_email_success(db: AsyncSession):
         username="testuser3",
         email="test3@example.com",
         nickname="测试用户3",
-        hashed_password=hash_password("password123")
+        hashed_password=hash_password(TEST_PASSWORD)
     )
     db.add(user)
     await db.commit()
@@ -126,7 +127,7 @@ async def test_get_user_by_username_or_email_with_username(db: AsyncSession):
         username="testuser4",
         email="test4@example.com",
         nickname="测试用户4",
-        hashed_password=hash_password("password123")
+        hashed_password=hash_password(TEST_PASSWORD)
     )
     db.add(user)
     await db.commit()
@@ -147,7 +148,7 @@ async def test_get_user_by_username_or_email_with_email(db: AsyncSession):
         username="testuser5",
         email="test5@example.com",
         nickname="测试用户5",
-        hashed_password=hash_password("password123")
+        hashed_password=hash_password(TEST_PASSWORD)
     )
     db.add(user)
     await db.commit()
@@ -168,7 +169,7 @@ async def test_create_user_success(db: AsyncSession):
         username="newuser",
         email="newuser@example.com",
         nickname="新用户",
-        password="SecurePass123",
+        password=TEST_PASSWORD,
         agree_terms=True,
         agree_privacy=True,
         agree_ai_disclaimer=True
@@ -183,8 +184,8 @@ async def test_create_user_success(db: AsyncSession):
     assert user.email == "newuser@example.com"
     assert user.nickname == "新用户"
     assert user.hashed_password is not None
-    assert user.hashed_password != "SecurePass123"  # 密码应该被哈希
-    assert verify_password("SecurePass123", user.hashed_password)  # 验证密码可以正确验证
+    assert user.hashed_password != TEST_PASSWORD
+    assert verify_password(TEST_PASSWORD, user.hashed_password)
 
 
 @pytest.mark.asyncio
@@ -194,8 +195,8 @@ async def test_create_user_with_default_nickname(db: AsyncSession):
     user_data = UserCreate(
         username="newuser2",
         email="newuser2@example.com",
-        nickname=None,  # 不提供昵称
-        password="SecurePass123",
+        nickname=None,
+        password=TEST_PASSWORD,
         agree_terms=True,
         agree_privacy=True,
         agree_ai_disclaimer=True
@@ -206,27 +207,25 @@ async def test_create_user_with_default_nickname(db: AsyncSession):
 
     # Assert
     assert user is not None
-    assert user.nickname == "newuser2"  # 应该使用用户名作为默认昵称
+    assert user.nickname == "newuser2"
 
 
 @pytest.mark.asyncio
 async def test_create_user_duplicate_username(db: AsyncSession):
     """测试创建用户时用户名重复"""
     # Arrange
-    # 先创建一个用户
     existing_user = User(
         username="existinguser",
         email="existing@example.com",
-        hashed_password=hash_password("password123")
+        hashed_password=hash_password(TEST_PASSWORD)
     )
     db.add(existing_user)
     await db.commit()
 
-    # 尝试创建相同用户名的用户
     user_data = UserCreate(
         username="existinguser",
         email="different@example.com",
-        password="SecurePass123",
+        password=TEST_PASSWORD,
         agree_terms=True,
         agree_privacy=True,
         agree_ai_disclaimer=True
@@ -241,20 +240,18 @@ async def test_create_user_duplicate_username(db: AsyncSession):
 async def test_create_user_duplicate_email(db: AsyncSession):
     """测试创建用户时邮箱重复"""
     # Arrange
-    # 先创建一个用户
     existing_user = User(
         username="uniqueuser",
         email="duplicate@example.com",
-        hashed_password=hash_password("password123")
+        hashed_password=hash_password(TEST_PASSWORD)
     )
     db.add(existing_user)
     await db.commit()
 
-    # 尝试创建相同邮箱的用户
     user_data = UserCreate(
         username="newuniqueuser",
         email="duplicate@example.com",
-        password="SecurePass123",
+        password=TEST_PASSWORD,
         agree_terms=True,
         agree_privacy=True,
         agree_ai_disclaimer=True
@@ -273,7 +270,7 @@ async def test_update_user_success(db: AsyncSession):
         username="testuser6",
         email="test6@example.com",
         nickname="旧昵称",
-        hashed_password=hash_password("password123")
+        hashed_password=hash_password(TEST_PASSWORD)
     )
     db.add(user)
     await db.commit()
@@ -289,8 +286,8 @@ async def test_update_user_success(db: AsyncSession):
     # Assert
     assert updated_user.nickname == "新昵称"
     assert updated_user.avatar == "https://example.com/avatar.jpg"
-    assert updated_user.username == "testuser6"  # 用户名不应该改变
-    assert updated_user.email == "test6@example.com"  # 邮箱不应该改变
+    assert updated_user.username == "testuser6"
+    assert updated_user.email == "test6@example.com"
 
 
 @pytest.mark.asyncio
@@ -303,7 +300,7 @@ async def test_update_user_phone_number_change(db: AsyncSession):
         phone="13800138000",
         phone_verified=True,
         phone_verified_at=datetime.now(timezone.utc),
-        hashed_password=hash_password("password123")
+        hashed_password=hash_password(TEST_PASSWORD)
     )
     db.add(user)
     await db.commit()
@@ -317,7 +314,7 @@ async def test_update_user_phone_number_change(db: AsyncSession):
 
     # Assert
     assert updated_user.phone == "13800138001"
-    assert updated_user.phone_verified is False  # 手机号改变时验证状态应该被重置
+    assert updated_user.phone_verified is False
     assert updated_user.phone_verified_at is None
 
 
@@ -330,12 +327,11 @@ async def test_update_user_partial(db: AsyncSession):
         email="test8@example.com",
         nickname="原始昵称",
         phone="13800138000",
-        hashed_password=hash_password("password123")
+        hashed_password=hash_password(TEST_PASSWORD)
     )
     db.add(user)
     await db.commit()
 
-    # 只更新昵称，不更新手机号
     update_data = UserUpdate(
         nickname="更新后的昵称"
     )
@@ -345,7 +341,7 @@ async def test_update_user_partial(db: AsyncSession):
 
     # Assert
     assert updated_user.nickname == "更新后的昵称"
-    assert updated_user.phone == "13800138000"  # 手机号不应该改变
+    assert updated_user.phone == "13800138000"
 
 
 @pytest.mark.asyncio
@@ -357,7 +353,7 @@ async def test_update_user_remove_phone(db: AsyncSession):
         email="test9@example.com",
         phone="13800138000",
         phone_verified=True,
-        hashed_password=hash_password("password123")
+        hashed_password=hash_password(TEST_PASSWORD)
     )
     db.add(user)
     await db.commit()
@@ -382,13 +378,13 @@ async def test_authenticate_success(db: AsyncSession):
     user = User(
         username="authuser",
         email="auth@example.com",
-        hashed_password=hash_password("CorrectPassword123")
+        hashed_password=hash_password(TEST_PASSWORD)
     )
     db.add(user)
     await db.commit()
 
     # Act
-    authenticated_user = await UserService.authenticate(db, "authuser", "CorrectPassword123")
+    authenticated_user = await UserService.authenticate(db, "authuser", TEST_PASSWORD)
 
     # Assert
     assert authenticated_user is not None
@@ -403,13 +399,13 @@ async def test_authenticate_with_email(db: AsyncSession):
     user = User(
         username="emailuser",
         email="email@example.com",
-        hashed_password=hash_password("CorrectPassword123")
+        hashed_password=hash_password(TEST_PASSWORD)
     )
     db.add(user)
     await db.commit()
 
-    # Act - 使用邮箱而不是用户名
-    authenticated_user = await UserService.authenticate(db, "email@example.com", "CorrectPassword123")
+    # Act
+    authenticated_user = await UserService.authenticate(db, "email@example.com", TEST_PASSWORD)
 
     # Assert
     assert authenticated_user is not None
@@ -420,7 +416,7 @@ async def test_authenticate_with_email(db: AsyncSession):
 async def test_authenticate_user_not_found(db: AsyncSession):
     """测试认证不存在的用户"""
     # Act
-    authenticated_user = await UserService.authenticate(db, "nonexistent", "password123")
+    authenticated_user = await UserService.authenticate(db, "nonexistent", TEST_PASSWORD)
 
     # Assert
     assert authenticated_user is None
@@ -433,7 +429,7 @@ async def test_authenticate_wrong_password(db: AsyncSession):
     user = User(
         username="wrongpass",
         email="wrongpass@example.com",
-        hashed_password=hash_password("CorrectPassword123")
+        hashed_password=hash_password(TEST_PASSWORD)
     )
     db.add(user)
     await db.commit()
@@ -452,7 +448,7 @@ async def test_is_username_taken_true(db: AsyncSession):
     user = User(
         username="takenuser",
         email="taken@example.com",
-        hashed_password=hash_password("password123")
+        hashed_password=hash_password(TEST_PASSWORD)
     )
     db.add(user)
     await db.commit()
@@ -481,7 +477,7 @@ async def test_is_email_taken_true(db: AsyncSession):
     user = User(
         username="emailtaken",
         email="takenemail@example.com",
-        hashed_password=hash_password("password123")
+        hashed_password=hash_password(TEST_PASSWORD)
     )
     db.add(user)
     await db.commit()
@@ -508,7 +504,7 @@ async def test_get_user_list_without_keyword(db: AsyncSession):
     """测试获取用户列表（无关键词）"""
     # Arrange
     users = [
-        User(username=f"user{i}", email=f"user{i}@example.com", hashed_password=hash_password("pass"))
+        User(username=f"user{i}", email=f"user{i}@example.com", hashed_password=hash_password(TEST_PASSWORD))
         for i in range(5)
     ]
     for user in users:
@@ -528,9 +524,9 @@ async def test_get_user_list_with_keyword(db: AsyncSession):
     """测试获取用户列表（带关键词）"""
     # Arrange
     users = [
-        User(username="testuser1", email="test1@example.com", nickname="测试用户1", hashed_password=hash_password("pass")),
-        User(username="testuser2", email="test2@example.com", nickname="测试用户2", hashed_password=hash_password("pass")),
-        User(username="otheruser", email="other@example.com", nickname="其他用户", hashed_password=hash_password("pass")),
+        User(username="testuser1", email="test1@example.com", nickname="测试用户1", hashed_password=hash_password(TEST_PASSWORD)),
+        User(username="testuser2", email="test2@example.com", nickname="测试用户2", hashed_password=hash_password(TEST_PASSWORD)),
+        User(username="otheruser", email="other@example.com", nickname="其他用户", hashed_password=hash_password(TEST_PASSWORD)),
     ]
     for user in users:
         db.add(user)
@@ -540,7 +536,7 @@ async def test_get_user_list_with_keyword(db: AsyncSession):
     user_list, total = await UserService.get_user_list(db, page=1, page_size=10, keyword="test")
 
     # Assert
-    assert len(user_list) == 2  # 应该找到2个匹配的用户
+    assert len(user_list) == 2
     assert total == 2
 
     # Act - 搜索关键词"测试"
@@ -556,7 +552,7 @@ async def test_get_user_list_pagination(db: AsyncSession):
     """测试用户列表分页"""
     # Arrange
     users = [
-        User(username=f"user{i}", email=f"user{i}@example.com", hashed_password=hash_password("pass"))
+        User(username=f"user{i}", email=f"user{i}@example.com", hashed_password=hash_password(TEST_PASSWORD))
         for i in range(15)
     ]
     for user in users:
@@ -573,10 +569,9 @@ async def test_get_user_list_pagination(db: AsyncSession):
     assert len(page2) == 5
     assert total2 == 15
 
-    # 验证分页正确性
     page1_ids = [u.id for u in page1]
     page2_ids = [u.id for u in page2]
-    assert len(set(page1_ids) & set(page2_ids)) == 0  # 两页不应该有重叠
+    assert len(set(page1_ids) & set(page2_ids)) == 0
 
 
 @pytest.mark.asyncio
@@ -584,7 +579,7 @@ async def test_get_user_list_ordering(db: AsyncSession):
     """测试用户列表排序（应该按ID降序）"""
     # Arrange
     users = [
-        User(username=f"user{i}", email=f"user{i}@example.com", hashed_password=hash_password("pass"))
+        User(username=f"user{i}", email=f"user{i}@example.com", hashed_password=hash_password(TEST_PASSWORD))
         for i in range(3)
     ]
     for user in users:
@@ -594,7 +589,7 @@ async def test_get_user_list_ordering(db: AsyncSession):
     # Act
     user_list, total = await UserService.get_user_list(db, page=1, page_size=10)
 
-    # Assert - 应该按ID降序排列
+    # Assert
     assert user_list[0].id > user_list[1].id
     assert user_list[1].id > user_list[2].id
     assert total == 3

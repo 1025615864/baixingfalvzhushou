@@ -18,6 +18,7 @@ from .validators import *
 from .permissions import *
 from .deps import *
 from .content_filter import *
+from . import content_filter
 from .verification import *
 from .periodic_task_runner import *
 from .service_governance import *

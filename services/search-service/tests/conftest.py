@@ -13,7 +13,6 @@ def event_loop():
 
 @pytest.fixture
 async def client():
-    """创建测试客户端"""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac

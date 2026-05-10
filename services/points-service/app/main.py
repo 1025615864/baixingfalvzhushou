@@ -2,8 +2,9 @@
 import logging
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from .config.settings import get_settings
 from .database import engine, Base
 
@@ -84,7 +85,12 @@ def create_app() -> FastAPI:
 
     @app.get("/health/ready")
     async def readiness_check():
-        return {"status": "ready"}
+        try:
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            return {"status": "ready"}
+        except Exception:
+            raise HTTPException(status_code=503, detail="Service not ready")
 
     @app.get("/health/live")
     async def liveness_check():

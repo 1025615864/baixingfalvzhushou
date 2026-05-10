@@ -154,3 +154,45 @@ class PeriodicJobsConfig:
         if (not debug) and (not redis_connected):
             enabled = False
         return enabled
+
+
+def setup_periodic_tasks(
+    settings: object,
+    runner: object,
+    redis_connected: bool,
+) -> list[asyncio.Task[None]]:
+    cfg = PeriodicJobsConfig
+    debug = getattr(settings, "debug", False)
+    tasks: list[asyncio.Task[None]] = []
+
+    if cfg.is_settlement_enabled(debug, redis_connected):
+        tasks.append(asyncio.create_task(
+            runner.run(
+                lock_key="locks:settlement",
+                lock_ttl_seconds=60,
+                interval_seconds=cfg.SETTLEMENT_INTERVAL_SECONDS,
+                job=settlement_job_wrapper,
+            )
+        ))
+
+    if cfg.is_wechatpay_refresh_enabled(debug, redis_connected):
+        tasks.append(asyncio.create_task(
+            runner.run(
+                lock_key="locks:wechatpay_platform_certs",
+                lock_ttl_seconds=120,
+                interval_seconds=cfg.WECHATPAY_CERT_REFRESH_INTERVAL_SECONDS,
+                job=lambda: wechatpay_platform_certs_refresh_job_wrapper(settings),
+            )
+        ))
+
+    if cfg.is_review_sla_enabled(debug, redis_connected):
+        tasks.append(asyncio.create_task(
+            runner.run(
+                lock_key="locks:review_task_sla",
+                lock_ttl_seconds=60,
+                interval_seconds=cfg.REVIEW_TASK_SLA_SCAN_INTERVAL_SECONDS,
+                job=review_task_sla_job_wrapper,
+            )
+        ))
+
+    return tasks

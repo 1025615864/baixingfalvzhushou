@@ -20,7 +20,7 @@ const SERVICE_CONFIGS: Record<string, ServiceConfig> = {
   payment: { host: 'localhost', port: 8000, basePath: '/api/v1/payment' },
   accounting: { host: 'localhost', port: 8000, basePath: '/api/v1' },
   legal: { host: 'localhost', port: 8000, basePath: '/api/v1/legal' },
-  ai: { host: 'localhost', port: 8000, basePath: '/api/v1/ai' },
+  ai: { host: 'localhost', port: 8005, basePath: '/api/v1/ai' },
   news: { host: 'localhost', port: 8000, basePath: '/api/v1/news' },
   community: { host: 'localhost', port: 8000, basePath: '/api/v1/community' },
   points: { host: 'localhost', port: 8000, basePath: '/api/v1/points' },

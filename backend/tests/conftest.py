@@ -38,6 +38,8 @@ from app.database import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.user import User  # noqa: E402
 
+TEST_PASSWORD = "TestP@ssw0rd_2026!"
+
 # =============================================================================
 # 区域 1: 数据库 Fixtures
 # =============================================================================

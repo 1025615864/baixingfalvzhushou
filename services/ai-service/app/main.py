@@ -134,15 +134,17 @@ def create_app() -> FastAPI:
     cors_config = get_cors_config()
     app.add_middleware(CORSMiddleware, **cors_config)
 
-    from .routers import chat_router, agent_router, config_router, metrics_router, websocket_router, health_router, ai_ops as ai_ops_router, audit_ops as audit_ops_router
+    from .routers import chat_router, agent_router, config_router, metrics_router, websocket_router, health_router
+    from .routers.ai_ops import router as ai_ops_router
+    from .routers.audit_ops import router as audit_ops_router
     app.include_router(chat_router, prefix="/api/v1/ai", tags=["AI对话"])
-    app.include_router(ai_ops_router, prefix="/api/v1/ai-ops", tags=["AI质量运营"])
+    app.include_router(ai_ops_router, tags=["AI质量运营"])
     app.include_router(agent_router, prefix="/api/v1/ai/admin/agents", tags=["Agent管理"])
     app.include_router(config_router, prefix="/api/v1/ai/admin/config", tags=["配置管理"])
     app.include_router(metrics_router, prefix="/api/v1/ai", tags=["监控指标"])
     app.include_router(health_router, prefix="/api/v1/health", tags=["健康检查"])
     app.include_router(websocket_router, tags=["WebSocket"])
-    app.include_router(audit_ops_router, prefix="/api/v1/ai-ops", tags=["审计日志运营"])
+    app.include_router(audit_ops_router, tags=["审计日志运营"])
 
     @app.get("/health")
     async def health_check():

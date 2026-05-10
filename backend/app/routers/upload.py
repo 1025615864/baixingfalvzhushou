@@ -307,7 +307,7 @@ async def upload_avatar(
     }
 
 
-@router.get("/avatars/{filename}", summary="获取头像")
+@router.get("/avatars/{filename}", summary="获取头像", response_model=None)
 async def get_avatar(
     filename: str,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -427,7 +427,7 @@ async def upload_file(
     }
 
 
-@router.get("/files/{filename}", summary="获取附件")
+@router.get("/files/{filename}", summary="获取附件", response_model=None)
 async def get_file(
     filename: str,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -560,7 +560,7 @@ async def upload_image(
     }
 
 
-@router.get("/images/{filename}", summary="获取图片")
+@router.get("/images/{filename}", summary="获取图片", response_model=None)
 async def get_image(
     filename: str,
     current_user: Annotated[User, Depends(get_current_user)],

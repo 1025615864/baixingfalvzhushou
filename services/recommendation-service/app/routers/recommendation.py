@@ -1,4 +1,3 @@
-"""推荐路由"""
 from typing import List, Optional
 
 from fastapi import APIRouter, Query, Depends
@@ -15,7 +14,6 @@ async def recommend_lawyers(
     limit: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
 ):
-    """推荐律师"""
     items = await recommendation_service.recommend_lawyers(db, user_id, limit)
     return {"items": items}
 
@@ -26,7 +24,6 @@ async def recommend_news(
     limit: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
 ):
-    """推荐新闻"""
     items = await recommendation_service.recommend_news(db, user_id, limit)
     return {"items": items}
 
@@ -37,7 +34,6 @@ async def recommend_posts(
     limit: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
 ):
-    """推荐帖子"""
     items = await recommendation_service.recommend_posts(db, user_id, limit)
     return {"items": items}
 
@@ -48,8 +44,27 @@ async def get_personalized_feed(
     limit: int = Query(20, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
 ):
-    """个性化推荐信息流（混合推荐）"""
     items = await recommendation_service.get_personalized_feed(db, user_id, limit)
+    return {"items": items}
+
+
+@router.get("/homepage")
+async def recommend_homepage(
+    user_id: int = Query(..., description="用户ID"),
+    limit: int = Query(20, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    items = await recommendation_service.recommend_homepage(db, user_id, limit)
+    return {"items": items}
+
+
+@router.get("/knowledge")
+async def recommend_knowledge(
+    user_id: int = Query(..., description="用户ID"),
+    limit: int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    items = await recommendation_service.recommend_knowledge(db, user_id, limit)
     return {"items": items}
 
 
@@ -59,7 +74,6 @@ async def update_user_features(
     features: dict,
     db: AsyncSession = Depends(get_db),
 ):
-    """更新用户特征"""
     user_feature = await recommendation_service.update_user_features(
         db, user_id, features
     )
@@ -78,7 +92,6 @@ async def update_item_features(
     score: float = 0.0,
     db: AsyncSession = Depends(get_db),
 ):
-    """更新物品特征"""
     item_feature = await recommendation_service.update_item_features(
         db, item_type, item_id, features, score
     )

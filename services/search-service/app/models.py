@@ -1,8 +1,19 @@
 """搜索服务模型"""
 from datetime import datetime
+from dataclasses import dataclass
 from sqlalchemy import String, DateTime, Integer, Index, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
+
+
+@dataclass
+class SearchItem:
+    id: int
+    type: str
+    title: str
+    description: str
+    url: str
+    score: float = 1.0
 
 
 class SearchIndex(Base):

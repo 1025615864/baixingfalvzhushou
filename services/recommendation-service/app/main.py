@@ -1,4 +1,3 @@
-"""推荐服务主应用"""
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -43,6 +42,14 @@ async def lifespan(app: FastAPI):
         otlp_endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
     )
 
+    from app.services.client_service import microservice_client
+    from app.services.cache_service import redis_cache_service
+    from app.consumers.behavior_consumer import behavior_consumer
+    from app.database import AsyncSessionLocal
+
+    behavior_consumer.set_session_factory(AsyncSessionLocal)
+    await behavior_consumer.start()
+
     consul = get_consul_registry()
     if consul and os.getenv("CONSUL_ENABLED", "").lower() in {"1", "true", "yes"}:
         host = os.getenv("SERVICE_HOST", "localhost")
@@ -58,6 +65,10 @@ async def lifespan(app: FastAPI):
         )
 
     yield
+
+    await behavior_consumer.stop()
+    await microservice_client.close()
+    await redis_cache_service.close()
 
     if consul and os.getenv("CONSUL_ENABLED", "").lower() in {"1", "true", "yes"}:
         port = int(os.getenv("SERVICE_PORT", "8010"))

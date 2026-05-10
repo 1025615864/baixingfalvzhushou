@@ -90,4 +90,34 @@ try:
 except ImportError:
     logger.warning("websocket路由未加载")
 
+try:
+    from . import ai
+    api_router.include_router(ai.router)
+except ImportError:
+    logger.warning("ai路由未加载")
+
+try:
+    from . import news
+    api_router.include_router(news.router)
+except ImportError:
+    logger.warning("news路由未加载")
+
+try:
+    from . import payment
+    api_router.include_router(payment.router)
+except ImportError:
+    logger.warning("payment路由未加载")
+
+try:
+    from . import search
+    api_router.include_router(search.router)
+except ImportError:
+    logger.warning("search路由未加载")
+
+try:
+    from . import forum
+    api_router.include_router(forum.router)
+except ImportError:
+    logger.warning("forum路由未加载")
+
 __all__ = ["api_router"]

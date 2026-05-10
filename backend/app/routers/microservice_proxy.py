@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 MICROSERVICES: dict[str, dict[str, Any]] = {
     "user": {"prefix": "/user", "url": "${USER_SERVICE_URL:-http://user-service:8001}"},
     "order": {"prefix": "/order", "url": "${ORDER_SERVICE_URL:-http://order-service:8004}"},
-    "notification": {"prefix": "/notification", "url": "${NOTIFICATION_SERVICE_URL:-http://notification-service:8005}"},
+    "notification": {"prefix": "/notification", "url": "${NOTIFICATION_SERVICE_URL:-http://notification-service:8011}"},
     "news": {"prefix": "/news", "url": "${NEWS_SERVICE_URL:-http://news-service:8006}"},
     "community": {"prefix": "/community", "url": "${COMMUNITY_SERVICE_URL:-http://community-service:8007}"},
     "legal": {"prefix": "/legal", "url": "${LEGAL_SERVICE_URL:-http://legal-service:8008}"},
@@ -28,13 +28,14 @@ MICROSERVICES: dict[str, dict[str, Any]] = {
     "points": {"prefix": "/points", "url": "${POINTS_SERVICE_URL:-http://points-service:8012}"},
     "archive": {"prefix": "/archive", "url": "${ARCHIVE_SERVICE_URL:-http://archive-service:8013}"},
     "knowledge": {"prefix": "/knowledge", "url": "${KNOWLEDGE_SERVICE_URL:-http://knowledge-service:8081}"},
-    "ai": {"prefix": "/ai", "url": "${AI_SERVICE_URL:-http://localhost:8005}"},
+    "ai": {"prefix": "/ai", "url": "${AI_SERVICE_URL:-http://ai-service:8005}"},
 }
 
 # 超时配置（秒）
 TIMEOUT_CONNECT = 5.0
-TIMEOUT_READ = 15.0
-TIMEOUT_WRITE = 30.0
+TIMEOUT_READ = 30.0
+TIMEOUT_WRITE = 60.0
+TIMEOUT_STREAM = 300.0
 
 # 熔断器状态
 class CircuitState:
@@ -118,6 +119,8 @@ async def proxy_to_microservice(request: Request, service_name: str, path: str) 
             is_stream = "text/event-stream" in accept_header
 
             if is_stream:
+                stream_timeout = httpx.Timeout(connect=TIMEOUT_CONNECT, read=TIMEOUT_STREAM, write=TIMEOUT_WRITE, pool=TIMEOUT_CONNECT)
+
                 async def stream_response():
                     async with client.stream(
                         method=request.method,
@@ -125,6 +128,7 @@ async def proxy_to_microservice(request: Request, service_name: str, path: str) 
                         headers=_forward_headers(request),
                         params=request.query_params,
                         content=await request.body(),
+                        timeout=stream_timeout,
                     ) as resp:
                         async for chunk in resp.aiter_bytes():
                             yield chunk

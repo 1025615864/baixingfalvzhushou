@@ -1,4 +1,3 @@
-"""Embedding服务配置"""
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 
@@ -16,6 +15,11 @@ class Settings(BaseSettings):
 
     EMBEDDING_MODEL: str = "shibing624/text2vec-base-chinese"
     EMBEDDING_DEVICE: str = "cpu"
+    EMBEDDING_DIM: int = 768
+    DEFAULT_BATCH_SIZE: int = 32
+    MAX_BATCH_SIZE: int = 512
+    DEFAULT_TOP_K: int = 5
+    MAX_TOP_K: int = 100
 
     cors_allowed_origins: List[str] = ["*"]
 

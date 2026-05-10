@@ -3,7 +3,6 @@ import asyncio
 from contextlib import asynccontextmanager
 import logging
 import os
-import time
 from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
@@ -11,10 +10,12 @@ from fastapi.exceptions import ResponseValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
+from .config.sentry import init_sentry
 from .database import init_db
 from .services import cache_service, prometheus_metrics, periodic_jobs
 from .services.ai_metrics import ai_metrics
-from .database import AsyncSessionLocal
+from .services.sitemap_service import generate_robots_txt, generate_sitemap_xml
+from .services.health_service import get_detailed_health
 from .routers import api_router, websocket
 from .middleware.logging_middleware import RequestLoggingMiddleware, ErrorLoggingMiddleware
 from .middleware.auth_context_middleware import AuthContextMiddleware
@@ -41,25 +42,7 @@ settings = get_settings()
 
 logger = logging.getLogger(__name__)
 
-try:
-    import sentry_sdk
-except Exception:
-    sentry_sdk = None
-
-if sentry_sdk is not None:
-    dsn = str(getattr(settings, "sentry_dsn", "") or "").strip()
-    if dsn:
-        env = str(getattr(settings, "sentry_environment", "") or "").strip() or None
-        release = str(getattr(settings, "sentry_release", "") or "").strip() or None
-        traces = float(getattr(settings, "sentry_traces_sample_rate", 0.0) or 0.0)
-        profiles = float(getattr(settings, "sentry_profiles_sample_rate", 0.0) or 0.0)
-        _ = sentry_sdk.init(
-            dsn=dsn,
-            environment=env,
-            release=release,
-            traces_sample_rate=max(0.0, min(1.0, traces)),
-            profiles_sample_rate=max(0.0, min(1.0, profiles)),
-        )
+init_sentry(settings)
 
 try:
     from .routers import auth as auth_router
@@ -117,40 +100,7 @@ async def lifespan(app: FastAPI) -> None:
     if (not settings.debug) and (not redis_connected):
         raise RuntimeError("Redis must be available when DEBUG is False. Please set REDIS_URL and ensure Redis is reachable.")
 
-    cfg = periodic_jobs.PeriodicJobsConfig
-
-    settlement_task: asyncio.Task[None] | None = None
-    if cfg.is_settlement_enabled(settings.debug, redis_connected):
-        settlement_task = asyncio.create_task(
-            runner.run(
-                lock_key="locks:settlement",
-                lock_ttl_seconds=60,
-                interval_seconds=cfg.SETTLEMENT_INTERVAL_SECONDS,
-                job=periodic_jobs.settlement_job_wrapper,
-            )
-        )
-
-    wechatpay_task: asyncio.Task[None] | None = None
-    if cfg.is_wechatpay_refresh_enabled(settings.debug, redis_connected):
-        wechatpay_task = asyncio.create_task(
-            runner.run(
-                lock_key="locks:wechatpay_platform_certs",
-                lock_ttl_seconds=120,
-                interval_seconds=cfg.WECHATPAY_CERT_REFRESH_INTERVAL_SECONDS,
-                job=lambda: periodic_jobs.wechatpay_platform_certs_refresh_job_wrapper(settings),
-            )
-        )
-
-    review_sla_task: asyncio.Task[None] | None = None
-    if cfg.is_review_sla_enabled(settings.debug, redis_connected):
-        review_sla_task = asyncio.create_task(
-            runner.run(
-                lock_key="locks:review_task_sla",
-                lock_ttl_seconds=60,
-                interval_seconds=cfg.REVIEW_TASK_SLA_SCAN_INTERVAL_SECONDS,
-                job=periodic_jobs.review_task_sla_job_wrapper,
-            )
-        )
+    periodic_tasks = periodic_jobs.setup_periodic_tasks(settings, runner, redis_connected)
 
     logger.info("数据库初始化完成")
     
@@ -162,9 +112,7 @@ async def lifespan(app: FastAPI) -> None:
         logger.info("服务已从Consul注销")
 
     stop_event.set()
-    for t in (wechatpay_task, settlement_task, review_sla_task):
-        if t is None:
-            continue
+    for t in periodic_tasks:
         _ = t.cancel()
         try:
             await t
@@ -245,6 +193,11 @@ Authorization: Bearer <your_token>
     }
 )
 
+if settings.environment == "production":
+    app.openapi_url = None
+    app.docs_url = None
+    app.redoc_url = None
+
 
 @app.exception_handler(ResponseValidationError)
 async def response_validation_exception_handler(request: Request, exc: ResponseValidationError):
@@ -302,80 +255,17 @@ if user_router is not None:
     app.include_router(user_router.router, prefix="/api")
 
 
-def _normalize_base_url(raw: str) -> str:
-    base = str(raw or "").strip()
-    if base.endswith("/"):
-        base = base[:-1]
-    return base
-
-
 @app.get("/robots.txt", include_in_schema=False)
 async def robots_txt() -> PlainTextResponse:
-    base = _normalize_base_url(getattr(settings, "frontend_base_url", "") or "")
-    sitemap_url = f"{base}/sitemap.xml" if base else "/sitemap.xml"
-    content = "\n".join(
-        [
-            "User-agent: *",
-            "Allow: /",
-            "Disallow: /admin",
-            f"Sitemap: {sitemap_url}",
-            "",
-        ]
-    )
+    base_url = getattr(settings, "frontend_base_url", "") or ""
+    content = generate_robots_txt(base_url)
     return PlainTextResponse(content=content, media_type="text/plain")
 
 
 @app.get("/sitemap.xml", include_in_schema=False)
 async def sitemap_xml() -> Response:
-    base = _normalize_base_url(getattr(settings, "frontend_base_url", "") or "")
-
-    paths = [
-        "/",
-        "/chat",
-        "/chat/history",
-        "/lawfirm",
-        "/calculator",
-        "/limitations",
-        "/documents",
-        "/contracts",
-        "/faq",
-        "/vip",
-        "/terms",
-        "/privacy",
-        "/ai-disclaimer",
-    ]
-
-    try:
-        pass
-    except Exception:
-        logger.exception("failed to build dynamic sitemap urls")
-
-    uniq_paths: list[str] = []
-    seen: set[str] = set()
-    for p in paths:
-        if not isinstance(p, str):
-            continue
-        if p in seen:
-            continue
-        seen.add(p)
-        uniq_paths.append(p)
-    paths = uniq_paths
-
-    def _loc(p: str) -> str:
-        if not p.startswith("/"):
-            p = "/" + p
-        return f"{base}{p}" if base else p
-
-    urls_xml: str = "\n".join(
-        f"  <url>\n    <loc>{_loc(p)}</loc>\n  </url>" for p in paths
-    )
-
-    xml = (
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-        "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n"
-        f"{urls_xml}\n"
-        "</urlset>\n"
-    )
+    base_url = getattr(settings, "frontend_base_url", "") or ""
+    xml = generate_sitemap_xml(base_url)
     return Response(content=xml, media_type="application/xml")
 
 
@@ -417,59 +307,4 @@ async def api_health_check() -> dict[str, str]:
 
 @app.get("/health/detailed")
 async def health_check_detailed() -> dict[str, Any]:
-    """详细健康检查"""
-    import time
-    from datetime import datetime
-    
-    checks: dict[str, object] = {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
-        "version": "1.0.0",
-        "checks": {}
-    }
-
-    checks_detail = checks.get("checks")
-    if not isinstance(checks_detail, dict):
-        checks_detail = {}
-        checks["checks"] = checks_detail
-    
-    # 数据库检查
-    try:
-        from sqlalchemy import text
-        from .database import engine
-        start = time.time()
-        async with engine.connect() as conn:
-            _ = await conn.execute(text("SELECT 1"))
-        db_time = (time.time() - start) * 1000
-        checks_detail["database"] = {
-            "status": "ok",
-            "response_time_ms": round(db_time, 2)
-        }
-    except Exception as e:
-        checks["status"] = "degraded"
-        checks_detail["database"] = {
-            "status": "error",
-            "error": str(e)
-        }
-    
-    # AI服务检查
-    if settings.openai_api_key:
-        checks_detail["ai_service"] = {"status": "configured"}
-    else:
-        checks_detail["ai_service"] = {"status": "not_configured"}
-    
-    # 内存使用
-    try:
-        import psutil
-        process = psutil.Process()
-        mem_info = process.memory_info()
-        rss_bytes = int(getattr(mem_info, "rss", 0) or 0)
-        memory_mb = float(rss_bytes) / 1024.0 / 1024.0
-        checks_detail["memory"] = {
-            "status": "ok",
-            "usage_mb": round(memory_mb, 2)
-        }
-    except ImportError:
-        checks_detail["memory"] = {"status": "unknown"}
-    
-    return checks
+    return await get_detailed_health(settings)

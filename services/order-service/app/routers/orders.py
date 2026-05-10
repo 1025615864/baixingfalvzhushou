@@ -1,5 +1,6 @@
 """订单服务 - API 路由"""
 import logging
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -7,11 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.order import Order, OrderStatus, OrderType, PaymentMethod
 from app.services.order_service import order_service
+from app.events.order_events import order_event_publisher
 from app.database import get_db
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
+admin_router = APIRouter(prefix="/api/v1/orders/admin", tags=["admin"])
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -40,6 +43,11 @@ async def create_order(
         business_type=business_type,
         discount_amount=discount_amount,
     )
+
+    try:
+        await order_event_publisher.publish_order_created(order)
+    except Exception as e:
+        logger.error(f"Failed to publish order_created event: {e}")
 
     return {
         "id": order.id,
@@ -128,6 +136,12 @@ async def pay_order(
     """支付订单"""
     try:
         order = await order_service.pay_order(db, order_no, payment_method, saga_id)
+
+        try:
+            await order_event_publisher.publish_order_paid(order)
+        except Exception as e:
+            logger.error(f"Failed to publish order_paid event: {e}")
+
         return {
             "id": order.id,
             "order_no": order.order_no,
@@ -149,6 +163,12 @@ async def cancel_order(
     """取消订单"""
     try:
         order = await order_service.cancel_order(db, order_no, reason)
+
+        try:
+            await order_event_publisher.publish_order_cancelled(order)
+        except Exception as e:
+            logger.error(f"Failed to publish order_cancelled event: {e}")
+
         return {
             "id": order.id,
             "order_no": order.order_no,
@@ -168,6 +188,12 @@ async def complete_order(
     """完成订单"""
     try:
         order = await order_service.complete_order(db, order_no)
+
+        try:
+            await order_event_publisher.publish_order_completed(order)
+        except Exception as e:
+            logger.error(f"Failed to publish order_completed event: {e}")
+
         return {
             "id": order.id,
             "order_no": order.order_no,
@@ -188,6 +214,12 @@ async def refund_order(
     """退款订单"""
     try:
         order = await order_service.refund_order(db, order_no, reason)
+
+        try:
+            await order_event_publisher.publish_order_refunded(order)
+        except Exception as e:
+            logger.error(f"Failed to publish order_refunded event: {e}")
+
         return {
             "id": order.id,
             "order_no": order.order_no,
@@ -195,3 +227,87 @@ async def refund_order(
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@admin_router.get("/all")
+async def admin_list_all_orders(
+    user_id: Optional[int] = Query(None),
+    order_type: Optional[OrderType] = Query(None),
+    status_filter: Optional[OrderStatus] = Query(None, alias="status"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    """管理员获取所有订单列表"""
+    orders, total = await order_service.list_all_orders(
+        db,
+        user_id=user_id,
+        order_type=order_type,
+        status=status_filter,
+        offset=offset,
+        limit=limit,
+    )
+
+    return {
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "items": [
+            {
+                "id": o.id,
+                "order_no": o.order_no,
+                "user_id": o.user_id,
+                "order_type": o.order_type.value,
+                "title": o.title,
+                "amount": o.amount,
+                "actual_amount": o.actual_amount,
+                "status": o.status.value,
+                "payment_method": o.payment_method.value if o.payment_method else None,
+                "created_at": o.created_at.isoformat(),
+                "paid_at": o.paid_at.isoformat() if o.paid_at else None,
+                "cancelled_at": o.cancelled_at.isoformat() if o.cancelled_at else None,
+                "completed_at": o.completed_at.isoformat() if o.completed_at else None,
+            }
+            for o in orders
+        ],
+    }
+
+
+@admin_router.get("/stats")
+async def admin_order_stats(
+    start_date: datetime = Query(...),
+    end_date: datetime = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """管理员获取订单统计"""
+    if start_date >= end_date:
+        raise HTTPException(status_code=400, detail="start_date must be before end_date")
+
+    stats = await order_service.get_order_stats(db, start_date, end_date)
+    return stats
+
+
+@admin_router.post("/{order_no}/force-cancel")
+async def admin_force_cancel_order(
+    order_no: str,
+    reason: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """管理员强制取消订单"""
+    try:
+        order = await order_service.force_cancel_order(db, order_no, reason)
+
+        try:
+            await order_event_publisher.publish_order_cancelled(order)
+        except Exception as e:
+            logger.error(f"Failed to publish order_cancelled event: {e}")
+
+        return {
+            "id": order.id,
+            "order_no": order.order_no,
+            "status": order.status.value,
+            "cancel_reason": order.cancel_reason,
+            "cancelled_at": order.cancelled_at.isoformat(),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

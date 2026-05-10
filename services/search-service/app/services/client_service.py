@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from app.config.settings import settings
-from app.services.search_service import SearchItem
+from app.models import SearchItem
 
 logger = logging.getLogger(__name__)
 

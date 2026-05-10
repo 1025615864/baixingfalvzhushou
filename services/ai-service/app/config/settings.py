@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     rag_level1_timeout_ms: int = Field(default=500, ge=100)
     rag_level2_timeout_ms: int = Field(default=2000, ge=500)
     rag_min_similarity: float = Field(default=0.75, ge=0.0, le=1.0)
+    rag_top_k: int = Field(default=5, ge=1, le=20)
 
     cors_origins: list[str] = Field(
         default=["http://localhost:3000", "http://localhost:8080"],
@@ -64,8 +65,9 @@ class Settings(BaseSettings):
     @field_validator("openai_api_key")
     @classmethod
     def validate_api_key(cls, v: str) -> str:
-        if not v or len(v) < 10:
-            raise ValueError("OPENAI_API_KEY is required and must be a valid API key")
+        env = os.getenv("ENVIRONMENT", "development")
+        if env == "production" and (not v or len(v) < 10):
+            raise ValueError("OPENAI_API_KEY is required and must be a valid API key in production")
         return v
 
     @property

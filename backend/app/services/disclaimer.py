@@ -1,7 +1,19 @@
 from __future__ import annotations
 
-from .ai_response_strategy import ResponseStrategy
-from .content_safety import RiskLevel
+from enum import Enum
+from typing import Optional
+
+
+class RiskLevel(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class ResponseStrategy(str, Enum):
+    DIRECT = "direct"
+    REDIRECT = "redirect"
+    CLARIFY = "clarify"
 
 
 class DisclaimerManager:
@@ -12,8 +24,8 @@ class DisclaimerManager:
         RiskLevel.MEDIUM: "\n\n---\n\n🟡 **风险提示**：此类问题情况复杂，建议结合实际情况咨询专业律师。",
     }
 
-    def get_disclaimer(self, *, risk_level: RiskLevel,
-                       strategy: ResponseStrategy) -> str:
+    def get_disclaimer(self, *, risk_level: RiskLevel = RiskLevel.LOW,
+                       strategy: ResponseStrategy = ResponseStrategy.DIRECT) -> str:
         parts: list[str] = []
         risk = self.RISK_DISCLAIMERS.get(risk_level)
         if risk:

@@ -53,3 +53,25 @@ class PaymentCallback(Base):
 
     def __repr__(self) -> str:
         return f"<PaymentCallback(order_no={self.order_no}, provider={self.provider}, status={self.status})>"
+
+
+class PaymentRefund(Base):
+    __tablename__ = "payment_refunds"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    order_no: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    refund_no: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    reason: Mapped[str] = mapped_column(String(500), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    provider: Mapped[str] = mapped_column(String(20), nullable=False)
+    provider_refund_no: Mapped[str] = mapped_column(String(64), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    completed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("idx_refunds_order_status", "order_no", "status"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<PaymentRefund(refund_no={self.refund_no}, order_no={self.order_no}, status={self.status})>"

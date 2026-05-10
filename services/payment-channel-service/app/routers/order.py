@@ -1,12 +1,14 @@
-"""支付订单路由"""
 import secrets
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import AsyncSessionLocal
 from ..models import PaymentOrder
+from ..services.channels import get_adapter
 
 router = APIRouter()
 
@@ -35,8 +37,23 @@ class OrderResponse(BaseModel):
         from_attributes = True
 
 
+class OrderListResponse(BaseModel):
+    items: list[OrderResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class PaymentStatusResponse(BaseModel):
+    order_no: str
+    status: str
+    provider: str
+    provider_status: str
+    trade_no: Optional[str] = None
+    paid_at: Optional[datetime] = None
+
+
 def generate_order_no() -> str:
-    """生成订单号"""
     now = datetime.now()
     random_part = secrets.token_hex(4).upper()
     return f"ORD{now.strftime('%Y%m%d')}{random_part}"
@@ -47,7 +64,6 @@ async def create_order(
     request: CreateOrderRequest,
     db: AsyncSession = Depends(lambda: AsyncSessionLocal())
 ):
-    """创建支付订单"""
     order_no = generate_order_no()
 
     order = PaymentOrder(
@@ -72,31 +88,53 @@ async def create_order(
     return OrderResponse.model_validate(order)
 
 
+@router.get("/orders", response_model=OrderListResponse)
+async def list_orders(
+    user_id: int = Query(..., description="用户ID"),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    status_filter: Optional[str] = Query(None, alias="status", description="订单状态筛选"),
+    db: AsyncSession = Depends(lambda: AsyncSessionLocal()),
+):
+    query = select(PaymentOrder).where(PaymentOrder.user_id == user_id)
+
+    if status_filter:
+        query = query.where(PaymentOrder.status == status_filter)
+
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    query = query.order_by(PaymentOrder.created_at.desc())
+    query = query.offset((page - 1) * page_size).limit(page_size)
+
+    result = await db.execute(query)
+    orders = result.scalars().all()
+
+    items = [OrderResponse.model_validate(order) for order in orders]
+
+    return OrderListResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+
+
 @router.get("/orders/{order_no}", response_model=OrderResponse)
 async def get_order(
     order_no: str,
     db: AsyncSession = Depends(lambda: AsyncSessionLocal())
 ):
-    """获取订单详情"""
     result = await db.execute(
-        PaymentOrder.__table__.select().where(PaymentOrder.order_no == order_no)
+        select(PaymentOrder).where(PaymentOrder.order_no == order_no)
     )
-    order = result.fetchone()
+    order = result.scalar_one_or_none()
 
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    return OrderResponse(
-        id=order.id,
-        order_no=order.order_no,
-        user_id=order.user_id,
-        amount=float(order.amount),
-        status=order.status,
-        payment_method=order.payment_method,
-        title=order.title,
-        expires_at=order.expires_at,
-        created_at=order.created_at,
-    )
+    return OrderResponse.model_validate(order)
 
 
 @router.post("/orders/{order_no}/pay")
@@ -104,11 +142,10 @@ async def initiate_payment(
     order_no: str,
     db: AsyncSession = Depends(lambda: AsyncSessionLocal())
 ):
-    """发起支付"""
     result = await db.execute(
-        PaymentOrder.__table__.select().where(PaymentOrder.order_no == order_no)
+        select(PaymentOrder).where(PaymentOrder.order_no == order_no)
     )
-    order = result.fetchone()
+    order = result.scalar_one_or_none()
 
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -116,9 +153,66 @@ async def initiate_payment(
     if order.status != "pending":
         raise HTTPException(status_code=400, detail="Order is not pending")
 
-    # TODO: 调用具体的支付通道
+    provider = order.payment_method or "alipay"
+
+    try:
+        adapter = get_adapter(provider)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Unsupported payment provider: {provider}")
+
+    try:
+        payment_result = await adapter.create_payment(
+            order_no=order.order_no,
+            amount=order.amount_cents,
+            title=order.title,
+            description=order.description or "",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Payment initiation failed: {str(e)}")
+
     return {
         "order_no": order_no,
-        "payment_url": f"https://payment.example.com/pay?order={order_no}",
-        "qr_code": "data:image/png;base64,..."
+        "payment_url": payment_result.get("payment_url", ""),
+        "qr_code": payment_result.get("qr_code", ""),
+        "provider": provider,
     }
+
+
+@router.get("/orders/{order_no}/status", response_model=PaymentStatusResponse)
+async def query_payment_status(
+    order_no: str,
+    db: AsyncSession = Depends(lambda: AsyncSessionLocal()),
+):
+    result = await db.execute(
+        select(PaymentOrder).where(PaymentOrder.order_no == order_no)
+    )
+    order = result.scalar_one_or_none()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    provider = order.payment_method or "alipay"
+
+    try:
+        adapter = get_adapter(provider)
+        provider_result = await adapter.query_payment(order_no)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Unsupported payment provider: {provider}")
+    except Exception:
+        provider_result = {}
+
+    if provider == "alipay":
+        provider_status = provider_result.get("trade_status", "UNKNOWN")
+    elif provider == "wechat":
+        provider_status = provider_result.get("trade_state", "UNKNOWN")
+    else:
+        provider_status = "UNKNOWN"
+
+    return PaymentStatusResponse(
+        order_no=order_no,
+        status=order.status,
+        provider=provider,
+        provider_status=provider_status,
+        trade_no=order.trade_no,
+        paid_at=order.paid_at,
+    )

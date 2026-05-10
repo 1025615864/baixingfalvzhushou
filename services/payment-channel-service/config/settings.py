@@ -30,6 +30,9 @@ class PaymentChannelSettings(BaseSettings):
     wechatpay_mch_id: str = os.getenv("WECHATPAY_MCH_ID", "")
     wechatpay_private_key: str = os.getenv("WECHATPAY_PRIVATE_KEY", "")
     wechatpay_api_v3_key: str = os.getenv("WECHATPAY_API_V3_KEY", "")
+    wechatpay_app_id: str = os.getenv("WECHATPAY_APP_ID", "")
+    wechatpay_cert_path: str = os.getenv("WECHATPAY_CERT_PATH", "")
+    wechatpay_notify_url: str = os.getenv("WECHATPAY_NOTIFY_URL", "")
 
     kafka_bootstrap_servers: str = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 

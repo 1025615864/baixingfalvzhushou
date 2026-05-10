@@ -338,8 +338,8 @@ class StorageConfig(BaseSettings):
     storage_s3_bucket: str = Field(default="", validation_alias=AliasChoices("STORAGE_S3_BUCKET", "UPLOAD_S3_BUCKET"))
     storage_s3_endpoint_url: str = Field(default="", validation_alias=AliasChoices("STORAGE_S3_ENDPOINT_URL", "UPLOAD_S3_ENDPOINT_URL", "S3_ENDPOINT_URL"))
     storage_s3_region: str = Field(default="", validation_alias=AliasChoices("STORAGE_S3_REGION", "UPLOAD_S3_REGION", "AWS_REGION"))
-    storage_s3_access_key_id: str = Field(default="", validation_alias=AliasChoices("STORAGE_S3_ACCESS_KEY_ID", "UPLOAD_S3_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID"))
-    storage_s3_secret_access_key: str = Field(default="", validation_alias=AliasChoices("STORAGE_S3_SECRET_ACCESS_KEY", "UPLOAD_S3_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"))
+    storage_s3_access_key_id: str = Field(default="", validation_alias=AliasChoices("STORAGE_S3_ACCESS_KEY_ID", "UPLOAD_S3_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID"), json_schema_extra={"writeOnly": True})
+    storage_s3_secret_access_key: str = Field(default="", validation_alias=AliasChoices("STORAGE_S3_SECRET_ACCESS_KEY", "UPLOAD_S3_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"), json_schema_extra={"writeOnly": True})
     storage_s3_prefix: str = Field(default="uploads", validation_alias=AliasChoices("STORAGE_S3_PREFIX", "UPLOAD_S3_PREFIX"))
 
 
@@ -455,3 +455,6 @@ def get_settings() -> Settings:
 def get_config() -> Settings:
     """向后兼容的配置获取函数"""
     return get_settings()
+
+
+settings = Settings()

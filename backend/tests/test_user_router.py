@@ -18,6 +18,7 @@ from pytest import MonkeyPatch
 
 from tests.helpers.test_data_factory import UserFactory
 from tests.helpers.assertion_helpers import assert_response_success
+from tests.conftest import TEST_PASSWORD
 
 
 class TestUserRegister:
@@ -30,7 +31,7 @@ class TestUserRegister:
         user_data = {
             "username": "newuser",
             "email": "newuser@example.com",
-            "password": "password123",
+            "password": TEST_PASSWORD,
             "nickname": "新用户",
             "agree_terms": True,
             "agree_privacy": True,
@@ -56,7 +57,7 @@ class TestUserRegister:
         user_data = {
             "username": "newuser",
             "email": "newuser@example.com",
-            "password": "password123",
+            "password": TEST_PASSWORD,
             "agree_terms": False,
             "agree_privacy": False,
             "agree_ai_disclaimer": False,
@@ -83,7 +84,7 @@ class TestUserRegister:
         user_data = {
             "username": "existinguser",
             "email": "newuser@example.com",
-            "password": "password123",
+            "password": TEST_PASSWORD,
             "agree_terms": True,
             "agree_privacy": True,
             "agree_ai_disclaimer": True,
@@ -108,7 +109,7 @@ class TestUserRegister:
         user_data = {
             "username": "newuser",
             "email": "existing@example.com",
-            "password": "password123",
+            "password": TEST_PASSWORD,
             "agree_terms": True,
             "agree_privacy": True,
             "agree_ai_disclaimer": True,
@@ -130,11 +131,11 @@ class TestUserLogin:
         from app.utils.security import hash_password
         
         user = await UserFactory.create_user(db, username="testuser")
-        user.hashed_password = hash_password("password123")
+        user.hashed_password = hash_password(TEST_PASSWORD)
         await db.commit()
 
         # Act
-        login_data = {"username": "testuser", "password": "password123"}
+        login_data = {"username": "testuser", "password": TEST_PASSWORD}
         response = await client.post("/api/user/login", json=login_data)
 
         # Assert
@@ -165,7 +166,7 @@ class TestUserLogin:
         from app.utils.security import hash_password
         
         user = await UserFactory.create_user(db, username="testuser")
-        user.hashed_password = hash_password("password123")
+        user.hashed_password = hash_password(TEST_PASSWORD)
         await db.commit()
 
         # Act
@@ -183,12 +184,12 @@ class TestUserLogin:
         from app.utils.security import hash_password
         
         user = await UserFactory.create_user(db, username="testuser")
-        user.hashed_password = hash_password("password123")
+        user.hashed_password = hash_password(TEST_PASSWORD)
         user.is_active = False  # 禁用账号
         await db.commit()
 
         # Act
-        login_data = {"username": "testuser", "password": "password123"}
+        login_data = {"username": "testuser", "password": TEST_PASSWORD}
         response = await client.post("/api/user/login", json=login_data)
 
         # Assert

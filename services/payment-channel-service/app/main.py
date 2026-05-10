@@ -8,7 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config.settings import get_settings
 from .database import engine, AsyncSessionLocal, Base
-from .routers import order_router, callback_router
+from .routers import order_router, callback_router, refund_router
+from .services.channels import init_adapters
 
 try:
     from services.common.security import get_cors_config
@@ -65,6 +66,8 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+    init_adapters(settings)
+
     yield
 
     if consul and os.getenv("CONSUL_ENABLED", "").lower() in {"1", "true", "yes"}:
@@ -89,6 +92,7 @@ def create_app() -> FastAPI:
 
     app.include_router(order_router, prefix="/api/v1/payment", tags=["支付订单"])
     app.include_router(callback_router, prefix="/api/v1/payment/callbacks", tags=["支付回调"])
+    app.include_router(refund_router, prefix="/api/v1/payment", tags=["退款管理"])
 
     @app.get("/health")
     async def health_check():

@@ -22,7 +22,7 @@ export const services = new ServiceDiscovery({
   payment: getServiceUrl('payment', 8000),
   accounting: getServiceUrl('accounting', 8000),
   legal: getServiceUrl('legal', 8000),
-  ai: getServiceUrl('ai', 8000),
+  ai: getServiceUrl('ai', 8005),
   news: getServiceUrl('news', 8000),
   community: getServiceUrl('community', 8000),
   points: getServiceUrl('points', 8000),

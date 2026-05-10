@@ -1,12 +1,10 @@
 """百姓法律助手 - FastAPI主应用"""
-from contextlib import asynccontextmanager
-import importlib
-import logging
 import asyncio
+from contextlib import asynccontextmanager
+import logging
 import os
 import time
-from sqlalchemy import select, desc
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from fastapi.exceptions import ResponseValidationError
@@ -14,8 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .database import init_db
-from .services.cache_service import cache_service
-from .services.prometheus_metrics import prometheus_metrics
+from .services import cache_service, prometheus_metrics, periodic_jobs
+from .services.ai_metrics import ai_metrics
 from .database import AsyncSessionLocal
 from .routers import api_router, websocket
 from .middleware.logging_middleware import RequestLoggingMiddleware, ErrorLoggingMiddleware
@@ -64,132 +62,20 @@ if sentry_sdk is not None:
         )
 
 try:
-    from .routers import ai
+    from .routers import auth as auth_router
 except Exception:
-    ai = None
-    logger.exception("AI路由加载失败")
+    auth_router = None
+    logger.exception("认证路由加载失败")
 
-
-def _prom_escape_label_value(value: str) -> str:
-    s = str(value)
-    s = s.replace("\\", "\\\\")
-    s = s.replace('"', "\\\"")
-    s = s.replace("\n", "\\n")
-    return s
-
-
-def _ai_metrics_extra_lines() -> list[str]:
-    snap: dict[str, object] = {}
-    try:
-        mod = importlib.import_module("app.services.ai_metrics")
-        ai_metrics_obj = getattr(mod, "ai_metrics", None)
-        if ai_metrics_obj is not None:
-            snapshot = getattr(ai_metrics_obj, "snapshot", None)
-            if callable(snapshot):
-                raw = snapshot()
-                if isinstance(raw, dict):
-                    snap = {str(k): v for k, v in raw.items()}
-    except Exception:
-        snap = {}
-
-    started_at_obj = snap.get("started_at")
-    started_at = (
-        float(started_at_obj)
-        if isinstance(started_at_obj, (int, float)) and not isinstance(started_at_obj, bool)
-        else 0.0
-    )
-
-    chat_total_obj = snap.get("chat_requests_total")
-    chat_total = (
-        int(chat_total_obj)
-        if isinstance(chat_total_obj, (int, float)) and not isinstance(chat_total_obj, bool)
-        else 0
-    )
-
-    chat_stream_total_obj = snap.get("chat_stream_requests_total")
-    chat_stream_total = (
-        int(chat_stream_total_obj)
-        if isinstance(chat_stream_total_obj, (int, float)) and not isinstance(chat_stream_total_obj, bool)
-        else 0
-    )
-
-    errors_total_obj = snap.get("errors_total")
-    errors_total = (
-        int(errors_total_obj)
-        if isinstance(errors_total_obj, (int, float)) and not isinstance(errors_total_obj, bool)
-        else 0
-    )
-
-    error_code_counts_obj = snap.get("error_code_counts")
-    endpoint_error_counts_obj = snap.get("endpoint_error_counts")
-
-    error_code_counts: dict[str, int] = {}
-    if isinstance(error_code_counts_obj, dict):
-        for k_obj, v_obj in error_code_counts_obj.items():
-            k = str(k_obj or "").strip()
-            if not k:
-                continue
-            try:
-                if isinstance(v_obj, (int, float)) and not isinstance(v_obj, bool):
-                    error_code_counts[k] = int(v_obj)
-                elif isinstance(v_obj, str):
-                    error_code_counts[k] = int(float(v_obj.strip() or "0"))
-            except Exception:
-                continue
-
-    endpoint_error_counts: dict[str, int] = {}
-    if isinstance(endpoint_error_counts_obj, dict):
-        for k_obj, v_obj in endpoint_error_counts_obj.items():
-            k = str(k_obj or "").strip()
-            if not k:
-                continue
-            try:
-                if isinstance(v_obj, (int, float)) and not isinstance(v_obj, bool):
-                    endpoint_error_counts[k] = int(v_obj)
-                elif isinstance(v_obj, str):
-                    endpoint_error_counts[k] = int(float(v_obj.strip() or "0"))
-            except Exception:
-                continue
-
-    lines: list[str] = []
-    lines.append("# HELP baixing_ai_started_at_seconds Unix timestamp when AiMetrics started")
-    lines.append("# TYPE baixing_ai_started_at_seconds gauge")
-    lines.append(f"baixing_ai_started_at_seconds {started_at}")
-    lines.append("# HELP baixing_ai_chat_requests_total Total /ai/chat requests")
-    lines.append("# TYPE baixing_ai_chat_requests_total counter")
-    lines.append(f"baixing_ai_chat_requests_total {chat_total}")
-    lines.append("# HELP baixing_ai_chat_stream_requests_total Total /ai/chat_stream requests")
-    lines.append("# TYPE baixing_ai_chat_stream_requests_total counter")
-    lines.append(f"baixing_ai_chat_stream_requests_total {chat_stream_total}")
-    lines.append("# HELP baixing_ai_errors_total Total AI errors")
-    lines.append("# TYPE baixing_ai_errors_total counter")
-    lines.append(f"baixing_ai_errors_total {errors_total}")
-
-    lines.append("# HELP baixing_ai_error_code_total Total errors grouped by error_code")
-    lines.append("# TYPE baixing_ai_error_code_total counter")
-    for code in sorted(error_code_counts.keys()):
-        v = int(error_code_counts.get(code) or 0)
-        if v <= 0:
-            continue
-        lines.append(
-            f"baixing_ai_error_code_total{{error_code=\"{_prom_escape_label_value(code)}\"}} {v}"
-        )
-
-    lines.append("# HELP baixing_ai_endpoint_error_total Total errors grouped by endpoint")
-    lines.append("# TYPE baixing_ai_endpoint_error_total counter")
-    for ep in sorted(endpoint_error_counts.keys()):
-        v = int(endpoint_error_counts.get(ep) or 0)
-        if v <= 0:
-            continue
-        lines.append(
-            f"baixing_ai_endpoint_error_total{{endpoint=\"{_prom_escape_label_value(ep)}\"}} {v}"
-        )
-
-    return lines
+try:
+    from .routers import user_profile as user_router
+except Exception:
+    user_router = None
+    logger.exception("用户路由加载失败")
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> None:
     """应用生命周期管理"""
     _ = app
 
@@ -221,17 +107,17 @@ async def lifespan(app: FastAPI):
 
     stop_event = asyncio.Event()
 
-    runner = PeriodicLockedRunner(stop_event=stop_event, lock_client=cache_service, logger=logger)
+    runner = PeriodicLockedRunner(stop_event=stop_event, lock_client=cache_service.cache_service, logger=logger)
 
     redis_connected = False
 
     if settings.redis_url:
-        redis_connected = bool(await cache_service.connect(settings.redis_url))
+        redis_connected = bool(await cache_service.cache_service.connect(settings.redis_url))
 
     if (not settings.debug) and (not redis_connected):
         raise RuntimeError("Redis must be available when DEBUG is False. Please set REDIS_URL and ensure Redis is reachable.")
 
-    cfg = services.periodic_jobs.PeriodicJobsConfig
+    cfg = periodic_jobs.PeriodicJobsConfig
 
     settlement_task: asyncio.Task[None] | None = None
     if cfg.is_settlement_enabled(settings.debug, redis_connected):
@@ -240,7 +126,7 @@ async def lifespan(app: FastAPI):
                 lock_key="locks:settlement",
                 lock_ttl_seconds=60,
                 interval_seconds=cfg.SETTLEMENT_INTERVAL_SECONDS,
-                job=services.periodic_jobs.settlement_job_wrapper,
+                job=periodic_jobs.settlement_job_wrapper,
             )
         )
 
@@ -251,7 +137,7 @@ async def lifespan(app: FastAPI):
                 lock_key="locks:wechatpay_platform_certs",
                 lock_ttl_seconds=120,
                 interval_seconds=cfg.WECHATPAY_CERT_REFRESH_INTERVAL_SECONDS,
-                job=lambda: services.periodic_jobs.wechatpay_platform_certs_refresh_job_wrapper(settings),
+                job=lambda: periodic_jobs.wechatpay_platform_certs_refresh_job_wrapper(settings),
             )
         )
 
@@ -262,15 +148,11 @@ async def lifespan(app: FastAPI):
                 lock_key="locks:review_task_sla",
                 lock_ttl_seconds=60,
                 interval_seconds=cfg.REVIEW_TASK_SLA_SCAN_INTERVAL_SECONDS,
-                job=services.periodic_jobs.review_task_sla_job_wrapper,
+                job=periodic_jobs.review_task_sla_job_wrapper,
             )
         )
 
     logger.info("数据库初始化完成")
-    if ai is not None:
-        logger.info("AI助手模块已启用")
-    else:
-        logger.info("AI助手模块未启用")
     
     yield
 
@@ -291,7 +173,7 @@ async def lifespan(app: FastAPI):
         except Exception:
             pass
 
-    await cache_service.disconnect()
+    await cache_service.cache_service.disconnect()
 
     logger.info("应用关闭")
 
@@ -372,6 +254,17 @@ async def response_validation_exception_handler(request: Request, exc: ResponseV
         content={"detail": exc.errors() if settings.debug else "服务器错误"},
     )
 
+# 中间件顺序（从上往下，后添加的先执行）:
+# 1. ErrorLoggingMiddleware - 捕获所有错误
+# 2. RequestLoggingMiddleware - 记录请求日志
+# 3. CORSMiddleware - 处理跨域
+# 4. RateLimitMiddleware - 速率限制
+# 5. EnvelopeMiddleware - 响应统一包装
+# 6. MetricsMiddleware - 收集指标（在包装之前，记录真实业务数据）
+# 7. SentryContextMiddleware - Sentry 上下文
+# 8. AuthContextMiddleware - 认证上下文
+# 9. RequestIdMiddleware - 请求 ID
+
 app.add_middleware(ErrorLoggingMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 
@@ -379,11 +272,10 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_allow_origins,
     allow_credentials=settings.cors_allow_credentials,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With", "X-CSRF-Token", "X-Request-ID", "X-Trace-ID", "Accept"],
 )
 
-# 添加速率限制中间件
 app.add_middleware(
     RateLimitMiddleware,
     requests_per_minute=120,
@@ -403,6 +295,12 @@ app.add_middleware(RequestIdMiddleware)
 app.include_router(api_router, prefix="/api/v1")
 app.include_router(websocket.router)
 
+if auth_router is not None:
+    app.include_router(auth_router.router, prefix="/api")
+
+if user_router is not None:
+    app.include_router(user_router.router, prefix="/api")
+
 
 def _normalize_base_url(raw: str) -> str:
     base = str(raw or "").strip()
@@ -412,7 +310,7 @@ def _normalize_base_url(raw: str) -> str:
 
 
 @app.get("/robots.txt", include_in_schema=False)
-async def robots_txt():
+async def robots_txt() -> PlainTextResponse:
     base = _normalize_base_url(getattr(settings, "frontend_base_url", "") or "")
     sitemap_url = f"{base}/sitemap.xml" if base else "/sitemap.xml"
     content = "\n".join(
@@ -428,7 +326,7 @@ async def robots_txt():
 
 
 @app.get("/sitemap.xml", include_in_schema=False)
-async def sitemap_xml():
+async def sitemap_xml() -> Response:
     base = _normalize_base_url(getattr(settings, "frontend_base_url", "") or "")
 
     paths = [
@@ -482,7 +380,7 @@ async def sitemap_xml():
 
 
 @app.get("/")
-async def root():
+async def root() -> dict[str, str]:
     """根路由"""
     return {
         "name": settings.app_name,
@@ -493,32 +391,32 @@ async def root():
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> dict[str, str]:
     """健康检查"""
     return {"status": "healthy"}
 
 
 @app.get("/metrics", include_in_schema=False)
-async def prometheus_metrics_endpoint(request: Request):
+async def prometheus_metrics_endpoint(request: Request) -> Response:
     token = os.getenv("METRICS_AUTH_TOKEN", "").strip()
     if token:
         auth = str(request.headers.get("Authorization") or "").strip()
         if auth != f"Bearer {token}":
             return PlainTextResponse(content="unauthorized\n", status_code=401)
 
-    extra_lines = _ai_metrics_extra_lines()
+    extra_lines = ai_metrics.render_prometheus()
     body = prometheus_metrics.render_prometheus(extra_lines=extra_lines)
     return PlainTextResponse(content=body, media_type="text/plain; version=0.0.4")
 
 
 @app.get("/api/health")
-async def api_health_check():
+async def api_health_check() -> dict[str, str]:
     """健康检查（API别名，兼容前端proxy）"""
     return {"status": "healthy"}
 
 
 @app.get("/health/detailed")
-async def health_check_detailed():
+async def health_check_detailed() -> dict[str, Any]:
     """详细健康检查"""
     import time
     from datetime import datetime

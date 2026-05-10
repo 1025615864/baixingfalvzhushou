@@ -2,13 +2,13 @@
 import json
 import time
 import logging
-from typing import Awaitable, Callable
+from typing import Any, Awaitable, Callable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from ..utils.rate_limiter import get_client_ip
-from ..utils.data_sanitizer import DataSanitizer, MaskLevel
+from app.utils.cache.rate_limiter import get_client_ip
+from app.utils.security.data_sanitizer import DataSanitizer, MaskLevel
 from ..config import get_settings
 
 logger = logging.getLogger("api.request")
@@ -17,7 +17,7 @@ logger = logging.getLogger("api.request")
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """请求日志记录中间件（支持敏感信息脱敏）"""
 
-    def __init__(self, app, mask_level: MaskLevel | None = None):
+    def __init__(self, app: Any, mask_level: MaskLevel | None = None) -> None:
         """初始化中间件
 
         Args:
@@ -216,7 +216,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 class ErrorLoggingMiddleware(BaseHTTPMiddleware):
     """错误日志记录中间件（敏感信息脱敏）"""
 
-    def __init__(self, app, mask_level: MaskLevel | None = None):
+    def __init__(self, app: Any, mask_level: MaskLevel | None = None) -> None:
         """初始化中间件
 
         Args:
@@ -305,7 +305,7 @@ class ErrorLoggingMiddleware(BaseHTTPMiddleware):
 class BodyLoggingMiddleware(BaseHTTPMiddleware):
     """请求/响应体日志中间件（用于调试，慎用）"""
 
-    def __init__(self, app, max_body_size: int = 10000, log_responses: bool = False):
+    def __init__(self, app: Any, max_body_size: int = 10000, log_responses: bool = False) -> None:
         """初始化中间件
 
         Args:

@@ -231,9 +231,8 @@ export const OrdersPage: React.FC = () => {
         <div className="p-6">
           {activeTab === 'orders' ? (
             <OrderList
-              onPayOrder={handlePayOrder}
-              onViewDetail={handleViewDetail}
-              pageSize={10}
+              onPay={(orderId: number) => handlePayOrder({ id: orderId } as Order)}
+              onCancel={() => {}}
             />
           ) : (
             <PaymentHistory pageSize={10} />

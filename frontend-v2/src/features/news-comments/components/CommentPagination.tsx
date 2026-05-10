@@ -73,8 +73,8 @@ export function CommentPagination({
 
       {/* 页码 */}
       <div className="flex items-center gap-1">
-        {pageNumbers.map((page, index) => (
-          <div key={index}>
+        {pageNumbers.map((page) => (
+          <div key={`page-${page}`}>
             {page === '...' ? (
               <span className="px-3 py-1.5 text-sm text-gray-400">...</span>
             ) : (

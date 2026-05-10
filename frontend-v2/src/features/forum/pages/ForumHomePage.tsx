@@ -1,7 +1,8 @@
-// ============================================
+﻿// ============================================
 // 论坛主页
 // ============================================
 
+import { logger } from '@/shared/lib/logger';
 import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -120,7 +121,7 @@ export function ForumHomePage() {
       setShowCreateModal(false);
       void refetch();
     } catch (err) {
-      console.error('创建帖子失败:', err);
+      logger.error('创建帖子失败:', err);
     }
   }, [createPostMutation, refetch]);
 

@@ -51,7 +51,7 @@ export const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({
       <ul className="py-2">
         {suggestions.map((suggestion, index) => (
           <li
-            key={index}
+            key={suggestion}
             onClick={() => onSelect(suggestion)}
             className={`
               flex items-center gap-3 px-4 py-2.5 cursor-pointer

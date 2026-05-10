@@ -94,8 +94,15 @@ async def create_domain(
     )
 
     db.add(new_domain)
-    await db.commit()
-    await db.refresh(new_domain)
+    try:
+        await db.commit()
+        await db.refresh(new_domain)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"添加域名失败: {str(e)}",
+        )
 
     return DomainDetailResponse.model_validate(new_domain)
 
@@ -165,8 +172,15 @@ async def update_domain(
         domain.status = "pending"
         domain.verification_code = generate_verification_code()
 
-    await db.commit()
-    await db.refresh(domain)
+    try:
+        await db.commit()
+        await db.refresh(domain)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"更新域名失败: {str(e)}",
+        )
 
     return DomainResponse.model_validate(domain)
 
@@ -192,7 +206,14 @@ async def delete_domain(
         )
 
     await db.delete(domain)
-    await db.commit()
+    try:
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"删除域名失败: {str(e)}",
+        )
 
 
 @router.post("/domains/{domain_id}/verify", response_model=DomainVerifyResult)
@@ -223,27 +244,24 @@ async def verify_domain(
             detail="域名不存在",
         )
 
-    # TODO: 实现实际的域名验证逻辑
-    # 这里可以调用外部服务或执行 DNS 查询来验证
-    # 示例：
-    # try:
-    #     import dns.resolver
-    #     txt_records = dns.resolver.resolve(domain.domain, 'TXT')
-    #     for record in txt_records:
-    #         if domain.verification_code in str(record):
-    #             domain.status = "verified"
-    #             break
-    #     else:
-    #         domain.status = "failed"
-    # except Exception as e:
-    #     domain.status = "failed"
-
-    # 临时模拟验证成功
-    import random
-    if random.random() > 0.5:  # 模拟验证成功
-        domain.status = "verified"
-        message = "域名验证成功"
-    else:
+    try:
+        import dns.resolver
+        txt_records = dns.resolver.resolve(domain.domain, 'TXT')
+        verified = False
+        for record in txt_records:
+            if domain.verification_code in str(record):
+                verified = True
+                break
+        if verified:
+            domain.status = "verified"
+            message = "域名验证成功"
+        else:
+            domain.status = "failed"
+            message = "域名验证失败，未找到匹配的 DNS TXT 记录"
+    except ImportError:
+        domain.status = "pending"
+        message = "DNS 解析库未安装，请安装 dnspython 后重试"
+    except Exception:
         domain.status = "failed"
         message = "域名验证失败，请确保已正确配置 DNS TXT 记录"
 

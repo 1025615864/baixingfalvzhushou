@@ -1,44 +1,60 @@
-name: Code Quality Report
+name: Code Quality & Security
 
 on:
   schedule:
-    # 每周一早上8点运行
     - cron: '0 8 * * 1'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - 'frontend-v2/**'
+      - 'backend/Dockerfile'
+      - 'frontend-v2/Dockerfile'
+      - '**/requirements.txt'
+      - '**/package.json'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - 'frontend-v2/**'
+      - 'backend/Dockerfile'
+      - 'frontend-v2/Dockerfile'
+      - '**/requirements.txt'
+      - '**/package.json'
   workflow_dispatch:
+    inputs:
+      severity_threshold:
+        description: 'Severity threshold (CRITICAL, HIGH, MEDIUM, LOW)'
+        required: false
+        default: 'HIGH'
 
 env:
   NODE_VERSION: '20'
   PYTHON_VERSION: '3.11'
 
+permissions:
+  contents: read
+  security-events: write
+  packages: read
+
 jobs:
-  # ============ 前端代码质量报告 ============
   frontend-quality:
-    name: Frontend Quality Analysis
+    name: Frontend Quality
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./frontend-v2
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: ./frontend-v2/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Generate ESLint report
-        run: npm run lint -- --format json --output-file eslint-report.json
+      - run: npm ci
+      - run: npm run lint -- --format json --output-file eslint-report.json
         continue-on-error: true
-
-      - name: Count ESLint issues
-        run: |
+      - run: |
           echo "## ESLint Statistics" >> $GITHUB_STEP_SUMMARY
           if [ -f eslint-report.json ]; then
             errors=$(cat eslint-report.json | jq '[.[].messages[] | select(.severity == 2)] | length')
@@ -48,45 +64,41 @@ jobs:
           else
             echo "- ESLint report not generated" >> $GITHUB_STEP_SUMMARY
           fi
-
-      - name: Upload ESLint report
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: frontend-eslint-report
           path: ./frontend-v2/eslint-report.json
         continue-on-error: true
+      - run: npm audit --audit-level=high --json > npm-audit.json 2>/dev/null || true
+        continue-on-error: true
+      - run: |
+          echo "## Frontend Security Audit" >> $GITHUB_STEP_SUMMARY
+          if [ -f npm-audit.json ]; then
+            vulns=$(cat npm-audit.json | jq '.metadata.vulnerabilities.total // 0')
+            echo "- Total vulnerabilities: $vulns" >> $GITHUB_STEP_SUMMARY
+          fi
+        continue-on-error: true
 
-  # ============ 后端代码质量报告 ============
   backend-quality:
-    name: Backend Quality Analysis
+    name: Backend Quality
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./backend
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
           cache-dependency-path: ./backend/requirements*.txt
-
-      - name: Install dependencies
-        run: |
+      - run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
-
-      - name: Run tests with coverage
-        run: pytest tests/ --cov=app --cov-report=xml --cov-report=term --cov-fail-under=60
+      - run: pytest tests/ --cov=app --cov-report=xml --cov-report=term --cov-fail-under=60
         continue-on-error: true
-
-      - name: Generate coverage report
-        run: |
+      - run: |
           echo "## Backend Test Coverage" >> $GITHUB_STEP_SUMMARY
           if [ -f coverage.xml ]; then
             coverage=$(grep -o 'line-rate="[0-9.]*"' coverage.xml | head -1 | cut -d'"' -f2)
@@ -96,47 +108,34 @@ jobs:
             echo "- Coverage report not generated" >> $GITHUB_STEP_SUMMARY
           fi
         continue-on-error: true
-
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: backend-coverage-report
           path: ./backend/coverage.xml
         continue-on-error: true
 
-  # ============ 依赖安全扫描 ============
-  dependency-security:
-    name: Dependency Security Scan
+  backend-security:
+    name: Backend Security Scan
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Run npm audit (frontend)
-        working-directory: ./frontend-v2
-        run: |
-          npm audit --audit-level=high --json > npm-audit.json 2>/dev/null || true
-          echo "## Frontend Security Audit" >> $GITHUB_STEP_SUMMARY
-          if [ -f npm-audit.json ]; then
-            vulns=$(cat npm-audit.json | jq '.metadata.vulnerabilities.total // 0')
-            echo "- Total vulnerabilities: $vulns" >> $GITHUB_STEP_SUMMARY
-          fi
-        continue-on-error: true
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Run pip-audit (backend)
-        working-directory: ./backend
-        run: |
-          pip install pip-audit
+      - run: |
+          pip install -r requirements.txt
+          pip install bandit safety pip-audit
+      - run: |
+          bandit -r app -f json -o bandit-report.json || true
+          bandit -r app -f screen
+      - run: |
+          safety check --json --output safety-report.json || true
+          safety check
+        continue-on-error: true
+      - run: |
           pip-audit --format=json --output=pip-audit.json || true
           echo "## Backend Security Audit" >> $GITHUB_STEP_SUMMARY
           if [ -f pip-audit.json ]; then
@@ -144,45 +143,152 @@ jobs:
             echo "- Total vulnerabilities: $vulns" >> $GITHUB_STEP_SUMMARY
           fi
         continue-on-error: true
-
-      - name: Upload security reports
-        uses: actions/upload-artifact@v4
+      - run: pytest tests/test_security.py -v --tb=short
+        continue-on-error: true
+      - run: |
+          if [ -f bandit-report.json ]; then
+            python -c "
+          import json
+          with open('bandit-report.json') as f:
+              report = json.load(f)
+              high_severity = [r for r in report['results'] if r['issue_severity'] == 'HIGH']
+              if high_severity:
+                  print(f'Found {len(high_severity)} high severity issues')
+                  for issue in high_severity:
+                      print(f\"  - {issue['test_id']}: {issue['issue_text']}\")
+                  exit(1)
+          "
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: security-audit-reports
+          name: security-reports
           path: |
-            ./frontend-v2/npm-audit.json
-            ./backend/pip-audit.json
+            backend/bandit-report.json
+            backend/safety-report.json
+            backend/pip-audit.json
+            frontend-v2/npm-audit.json
+
+  fs-security-scan:
+    name: Filesystem Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+        continue-on-error: true
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
         continue-on-error: true
 
-  # ============ 生成综合报告 ============
-  generate-report:
-    name: Generate Quality Report
+  container-scan-backend:
+    name: Container Scan (Backend)
     runs-on: ubuntu-latest
-    needs: [frontend-quality, backend-quality, dependency-security]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: false
+          load: true
+          tags: baixing-backend:scan
+          cache-from: type=gha
+      - uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'baixing-backend:scan'
+          format: 'sarif'
+          output: 'trivy-backend-results.sarif'
+          severity: ${{ github.event.inputs.severity_threshold || 'HIGH,CRITICAL' }}
+          ignore-unfixed: true
+          exit-code: '0'
+      - uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'baixing-backend:scan'
+          format: 'table'
+          severity: ${{ github.event.inputs.severity_threshold || 'HIGH,CRITICAL' }}
+          ignore-unfixed: true
+          exit-code: '0'
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-backend-results.sarif'
+          category: 'trivy-backend'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-backend-results
+          path: trivy-backend-results.sarif
+          retention-days: 30
 
-      - name: Count lines of code
-        run: |
+  container-scan-frontend:
+    name: Container Scan (Frontend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./frontend-v2
+          push: false
+          load: true
+          tags: baixing-frontend:scan
+          cache-from: type=gha
+      - uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'baixing-frontend:scan'
+          format: 'sarif'
+          output: 'trivy-frontend-results.sarif'
+          severity: ${{ github.event.inputs.severity_threshold || 'HIGH,CRITICAL' }}
+          ignore-unfixed: true
+          exit-code: '0'
+      - uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'baixing-frontend:scan'
+          format: 'table'
+          severity: ${{ github.event.inputs.severity_threshold || 'HIGH,CRITICAL' }}
+          ignore-unfixed: true
+          exit-code: '0'
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-frontend-results.sarif'
+          category: 'trivy-frontend'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-frontend-results
+          path: trivy-frontend-results.sarif
+          retention-days: 30
+
+  generate-report:
+    name: Quality Report
+    runs-on: ubuntu-latest
+    needs: [frontend-quality, backend-quality, backend-security, fs-security-scan, container-scan-backend, container-scan-frontend]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
           echo "## Code Statistics" >> $GITHUB_STEP_SUMMARY
           echo "### Frontend" >> $GITHUB_STEP_SUMMARY
           frontend_ts=$(find frontend-v2/src -name '*.ts' -o -name '*.tsx' | xargs wc -l | tail -1 | awk '{print $1}')
           frontend_css=$(find frontend-v2/src -name '*.css' | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
           echo "- TypeScript/TSX: $frontend_ts lines" >> $GITHUB_STEP_SUMMARY
           echo "- CSS: ${frontend_css:-0} lines" >> $GITHUB_STEP_SUMMARY
-          
           echo "### Backend" >> $GITHUB_STEP_SUMMARY
           backend_py=$(find backend/app -name '*.py' | xargs wc -l | tail -1 | awk '{print $1}')
           echo "- Python: $backend_py lines" >> $GITHUB_STEP_SUMMARY
-          
           echo "### Documentation" >> $GITHUB_STEP_SUMMARY
           docs_md=$(find docs -name '*.md' | xargs wc -l | tail -1 | awk '{print $1}')
           echo "- Markdown: $docs_md lines" >> $GITHUB_STEP_SUMMARY
         continue-on-error: true
-
-      - name: Post summary
-        run: |
+      - run: |
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "Report generated on $(date)" >> $GITHUB_STEP_SUMMARY

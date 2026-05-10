@@ -138,7 +138,7 @@ export function ContractReviewPage() {
               <h3 className="font-semibold text-gray-900 mb-3">修改建议</h3>
               <ul className="space-y-3">
                 {result.suggestions.map((suggestion, index) => (
-                  <li key={index} className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg">
+                  <li key={suggestion} className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg">
                     <span className="w-6 h-6 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">
                       {index + 1}
                     </span>
@@ -167,8 +167,8 @@ export function ContractReviewPage() {
               {[
                 { name: '劳动合同_v2.pdf', date: '2026-01-28', status: 'medium' },
                 { name: '租房合同.pdf', date: '2026-01-20', status: 'low' },
-              ].map((item, index) => (
-                <div key={index} className="p-4 flex items-center justify-between hover:bg-gray-50">
+              ].map((item) => (
+                <div key={item.name} className="p-4 flex items-center justify-between hover:bg-gray-50">
                   <div className="flex items-center gap-3">
                     <svg className="w-8 h-8 text-red-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />

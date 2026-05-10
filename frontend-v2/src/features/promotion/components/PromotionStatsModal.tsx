@@ -178,9 +178,9 @@ export function PromotionStatsModal({
               <div>
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">点击趋势</h4>
                 <div className="h-32 flex items-end gap-2">
-                  {trend.map((item, index) => (
+                  {trend.map((item) => (
                     <div
-                      key={index}
+                      key={item.date}
                       className="flex-1 bg-blue-200 dark:bg-blue-800 rounded-t"
                       style={{
                         height: `${(item.clicks / maxClicks) * 100}%`,
@@ -201,8 +201,8 @@ export function PromotionStatsModal({
               <div>
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">每日点击量</h4>
                 <div className="h-48 flex items-end gap-1 bg-gray-50 dark:bg-gray-700/30 rounded-lg p-4">
-                  {trend.map((item, index) => (
-                    <div key={index} className="flex-1 flex flex-col items-center gap-1">
+                  {trend.map((item) => (
+                    <div key={`click-${item.date}`} className="flex-1 flex flex-col items-center gap-1">
                       <div
                         className="w-full bg-blue-500 rounded-t transition-all hover:bg-blue-600"
                         style={{ height: `${(item.clicks / maxClicks) * 160}px` }}
@@ -218,8 +218,8 @@ export function PromotionStatsModal({
               <div>
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">每日转化量</h4>
                 <div className="h-48 flex items-end gap-1 bg-gray-50 dark:bg-gray-700/30 rounded-lg p-4">
-                  {trend.map((item, index) => (
-                    <div key={index} className="flex-1 flex flex-col items-center gap-1">
+                  {trend.map((item) => (
+                    <div key={`conv-${item.date}`} className="flex-1 flex flex-col items-center gap-1">
                       <div
                         className="w-full bg-green-500 rounded-t transition-all hover:bg-green-600"
                         style={{ height: `${(item.conversions / maxConversions) * 160}px` }}
@@ -247,11 +247,11 @@ export function PromotionStatsModal({
                   </tr>
                 </thead>
                 <tbody>
-                  {trend.map((item, index) => {
+                  {trend.map((item) => {
                     const rate = item.clicks > 0 ? (item.conversions / item.clicks) * 100 : 0;
                     return (
                       <tr
-                        key={index}
+                        key={item.date}
                         className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/30"
                       >
                         <td className="py-3 px-4 text-gray-900 dark:text-gray-100">

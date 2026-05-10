@@ -1,4 +1,4 @@
-import { useWalletBalance, useIncomeRecords, useWithdrawals } from '../../hooks/useSettlements';
+import { useWalletBalance, useIncomeRecords, useWithdrawals, statusConfig as withdrawalStatusConfig } from '../../hooks/useSettlements';
 import type { IncomeRecord, WithdrawalRequest } from '../../types';
 
 export function SettlementList(): JSX.Element {
@@ -105,7 +105,7 @@ export function SettlementList(): JSX.Element {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-medium text-gray-900">¥{record.actualAmount.toFixed(2)}</p>
-                  <p className="text-xs text-gray-400">{record.status}</p>
+                  <p className="text-xs text-gray-400">{withdrawalStatusConfig[record.status]?.label ?? record.status}</p>
                 </div>
               </div>
             ))}

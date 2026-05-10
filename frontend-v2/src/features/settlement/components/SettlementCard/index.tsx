@@ -1,4 +1,4 @@
-import { statusConfig } from '../../hooks/useSettlements';
+import { settlementStatusConfig } from '../../hooks/useSettlements';
 import type { SettlementRecord, SettlementStatus } from '../../types';
 
 interface SettlementCardProps {
@@ -7,7 +7,7 @@ interface SettlementCardProps {
 
 export function SettlementCard({ settlement }: SettlementCardProps): JSX.Element {
   const settlementStatus: SettlementStatus = settlement.status;
-  const status = statusConfig[settlementStatus];
+  const status = settlementStatusConfig[settlementStatus];
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">

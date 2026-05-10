@@ -272,6 +272,314 @@ services:
     networks:
       - frontend-network
 
+  # ========================================
+  # 微服务集群 (可选，注释掉以加快开发速度)
+  # ========================================
+
+  # 法律服务 (8008)
+  legal-service:
+    build:
+      context: ./services/legal-service
+      dockerfile: Dockerfile
+    container_name: baixing_legal_service
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/legal_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DEBUG: "true"
+    ports:
+      - "8008:8008"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8008/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging: *base-logging
+    networks:
+      - backend-network
+
+  # 社区服务 (8007)
+  community-service:
+    build:
+      context: ./services/community-service
+      dockerfile: Dockerfile
+    container_name: baixing_community_service
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/community_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      # KAFKA_BOOTSTRAP_SERVERS: kafka:29092  # 启用需要 docker-compose.microservices.yml
+      DEBUG: "true"
+    ports:
+      - "8007:8007"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8007/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging: *base-logging
+    networks:
+      - backend-network
+
+  # 新闻服务 (8006)
+  news-service:
+    build:
+      context: ./services/news-service
+      dockerfile: Dockerfile
+    container_name: baixing_news_service
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/news_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DEBUG: "true"
+    ports:
+      - "8006:8006"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8006/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging: *base-logging
+    networks:
+      - backend-network
+
+  # 搜索服务 (8009)
+  search-service:
+    build:
+      context: ./services/search-service
+      dockerfile: Dockerfile
+    container_name: baixing_search_service
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/search_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DEBUG: "true"
+    ports:
+      - "8009:8009"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8009/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging: *base-logging
+    networks:
+      - backend-network
+
+  # 推荐服务 (8010)
+  recommendation-service:
+    build:
+      context: ./services/recommendation-service
+      dockerfile: Dockerfile
+    container_name: baixing_recommendation_service
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/recommendation_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DEBUG: "true"
+    ports:
+      - "8010:8010"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8010/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging: *base-logging
+    networks:
+      - backend-network
+
+  # 通知服务 (8005)
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: baixing_notification_service
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/notification_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DEBUG: "true"
+    ports:
+      - "8005:8005"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging: *base-logging
+    networks:
+      - backend-network
+
+  # 用户服务 (8001)
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: baixing_user_service
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/user_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      CONSUL_ENABLED: "false"
+      KAFKA_ENABLED: "false"
+      DEBUG: "true"
+    ports:
+      - "8001:8001"
+      - "50051:50051"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging: *base-logging
+    networks:
+      - backend-network
+
+  # 积分服务 (8012)
+  points-service:
+    build:
+      context: ./services/points-service
+      dockerfile: Dockerfile
+    container_name: baixing_points_service
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/points_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DEBUG: "true"
+    ports:
+      - "8012:8012"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8012/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging: *base-logging
+    networks:
+      - backend-network
+
+  # 知识库服务 (8081)
+  knowledge-service:
+    build:
+      context: ./services/knowledge-service
+      dockerfile: Dockerfile
+    container_name: baixing_knowledge_service
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/knowledge_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DEBUG: "true"
+    ports:
+      - "8081:8081"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging: *base-logging
+    networks:
+      - backend-network
+
+  # 归档服务 (8013)
+  archive-service:
+    build:
+      context: ./services/archive-service
+      dockerfile: Dockerfile
+    container_name: baixing_archive_service
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/archive_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DEBUG: "true"
+    ports:
+      - "8013:8013"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8013/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging: *base-logging
+    networks:
+      - backend-network
+
+  # 订单服务 (8004)
+  order-service:
+    build:
+      context: ./services/order-service
+      dockerfile: Dockerfile
+    container_name: baixing_order_service
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/order_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DEBUG: "true"
+    ports:
+      - "8004:8004"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging: *base-logging
+    networks:
+      - backend-network
+
 volumes:
   postgres_data:
   redis_data:

@@ -10,6 +10,8 @@
  * @see FR-011: Token 刷新失败处理
  */
 
+import { logger } from '../logger';
+
 import { clearAuthStorage } from '../security/tokenStorage';
 
 
@@ -71,7 +73,7 @@ export function handleRefreshFailure(): void {
     try {
       globalSessionExpiredCallback();
     } catch (e) {
-      console.warn('Session expired callback failed:', e);
+      logger.warn('Session expired callback failed:', e);
     }
   }
 }

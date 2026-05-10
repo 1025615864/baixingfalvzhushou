@@ -19,6 +19,7 @@ router = APIRouter(prefix="/ab", tags=["A/B 测试"])
 
 @router.post("/experiments")
 async def create_ab_experiment(
+    current_user: Annotated[User, Depends(get_current_user)],
     experiment_id: str = Query(..., description="实验ID"),
     name: str = Query(..., description="实验名称"),
     variants: str = Query(..., description="变体列表 JSON 数组"),
@@ -59,6 +60,7 @@ async def get_ab_experiment(experiment_id: str) -> dict[str, Any]:
 
 @router.post("/experiments/{experiment_id}/status")
 async def update_ab_experiment_status(
+    current_user: Annotated[User, Depends(get_current_user)],
     experiment_id: str,
     status: str = Query(..., description="状态: draft/running/paused/completed"),
 ) -> dict[str, Any]:

@@ -93,7 +93,7 @@ export class TokenManager implements ITokenManager {
   private constructor(options?: {
     refreshUrl?: string;
   }) {
-    this.refreshUrl = options?.refreshUrl || `${import.meta.env.VITE_API_BASE_URL || '/api'}/user/auth/refresh`;
+    this.refreshUrl = options?.refreshUrl || `${import.meta.env.VITE_API_BASE_URL || '/api'}/auth/refresh`;
     this.storageEventListener = this.handleStorageEvent.bind(this);
   }
 

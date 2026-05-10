@@ -43,6 +43,7 @@ class Settings(BaseSettings):
 
     user_service_url: str = Field(default="http://localhost:8001")
     backend_url: str = Field(default="http://localhost:8000")
+    legal_service_url: str = Field(default="http://localhost:8008")
     use_remote_session: bool = Field(default=True)
 
     knowledge_service_url: str = Field(default="http://localhost:8081")

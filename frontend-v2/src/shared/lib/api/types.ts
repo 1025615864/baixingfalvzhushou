@@ -5,6 +5,8 @@
  * 支持新版响应格式 (success/message/data/error_code)
  */
 
+import type { ApiError } from './client';
+
 // ============================================================
 // 后端错误码映射
 // ============================================================
@@ -299,9 +301,9 @@ export interface PaginatedResponse<T = unknown> {
 }
 
 /**
- * 错误响应接口
+ * 错误响应接口 (API 响应格式)
  */
-export interface ApiError {
+export interface ApiResponseError {
   /** 始终为 false */
   success: false;
   /** 错误消息 */
@@ -324,7 +326,7 @@ export interface ApiError {
 export function isSuccessResponse<T>(
   response: ApiResponse<T> | ApiError
 ): response is ApiResponse<T> {
-  return response.success === true;
+  return 'success' in response && response.success === true;
 }
 
 /**
@@ -333,7 +335,7 @@ export function isSuccessResponse<T>(
 export function isErrorResponse<T>(
   response: ApiResponse<T> | ApiError
 ): response is ApiError {
-  return response.success === false;
+  return !('success' in response) || response.success !== true;
 }
 
 /**

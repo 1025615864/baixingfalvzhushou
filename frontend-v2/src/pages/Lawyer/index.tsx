@@ -283,9 +283,9 @@ export function LawyerPage(): JSX.Element {
 
                 {/* Specialty Tags */}
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {lawyer.specialty.map((spec, index) => (
+                  {lawyer.specialty.map((spec) => (
                     <span
-                      key={index}
+                      key={spec}
                       className="px-2.5 py-1 bg-slate-100 text-slate-600 text-xs rounded-lg"
                     >
                       {spec}
@@ -295,9 +295,9 @@ export function LawyerPage(): JSX.Element {
 
                 {/* Tags */}
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {lawyer.tags.map((tag, index) => (
+                  {lawyer.tags.map((tag) => (
                     <span
-                      key={index}
+                      key={tag}
                       className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full"
                     >
                       {tag}

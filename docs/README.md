@@ -4,10 +4,10 @@
 
 ## 项目状态
 
-> **当前版本**: v2.0.0
-> **最后更新**: 2026-05-07
-> **项目状态**: 🟡 生产就绪（核心功能完成，待上线前验证）
-> **架构模式**: 微服务 + BFF (Backend for Frontend)
+- **当前版本**: v2.1
+- **最后更新**: 2026-05-09
+- **项目状态**: 生产就绪
+- **架构模式**: 微服务 + BFF (Backend for Frontend)
 
 ## 项目概述
 
@@ -34,18 +34,18 @@
 
 | 服务 | 端口 | 说明 |
 |------|------|------|
-| **legal-service** | 8008 | 法律咨询服务 |
+| **backend (BFF)** | 8000 | BFF 聚合层 |
+| **user-service** | 8001 | 用户管理 |
+| **legal-service** | 8004 | 法律咨询服务 |
+| **ai-service** | 8005 | AI 对话服务 |
+| **news-service** | 8006 | 新闻服务 |
 | **community-service** | 8007 | 社区/论坛服务 |
-| **order-service** | 8004 | 订单/支付服务 |
-| **news-service** | 8006 | 新闻服务（含评论/订阅） |
+| **points-service** | 8008 | 积分服务 |
 | **search-service** | 8009 | 跨服务聚合搜索 |
-| **recommendation-service** | 8010 | 个性化推荐 |
-| **notification-service** | 8005 | 通知服务（含模板系统） |
-| **user-service** | 8003 | 用户管理 |
-| **ai-service** | 8011 | AI 对话服务 |
+| **order-service** | 8010 | 订单/支付服务 |
 | **knowledge-service** | 8081 | 知识库服务 |
-| **points-service** | 8012 | 积分服务 |
 | **archive-service** | 8013 | 档案服务 |
+| **embedding-service** | 8082 | 向量嵌入服务 |
 
 ### 后端技术栈
 
@@ -97,30 +97,27 @@
 
 ```
 百姓法律助手/
-├── backend/              # BFF 层 (FastAPI)
+├── backend/              # BFF 层 (FastAPI :8000)
 ├── frontend-v2/          # 前端应用 (React + Vite)
 ├── services/             # 微服务集群
-│   ├── common/           # 共享模块
-│   ├── legal-service/
-│   ├── community-service/
-│   ├── order-service/
-│   ├── news-service/
-│   ├── search-service/
-│   ├── recommendation-service/
-│   ├── notification-service/
-│   ├── user-service/
-│   ├── ai-service/
-│   ├── knowledge-service/
-│   ├── points-service/
-│   └── archive-service/
+│   ├── common/           # 共享模块 (gRPC, Kafka, Auth...)
+│   ├── ai-service/       # AI 对话服务
+│   ├── legal-service/    # 法律咨询服务
+│   ├── community-service/# 社区论坛服务
+│   ├── news-service/     # 新闻资讯服务
+│   ├── user-service/     # 用户管理服务
+│   ├── order-service/    # 订单支付服务
+│   ├── search-service/   # 搜索服务
+│   ├── points-service/   # 积分服务
+│   ├── knowledge-service/# 知识库服务
+│   ├── archive-service/  # 档案服务
+│   └── embedding-service/# 向量嵌入服务
 ├── deploy/               # 部署配置 (APISIX/systemd)
 ├── docs/                 # 项目文档
 ├── scripts/              # 运维脚本
-├── knowledge_base/       # 法律知识库
 ├── helm/                 # Kubernetes 部署配置
 ├── nginx/                # Nginx 配置
 ├── prometheus/           # 监控配置
-├── grafana/              # Grafana 仪表盘
 └── .github/workflows/    # CI/CD 流水线
 ```
 
@@ -129,23 +126,8 @@
 ### Docker Compose 一键启动
 
 ```bash
-# 克隆项目后，进入项目根目录
-
-# 生成安全密钥
-bash scripts/generate_secrets.sh
-
-# 配置环境变量
 cp .env.example .env
-# 编辑 .env，填入生成的密钥
-
-# 启动所有服务
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-
-# 初始化数据库
-docker exec -i baixing_db_prod bash < scripts/init_db_prod.sh
-
-# 查看服务状态
-docker compose ps
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```
 
 服务启动后可访问：
@@ -160,8 +142,6 @@ docker compose ps
 ```bash
 # 后端
 cd backend
-python -m venv venv
-source venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 
@@ -196,23 +176,24 @@ npm run dev
 | 文档 | 说明 |
 |------|------|
 | [生产部署指南](./PRODUCTION_DEPLOYMENT_GUIDE.md) | 生产环境部署全流程 |
+| [Docker 部署](./DOCKER_DEPLOYMENT.md) | Docker Compose 部署 |
 | [运维手册](./OPERATIONS.md) | 日常运维操作 |
-| [生产就绪报告](./PRODUCTION_READINESS_REPORT.md) | 上线差距分析 |
 
-### 知识库
+### 迭代文档
 
 | 文档 | 说明 |
 |------|------|
-| [法律知识库](../knowledge_base/) | 法律法规 JSON |
+| [v2.1 迭代计划](./V2.1_ITERATION_PLAN.md) | 当前迭代进度与验收 |
 
-## CI/CD 状态
+## CI/CD
 
-- 主流水线：`.github/workflows/ci-cd.yml`
-- 安全扫描：`.github/workflows/security-scan.yml`
-- 契约测试：`.github/workflows/pact.yml`
-- 自动化测试：`.github/workflows/test.yml`
-- 类型检查：`.github/workflows/type-check.yml`
+| Workflow | 说明 |
+|----------|------|
+| `ci.yml` | 主流水线 (CI + 测试 + 类型检查) |
+| `code-quality.yml` | 代码质量 + 安全扫描 |
+| `release.yml` | 发布流水线 |
+| `pact.yml` | 契约测试 |
 
 ## 许可证
 
-MIT License - 查看 [LICENSE](../LICENSE) 了解详情
+MIT License

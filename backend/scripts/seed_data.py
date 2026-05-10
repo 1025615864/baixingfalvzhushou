@@ -28,6 +28,11 @@ from app.models.notification import Notification, NotificationType
 from app.models.payment import BalanceTransaction, PaymentOrder
 from app.models.system import SearchHistory, UserActivity
 from app.models import PointsProduct
+from app.models.faq import FAQ
+from app.models.knowledge import KnowledgeCategory, ConsultationTemplate
+from app.models.membership import Membership
+from app.models.channel import Channel
+from app.models.system import AIModelConfig
 
 
 async def upsert_system_config(
@@ -911,6 +916,182 @@ async def seed_points_products(db: AsyncSession) -> None:
     print(f"✓ 已创建 {len(products)} 个积分商品")
 
 
+async def create_faqs(db: AsyncSession) -> None:
+    """创建常见问题"""
+    faqs = [
+        FAQ(question="如何注册账号？", answer="点击页面右上角的'注册'按钮，填写手机号或邮箱，设置密码即可完成注册。注册后需验证手机号或邮箱。", category="账号", sort_order=1, is_published=True),
+        FAQ(question="忘记密码怎么办？", answer="在登录页面点击'忘记密码'，通过注册时使用的手机号或邮箱验证身份后，即可重置密码。", category="账号", sort_order=2, is_published=True),
+        FAQ(question="AI法律咨询的回答准确吗？", answer="AI法律咨询基于中国现行法律法规和真实案例，提供参考性建议。但AI回答仅供参考，不构成法律意见。重要法律问题建议咨询专业律师。", category="AI咨询", sort_order=1, is_published=True),
+        FAQ(question="如何咨询律师？", answer="您可以通过律师列表页找到合适的律师，点击'立即咨询'按钮发起在线咨询。VIP会员享有优先回复权益。", category="律师咨询", sort_order=1, is_published=True),
+        FAQ(question="如何成为VIP会员？", answer="进入会员中心页面，选择合适的VIP套餐进行购买。支持支付宝、微信支付和余额支付。", category="会员", sort_order=1, is_published=True),
+        FAQ(question="如何充值余额？", answer="进入个人中心-钱包页面，选择充值金额，支持支付宝和微信支付。充值后余额可用于支付咨询费、文档生成等服务。", category="支付", sort_order=1, is_published=True),
+        FAQ(question="法律文书模板如何使用？", answer="进入法律文书商城，选择需要的模板，填写相关信息后即可生成法律文书。VIP会员可免费使用所有模板。", category="文书", sort_order=1, is_published=True),
+        FAQ(question="如何申请退款？", answer="如对服务不满意，可在订单详情页申请退款。已使用的服务不支持退款，具体退款政策请查看用户协议。", category="支付", sort_order=2, is_published=True),
+        FAQ(question="劳动合同被违法解除怎么办？", answer="1.保留证据：劳动合同、工资条、考勤记录等；2.与用人单位协商；3.向劳动监察部门投诉；4.申请劳动仲裁；5.对仲裁结果不服可向法院起诉。经济补偿标准为每工作一年支付一个月工资。", category="劳动纠纷", sort_order=1, is_published=True),
+        FAQ(question="交通事故如何处理？", answer="1.确保安全，拨打122报警；2.拍照保留现场证据；3.交换双方信息；4.及时就医并保留病历；5.联系保险公司理赔；6.协商不成可向法院起诉。", category="交通事故", sort_order=1, is_published=True),
+    ]
+    created = 0
+    for faq in faqs:
+        existing = (await db.execute(select(FAQ).where(FAQ.question == faq.question))).scalar_one_or_none()
+        if existing is None:
+            db.add(faq)
+            created += 1
+        else:
+            existing.answer = faq.answer
+            existing.category = faq.category
+            existing.sort_order = faq.sort_order
+            existing.is_published = faq.is_published
+            db.add(existing)
+    await db.commit()
+    print(f"✓ 创建/更新了 {len(faqs)} 条FAQ（新增 {created}）")
+
+
+async def create_knowledge_categories(db: AsyncSession) -> None:
+    """创建知识分类"""
+    categories = [
+        KnowledgeCategory(name="民法典", slug="civil-code", description="中华人民共和国民法典相关条文解读", parent_id=None, sort_order=1, is_active=True),
+        KnowledgeCategory(name="劳动法", slug="labor-law", description="劳动法与劳动合同法相关条文", parent_id=None, sort_order=2, is_active=True),
+        KnowledgeCategory(name="合同法", slug="contract-law", description="合同相关法律条文与案例", parent_id=None, sort_order=3, is_active=True),
+        KnowledgeCategory(name="婚姻家庭", slug="marriage-family", description="婚姻、继承、抚养等家庭法律", parent_id=None, sort_order=4, is_active=True),
+        KnowledgeCategory(name="侵权责任", slug="tort-liability", description="侵权责任法相关条文", parent_id=None, sort_order=5, is_active=True),
+        KnowledgeCategory(name="消费者权益", slug="consumer-rights", description="消费者权益保护相关法律", parent_id=None, sort_order=6, is_active=True),
+        KnowledgeCategory(name="刑法", slug="criminal-law", description="刑法相关条文与司法解释", parent_id=None, sort_order=7, is_active=True),
+        KnowledgeCategory(name="交通法规", slug="traffic-law", description="道路交通安全法相关条文", parent_id=None, sort_order=8, is_active=True),
+        KnowledgeCategory(name="知识产权", slug="ip-law", description="商标法、专利法、著作权法", parent_id=None, sort_order=9, is_active=True),
+        KnowledgeCategory(name="公司法", slug="corporate-law", description="公司法、证券法等商事法律", parent_id=None, sort_order=10, is_active=True),
+    ]
+    created = 0
+    for cat in categories:
+        existing = (await db.execute(select(KnowledgeCategory).where(KnowledgeCategory.slug == cat.slug))).scalar_one_or_none()
+        if existing is None:
+            db.add(cat)
+            created += 1
+        else:
+            existing.name = cat.name
+            existing.description = cat.description
+            existing.sort_order = cat.sort_order
+            existing.is_active = cat.is_active
+            db.add(existing)
+    await db.commit()
+    print(f"✓ 创建/更新了 {len(categories)} 个知识分类（新增 {created}）")
+
+
+async def create_consultation_templates(db: AsyncSession) -> None:
+    """创建咨询模板"""
+    templates = [
+        ConsultationTemplate(title="劳动纠纷咨询", description="适用于劳动合同、工资、工伤等劳动争议问题", category="labor", questions='["您与用人单位是否签订了劳动合同？","您的入职时间和离职时间？","用人单位的具体违法行为是什么？","您是否有相关证据（工资条、考勤记录等）？"]', is_active=True),
+        ConsultationTemplate(title="合同纠纷咨询", description="适用于买卖合同、租赁合同、服务合同等纠纷", category="contract", questions='["合同类型是什么？","对方违约的具体情况？","合同约定的违约条款？","您是否已经采取过协商等措施？"]', is_active=True),
+        ConsultationTemplate(title="婚姻家庭咨询", description="适用于离婚、财产分割、子女抚养等问题", category="family", questions='["您是协议离婚还是诉讼离婚？","是否有子女需要抚养？","婚后共同财产有哪些？","是否存在家庭暴力等情况？"]', is_active=True),
+        ConsultationTemplate(title="交通事故咨询", description="适用于交通事故责任认定、赔偿等问题", category="tort", questions='["事故发生的时间和地点？","是否有人员伤亡？","交警是否出具了事故认定书？","您的车辆是否购买了保险？"]', is_active=True),
+    ]
+    created = 0
+    for tpl in templates:
+        existing = (await db.execute(select(ConsultationTemplate).where(ConsultationTemplate.title == tpl.title))).scalar_one_or_none()
+        if existing is None:
+            db.add(tpl)
+            created += 1
+        else:
+            existing.description = tpl.description
+            existing.category = tpl.category
+            existing.questions = tpl.questions
+            existing.is_active = tpl.is_active
+            db.add(existing)
+    await db.commit()
+    print(f"✓ 创建/更新了 {len(templates)} 个咨询模板（新增 {created}）")
+
+
+async def create_memberships(db: AsyncSession, users: list[User]) -> None:
+    """创建会员等级"""
+    user1 = next((u for u in users if u.username == "user1"), None)
+    if user1 is None:
+        return
+    existing = (await db.execute(select(Membership).where(Membership.user_id == int(user1.id)))).scalar_one_or_none()
+    if existing is None:
+        db.add(Membership(user_id=int(user1.id), level="free", expires_at=None, auto_renew=False))
+    await db.commit()
+    print("✓ 创建了用户会员记录")
+
+
+async def create_channels(db: AsyncSession) -> None:
+    """创建渠道配置"""
+    channels = [
+        Channel(name="web", display_name="网页端", description="通过浏览器访问", is_active=True, sort_order=1),
+        Channel(name="wechat_mini", display_name="微信小程序", description="微信小程序端", is_active=True, sort_order=2),
+        Channel(name="h5", display_name="H5移动端", description="移动端H5页面", is_active=True, sort_order=3),
+    ]
+    created = 0
+    for ch in channels:
+        existing = (await db.execute(select(Channel).where(Channel.name == ch.name))).scalar_one_or_none()
+        if existing is None:
+            db.add(ch)
+            created += 1
+        else:
+            existing.display_name = ch.display_name
+            existing.description = ch.description
+            existing.is_active = ch.is_active
+            existing.sort_order = ch.sort_order
+            db.add(existing)
+    await db.commit()
+    print(f"✓ 创建/更新了 {len(channels)} 个渠道（新增 {created}）")
+
+
+async def create_system_configs(db: AsyncSession) -> None:
+    """创建系统配置"""
+    configs = [
+        ("site_name", "百姓法律助手", "网站名称", "general"),
+        ("site_description", "一站式法律服务平台，AI+律师双重保障", "网站描述", "general"),
+        ("default_ai_model", "gpt-4o-mini", "默认AI模型", "ai"),
+        ("ai_chat_max_tokens", "2048", "AI对话最大token数", "ai"),
+        ("ai_chat_temperature", "0.7", "AI对话温度参数", "ai"),
+        ("ai_daily_free_limit", "5", "每日免费AI咨询次数", "ai"),
+        ("upload_max_size_mb", "10", "文件上传最大大小(MB)", "upload"),
+        ("upload_allowed_types", "jpg,jpeg,png,pdf,doc,docx", "允许上传的文件类型", "upload"),
+        ("payment_alipay_enabled", "true", "支付宝支付开关", "payment"),
+        ("payment_wechat_enabled", "true", "微信支付开关", "payment"),
+        ("points_sign_in_daily", "10", "每日签到积分", "points"),
+        ("points_sign_in_continuous_bonus", "5", "连续签到额外奖励", "points"),
+        ("points_consultation_reward", "20", "完成咨询奖励积分", "points"),
+        ("forum_post_review_enabled", "true", "论坛帖子审核开关", "forum"),
+        ("forum_comment_review_enabled", "false", "论坛评论审核开关", "forum"),
+        ("notification_enabled", "true", "通知功能开关", "notification"),
+        ("consultation_review_enabled", "true", "律师复核开关", "consultation"),
+    ]
+    for key, value, description, category in configs:
+        await upsert_system_config(db, key=key, value=value, description=description, category=category)
+    await db.commit()
+    print(f"✓ 创建/更新了 {len(configs)} 项系统配置")
+
+
+async def create_ai_model_configs(db: AsyncSession) -> None:
+    """创建AI模型配置"""
+    configs = [
+        AIModelConfig(name="GPT-4o Mini", provider="openai", model_id="gpt-4o-mini", api_base="https://api.openai.com/v1", is_default=True, is_active=True, max_tokens=4096, temperature=0.7, priority=1, capabilities="chat,stream", cost_per_1k_input=0.15, cost_per_1k_output=0.6),
+        AIModelConfig(name="GPT-4o", provider="openai", model_id="gpt-4o", api_base="https://api.openai.com/v1", is_default=False, is_active=True, max_tokens=8192, temperature=0.7, priority=2, capabilities="chat,stream,vision", cost_per_1k_input=2.5, cost_per_1k_output=10.0),
+        AIModelConfig(name="DeepSeek Chat", provider="deepseek", model_id="deepseek-chat", api_base="https://api.deepseek.com/v1", is_default=False, is_active=True, max_tokens=4096, temperature=0.7, priority=3, capabilities="chat,stream", cost_per_1k_input=0.14, cost_per_1k_output=0.28),
+    ]
+    created = 0
+    for cfg in configs:
+        existing = (await db.execute(select(AIModelConfig).where(AIModelConfig.model_id == cfg.model_id))).scalar_one_or_none()
+        if existing is None:
+            db.add(cfg)
+            created += 1
+        else:
+            existing.name = cfg.name
+            existing.provider = cfg.provider
+            existing.api_base = cfg.api_base
+            existing.is_default = cfg.is_default
+            existing.is_active = cfg.is_active
+            existing.max_tokens = cfg.max_tokens
+            existing.temperature = cfg.temperature
+            existing.priority = cfg.priority
+            existing.capabilities = cfg.capabilities
+            existing.cost_per_1k_input = cfg.cost_per_1k_input
+            existing.cost_per_1k_output = cfg.cost_per_1k_output
+            db.add(existing)
+    await db.commit()
+    print(f"✓ 创建/更新了 {len(configs)} 个AI模型配置（新增 {created}）")
+
+
 async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--demo", action="store_true")
@@ -960,6 +1141,14 @@ async def main():
             await db.execute(delete(Post))
             await db.commit()
         await create_posts(db, users)
+
+        await create_faqs(db)
+        await create_knowledge_categories(db)
+        await create_consultation_templates(db)
+        await create_memberships(db, users)
+        await create_channels(db)
+        await create_system_configs(db)
+        await create_ai_model_configs(db)
 
         if bool(getattr(args, "demo", False)):
             await seed_demo_data(db, users)

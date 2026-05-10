@@ -3,6 +3,7 @@
  * 文档列表、创建、编辑、查看、导出等功能
  */
 
+import { logger } from '@/shared/lib/logger';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -81,7 +82,7 @@ export function DocumentsPage(): React.ReactElement {
   };
 
   // 处理删除文档
-  const handleDelete = async (doc: DocumentItem) => {
+  const handleDelete = async (doc: { id: number; title: string }) => {
     if (!window.confirm(`确定要删除文档"${doc.title}"吗？`)) {
       return;
     }
@@ -94,7 +95,7 @@ export function DocumentsPage(): React.ReactElement {
         setSelectedDocId(null);
       }
     } catch (error) {
-      console.error('删除文档失败:', error);
+      logger.error('删除文档失败:', error);
       alert('删除失败，请重试');
     }
   };
@@ -119,7 +120,7 @@ export function DocumentsPage(): React.ReactElement {
       setViewMode('list');
       setSelectedDocId(null);
     } catch (error) {
-      console.error('导出失败:', error);
+      logger.error('导出失败:', error);
       alert('导出失败，请重试');
     }
   };
@@ -132,7 +133,7 @@ export function DocumentsPage(): React.ReactElement {
       setSearchKeyword('');
       void refetchDocuments();
     } catch (error) {
-      console.error('创建文档失败:', error);
+      logger.error('创建文档失败:', error);
       alert('创建失败，请重试');
     }
   };
@@ -147,7 +148,7 @@ export function DocumentsPage(): React.ReactElement {
       setSelectedDocId(null);
       void refetchDocuments();
     } catch (error) {
-      console.error('更新文档失败:', error);
+      logger.error('更新文档失败:', error);
       alert('更新失败，请重试');
     }
   };
@@ -235,7 +236,7 @@ export function DocumentsPage(): React.ReactElement {
             onExport={() => setViewMode('export')}
             onDelete={() => {
               if (documentDetail) {
-                void handleDelete(documentDetail as unknown as DocumentItem);
+                void handleDelete(documentDetail);
               }
             }}
           />

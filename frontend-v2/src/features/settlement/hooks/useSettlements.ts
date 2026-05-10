@@ -22,6 +22,7 @@ import type {
   IncomeRecord,
   WithdrawalRequest,
   WithdrawalStatus,
+  SettlementStatus,
   BankAccount,
   GetIncomeRecordsRequest,
   GetWithdrawalRecordsRequest,
@@ -29,7 +30,13 @@ import type {
   AddBankAccountRequest,
 } from '../types';
 
-// 状态配置
+const settlementStatusConfig: Record<SettlementStatus, { label: string; color: string }> = {
+  pending: { label: '待结算', color: 'bg-yellow-100 text-yellow-800' },
+  processing: { label: '结算中', color: 'bg-purple-100 text-purple-800' },
+  completed: { label: '已结算', color: 'bg-green-100 text-green-800' },
+  failed: { label: '结算失败', color: 'bg-red-100 text-red-800' },
+};
+
 const statusConfig: Record<WithdrawalStatus, { label: string; color: string }> = {
   pending: { label: '待审核', color: 'bg-yellow-100 text-yellow-800' },
   approved: { label: '已批准', color: 'bg-blue-100 text-blue-800' },
@@ -157,7 +164,7 @@ export function useSetDefaultBankAccount() {
 }
 
 // 导出状态配置
-export { statusConfig, statusConfig as withdrawalStatusConfig };
+export { statusConfig, statusConfig as withdrawalStatusConfig, settlementStatusConfig };
 
 // 兼容旧API - 保持向后兼容
 export function useSettlements() {

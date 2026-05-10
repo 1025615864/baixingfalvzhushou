@@ -108,7 +108,7 @@ export type {
 } from './Input';
 
 export { Badge } from './Badge';
-export { Form, FormField, TextArea, Select, Checkbox, DatePicker, Button } from './Form';
+export { Form, TextArea, Checkbox, DatePicker } from './Form';
 
 // ==================== Tabs组件 ====================
 export { Tabs, TabsList, TabsTrigger, TabsContent } from './Tabs';
@@ -140,6 +140,10 @@ export {
   useNetworkStatus
 } from './NetworkStatus';
 export type { NetworkStatusProps, NetworkStatusIndicatorProps } from './NetworkStatus';
+
+// ==================== 图片懒加载组件 ====================
+export { LazyImage } from './LazyImage';
+export type { LazyImageProps } from './LazyImage';
 
 // ==================== 表单字段组件 ====================
 export {

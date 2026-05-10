@@ -357,32 +357,68 @@ class RAGRetrievalService:
         return unique_docs[:top_k]
 
     def _get_default_docs(self, query: str) -> list[RetrievedDoc]:
-        """获取默认文档（无检索结果时）"""
+        """获取默认文档（无检索结果时）- 领域感知"""
+        domain_defaults: dict[str, list[RetrievedDoc]] = {
+            "labor": [
+                RetrievedDoc(
+                    id="default_labor_1",
+                    content="根据《中华人民共和国劳动合同法》第四十四条，有下列情形之一的，劳动合同终止：（一）劳动合同期满的；（二）劳动者开始依法享受基本养老保险待遇的；（三）劳动者死亡，或者被人民法院宣告死亡或者宣告失踪的；（四）用人单位被依法宣告破产的；（五）用人单位被吊销营业执照、责令关闭、撤销或者用人单位决定提前解散的；（六）法律、行政法规规定的其他情形。",
+                    metadata={"law_name": "劳动合同法", "article_num": "第44条", "category": "劳动合同"},
+                    source="default", level="level_3_fallback", similarity=0.5,
+                ),
+                RetrievedDoc(
+                    id="default_labor_2",
+                    content="根据《中华人民共和国劳动合同法》第四十六条，有下列情形之一的，用人单位应当向劳动者支付经济补偿：（一）劳动者依照本法第三十八条规定解除劳动合同的；（二）用人单位依照本法第三十六条规定向劳动者提出解除劳动合同并与劳动者协商一致解除劳动合同的；（三）用人单位依照本法第四十条规定解除劳动合同的。",
+                    metadata={"law_name": "劳动合同法", "article_num": "第46条", "category": "经济补偿"},
+                    source="default", level="level_3_fallback", similarity=0.5,
+                ),
+            ],
+            "contract": [
+                RetrievedDoc(
+                    id="default_contract_1",
+                    content="根据《中华人民共和国民法典》第五百七十七条，当事人一方不履行合同义务或者履行合同义务不符合约定的，应当承担继续履行、采取补救措施或者赔偿损失等违约责任。",
+                    metadata={"law_name": "民法典", "article_num": "第577条", "category": "合同违约"},
+                    source="default", level="level_3_fallback", similarity=0.5,
+                ),
+            ],
+            "family": [
+                RetrievedDoc(
+                    id="default_family_1",
+                    content="根据《中华人民共和国民法典》第一千零八十七条，离婚时，夫妻的共同财产由双方协议处理；协议不成的，由人民法院根据财产的具体情况，按照照顾子女、女方和无过错方权益的原则判决。",
+                    metadata={"law_name": "民法典", "article_num": "第1087条", "category": "离婚财产分割"},
+                    source="default", level="level_3_fallback", similarity=0.5,
+                ),
+            ],
+            "tort": [
+                RetrievedDoc(
+                    id="default_tort_1",
+                    content="根据《中华人民共和国民法典》第一千一百七十九条，侵害他人造成人身损害的，应当赔偿医疗费、护理费、交通费、营养费、住院伙食补助费等为治疗和康复支出的合理费用，以及因误工减少的收入。",
+                    metadata={"law_name": "民法典", "article_num": "第1179条", "category": "人身损害赔偿"},
+                    source="default", level="level_3_fallback", similarity=0.5,
+                ),
+            ],
+        }
+
+        from app.services.lawyer_skill import infer_domain_from_query
+        domain = infer_domain_from_query(query)
+        domain_docs = domain_defaults.get(domain)
+
+        if domain_docs:
+            return domain_docs
+
         return [
             RetrievedDoc(
                 id="default_1",
                 content="根据《中华人民共和国民法典》第一千一百六十五条，行为人因过错侵害他人民事权益造成损害的，应当承担侵权责任。",
-                metadata={
-                    "law_name": "民法典",
-                    "article_num": "第1165条",
-                    "category": "侵权责任"
-                },
-                source="default",
-                level="level_3_fallback",
-                similarity=0.5
+                metadata={"law_name": "民法典", "article_num": "第1165条", "category": "侵权责任"},
+                source="default", level="level_3_fallback", similarity=0.5,
             ),
             RetrievedDoc(
                 id="default_2",
                 content="根据《中华人民共和国劳动法》第四十四条，用人单位应当按时足额支付劳动者工资，不得克扣或者无故拖欠。",
-                metadata={
-                    "law_name": "劳动法",
-                    "article_num": "第44条",
-                    "category": "劳动报酬"
-                },
-                source="default",
-                level="level_3_fallback",
-                similarity=0.5
-            )
+                metadata={"law_name": "劳动法", "article_num": "第44条", "category": "劳动报酬"},
+                source="default", level="level_3_fallback", similarity=0.5,
+            ),
         ]
 
 

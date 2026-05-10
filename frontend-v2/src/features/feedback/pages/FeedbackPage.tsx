@@ -1,8 +1,9 @@
-/**
+﻿/**
  * 反馈页面
  * 普通用户提交反馈和查看反馈历史
  */
 
+import { logger } from '@/shared/lib/logger';
 import React, { useState } from 'react';
 
 import type { CreateFeedbackDTO } from '../types';
@@ -32,7 +33,7 @@ export function FeedbackPage(): React.ReactElement {
       setIsSuccess(true);
     } catch (error) {
       // 错误处理已在 mutation 中统一处理
-      console.error('提交反馈失败:', error);
+      logger.error('提交反馈失败:', error);
     }
   };
 

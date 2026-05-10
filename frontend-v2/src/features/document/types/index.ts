@@ -161,6 +161,10 @@ export interface DocumentItem {
   documentType: DocumentType;
   title: string;
   createdAt: string;
+  type?: DocumentFileType;
+  fileType?: string;
+  description?: string;
+  tags?: string[];
 }
 
 /**

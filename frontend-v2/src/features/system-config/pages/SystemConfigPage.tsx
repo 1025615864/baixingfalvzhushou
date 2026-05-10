@@ -1,7 +1,8 @@
-/**
+﻿/**
  * SystemConfigPage - 系统配置页面
  */
 
+import { logger } from '@/shared/lib/logger';
 import { useState } from 'react';
 import { Settings, RefreshCw, Download, History } from 'lucide-react';
 
@@ -49,7 +50,7 @@ export function SystemConfigPage(): JSX.Element {
       setIsEditorOpen(false);
       setSelectedConfig(null);
     } catch (error) {
-      console.error('保存配置失败:', error);
+      logger.error('保存配置失败:', error);
       alert('保存配置失败，请重试');
     }
   };
@@ -60,7 +61,7 @@ export function SystemConfigPage(): JSX.Element {
       setIsEditorOpen(false);
       setSelectedConfig(null);
     } catch (error) {
-      console.error('重置配置失败:', error);
+      logger.error('重置配置失败:', error);
       alert('重置配置失败，请重试');
     }
   };
@@ -74,7 +75,7 @@ export function SystemConfigPage(): JSX.Element {
       link.download = result.filename;
       link.click();
     } catch (error) {
-      console.error('导出配置失败:', error);
+      logger.error('导出配置失败:', error);
       alert('导出配置失败，请重试');
     }
   };
@@ -84,7 +85,7 @@ export function SystemConfigPage(): JSX.Element {
       await refreshCacheMutation.mutateAsync();
       alert('配置缓存已刷新');
     } catch (error) {
-      console.error('刷新缓存失败:', error);
+      logger.error('刷新缓存失败:', error);
       alert('刷新缓存失败，请重试');
     }
   };

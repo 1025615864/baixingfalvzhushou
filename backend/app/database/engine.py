@@ -1,10 +1,11 @@
 """数据库引擎配置"""
 import logging
 import os
+import time
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy import text
+from sqlalchemy import text, event
 from sqlalchemy.pool import StaticPool
 
 from ..config import get_settings
@@ -12,6 +13,7 @@ from ..config import get_settings
 settings = get_settings()
 
 logger = logging.getLogger(__name__)
+slow_query_logger = logging.getLogger("sqlalchemy.slow_query")
 
 # SQLite 数据库路径处理
 if settings.database_url.startswith("sqlite"):
@@ -57,11 +59,6 @@ else:
         pool_recycle=int(os.getenv("DB_POOL_RECYCLE", "1800")),  # 连接回收时间：30分钟
         pool_pre_ping=True,  # 启用连接健康检查
         pool_timeout=int(os.getenv("DB_POOL_TIMEOUT", "30")),  # 连接获取超时：30秒
-        pool_size_map={
-            0: 5,      # 紧急：最小保留连接
-            -1: 10,    # 阻塞：中等连接数
-            -2: 20,    # 警戒：较高连接数
-        },
         # PostgreSQL 特定优化
         connect_args={
             "server_settings": {
@@ -70,10 +67,6 @@ else:
                 "jit": "off",  # 关闭 JIT 编译，减少 CPU 消耗
             },
             "command_timeout": 30,
-            "keepalives": 1,
-            "keepalives_idle": 30,
-            "keepalives_interval": 10,
-            "keepalives_count": 5,
         },
     )
 
@@ -91,3 +84,32 @@ def _env_truthy(name: str) -> bool:
     """检查环境变量是否为真值"""
     raw = os.getenv(name, "").strip().lower()
     return raw in {"1", "true", "yes", "on"}
+
+
+# ==========================================
+# 慢查询日志配置
+# ==========================================
+
+_slow_query_threshold_ms = float(os.getenv("SLOW_QUERY_THRESHOLD_MS", "100"))
+
+
+@event.listens_for(engine.sync_engine, "before_cursor_execute")
+def _before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    """记录查询开始时间"""
+    context._query_start_time = time.time()
+
+
+@event.listens_for(engine.sync_engine, "after_cursor_execute")
+def _after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    """记录慢查询"""
+    if not hasattr(context, "_query_start_time"):
+        return
+    total = (time.time() - context._query_start_time) * 1000  # 毫秒
+    if total >= _slow_query_threshold_ms:
+        truncated = statement[:200] + "..." if len(statement) > 200 else statement
+        slow_query_logger.warning(
+            "SLOW QUERY: %.0fms | %s | params=%s",
+            total,
+            truncated,
+            parameters if len(str(parameters)) < 100 else str(parameters)[:100] + "...",
+        )

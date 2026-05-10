@@ -64,9 +64,9 @@ export const SearchEmpty: React.FC<SearchEmptyProps> = ({
         <div className="w-full max-w-md">
           <p className="text-sm text-gray-600 mb-3 text-center">热门搜索：</p>
           <div className="flex flex-wrap justify-center gap-2">
-            {suggestions.map((suggestion, index) => (
+            {suggestions.map((suggestion) => (
               <button
-                key={index}
+                key={suggestion}
                 onClick={() => onSuggestionClick?.(suggestion)}
                 className="px-4 py-2 text-sm text-blue-600 bg-blue-50 rounded-full 
                          hover:bg-blue-100 transition-colors duration-200"

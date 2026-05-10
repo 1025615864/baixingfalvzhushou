@@ -13,13 +13,13 @@ import type {
 
 // API 端点 - 与后端路由匹配
 const ENDPOINTS = {
-  REGISTER: '/user/register',
-  LOGIN: '/user/login',
-  LOGOUT: '/user/logout',
-  PROFILE: '/user/me',          // 后端使用 /user/me
-  PASSWORD: '/user/me/password', // 后端使用 /user/me/password
-  CSRF_TOKEN: '/user/me/csrf-token', // CSRF Token 端点
-  REFRESH: '/user/auth/refresh',  // Token 刷新端点
+  REGISTER: '/auth/register',
+  LOGIN: '/auth/login',
+  LOGOUT: '/auth/logout',
+  PROFILE: '/user/me',
+  PASSWORD: '/user/me/password',
+  CSRF_TOKEN: '/user/me/csrf-token',
+  REFRESH: '/auth/refresh',
 } as const;
 
 /**
@@ -58,5 +58,5 @@ export async function getCurrentUser(): Promise<User> {
  */
 export async function updateProfile(data: Partial<User>): Promise<User> {
   // api.put 已经返回了 res.data
-  return await api.put<User>(ENDPOINTS.PROFILE, data);
+  return await api.patch<User>(ENDPOINTS.PROFILE, data);
 }

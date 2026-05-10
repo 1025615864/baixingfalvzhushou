@@ -2,6 +2,8 @@
 // 性能监控工具
 // ============================================
 
+import { logger } from './logger';
+
 // Layout Shift 条目类型
 interface LayoutShiftEntry extends PerformanceEntry {
   value: number;
@@ -188,7 +190,7 @@ export function reportPerformanceMetrics(
 
   // 输出警告
   if (warnings.length > 0) {
-    console.warn('[Performance] 性能指标警告:', warnings);
+    logger.warn('性能指标警告:', warnings);
   }
 
   // 发送到分析服务（如果有）
@@ -257,9 +259,7 @@ export function measurePerformance<T extends (...args: unknown[]) => unknown>(
     const result = fn(...args);
     const end = performance.now();
 
-    // 使用 console.info 输出性能日志
-    // eslint-disable-next-line no-console
-    console.info(`[Performance] ${name} 执行时间: ${(end - start).toFixed(2)}ms`);
+    logger.info(`${name} 执行时间: ${(end - start).toFixed(2)}ms`);
 
     return result as ReturnType<T>;
   } as T;

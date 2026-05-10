@@ -1,7 +1,8 @@
-// ============================================
+﻿// ============================================
 // 通知中心页面
 // ============================================
 
+import { logger } from '@/shared/lib/logger';
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 import {
@@ -205,7 +206,7 @@ export function NotificationCenter(): JSX.Element {
       
       setHasMore(mappedNotifications.length >= 20);
     } catch (error) {
-      console.error('加载通知失败:', error);
+      logger.error('加载通知失败:', error);
       // 如果 API 失败，使用空数组
       if (!append) {
         setNotifications([]);
@@ -264,7 +265,7 @@ export function NotificationCenter(): JSX.Element {
     try {
       await apiMarkAsRead(id);
     } catch (error) {
-      console.error('标记已读失败:', error);
+      logger.error('标记已读失败:', error);
     }
   }, []);
 
@@ -276,7 +277,7 @@ export function NotificationCenter(): JSX.Element {
     try {
       await apiMarkAllAsRead();
     } catch (error) {
-      console.error('标记全部已读失败:', error);
+      logger.error('标记全部已读失败:', error);
     }
   }, []);
 
@@ -288,7 +289,7 @@ export function NotificationCenter(): JSX.Element {
     try {
       await apiDeleteNotification(id);
     } catch (error) {
-      console.error('删除通知失败:', error);
+      logger.error('删除通知失败:', error);
     }
   }, []);
 
@@ -318,7 +319,7 @@ export function NotificationCenter(): JSX.Element {
     try {
       await apiBatchMarkAsRead({ ids });
     } catch (error) {
-      console.error('批量标记已读失败:', error);
+      logger.error('批量标记已读失败:', error);
     }
   }, [selectedItems]);
 
@@ -333,7 +334,7 @@ export function NotificationCenter(): JSX.Element {
     try {
       await apiBatchDeleteNotifications({ ids });
     } catch (error) {
-      console.error('批量删除失败:', error);
+      logger.error('批量删除失败:', error);
     }
   }, [selectedItems]);
 

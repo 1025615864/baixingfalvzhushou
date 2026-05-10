@@ -26,13 +26,12 @@ function getFileIcon(fileType: string): string {
 export function DocumentCard({ document, onClick, onDownload }: DocumentCardProps): JSX.Element {
   // 类型守卫：检查是否为完整Document类型
   const isFullDocument = (doc: Document | DocumentItem): doc is Document => {
-    return 'status' in doc && 'type' in doc;
+    return 'fileName' in doc && 'fileUrl' in doc;
   };
 
   const docStatus: DocumentStatus = isFullDocument(document) ? document.status : 'draft';
-  const docType: DocumentFileType = isFullDocument(document) ? document.type : 'other';
+  const docType: DocumentFileType = isFullDocument(document) ? document.type : (document.type ?? 'other');
   const status = statusConfig[docStatus];
-  // 使用类型守卫后，else分支中TypeScript知道document是DocumentItem类型
   const typeLabel = isFullDocument(document)
     ? typeNames[docType] ?? docType
     : document.documentType;
@@ -61,7 +60,7 @@ export function DocumentCard({ document, onClick, onDownload }: DocumentCardProp
       <div className="flex items-start gap-4">
         {/* File Icon */}
         <div className="flex-shrink-0 w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">
-          {getFileIcon(isFullDocument(document) ? document.fileType : 'folder')}
+          {getFileIcon(isFullDocument(document) ? document.fileType : (document.fileType ?? 'folder'))}
         </div>
 
         {/* Content */}
@@ -76,7 +75,7 @@ export function DocumentCard({ document, onClick, onDownload }: DocumentCardProp
           </div>
 
           <p className="text-sm text-gray-500 line-clamp-1 mb-2">
-            {isFullDocument(document) ? (document.description || document.fileName) : document.title}
+            {isFullDocument(document) ? (document.description || document.fileName) : (document.description || document.title)}
           </p>
 
           <div className="flex items-center justify-between">
@@ -101,7 +100,7 @@ export function DocumentCard({ document, onClick, onDownload }: DocumentCardProp
             )}
           </div>
 
-          {isFullDocument(document) && document.tags !== undefined && document.tags.length > 0 && (
+          {document.tags && document.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
               {document.tags.map((tag: string) => (
                 <span

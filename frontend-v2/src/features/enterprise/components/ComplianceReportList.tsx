@@ -1,9 +1,10 @@
-/**
+﻿/**
  * ComplianceReportList - 合规报告列表组件
  *
  * 展示企业合规报告列表，支持筛选、排序、分页和统计功能
  */
 
+import { logger } from '@/shared/lib/logger';
 import { useMemo, useState, useCallback } from 'react';
 
 import { StatCard } from '../../analytics/components/StatCard';
@@ -473,8 +474,8 @@ function Pagination({
  *   reports={reportsData}
  *   isLoading={false}
  *   pagination={{ current: 1, pageSize: 10, total: 100 }}
- *   onReportClick={(report) => console.log(report)}
- *   onGenerateReport={() => console.log('生成报告')}
+ *   onReportClick={(report) => logger.info(report)}
+ *   onGenerateReport={() => logger.info('生成报告')}
  * />
  * ```
  */

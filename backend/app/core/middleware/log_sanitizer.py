@@ -34,7 +34,9 @@ import logging
 import re
 from typing import Any
 
-from ...utils.data_sanitizer import DataSanitizer, MaskLevel, sanitizer
+from app.utils.security.data_sanitizer import DataSanitizer, MaskLevel
+
+_default_data_sanitizer = DataSanitizer()
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +77,7 @@ class LogSanitizer:
     def __init__(self) -> None:
         self.patterns: list[tuple[re.Pattern[str], str]] = list(self.DEFAULT_PATTERNS)
         self.custom_replacements: dict[str, str] = {}
-        self._data_sanitizer = sanitizer
+        self._data_sanitizer = _default_data_sanitizer
 
     def set_mask_level(self, level: MaskLevel | str) -> None:
         """设置脱敏级别

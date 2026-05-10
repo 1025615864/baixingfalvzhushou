@@ -1,4 +1,4 @@
-
+﻿
 /**
  * ComplianceReportDetail - 合规报告详情组件
  *
@@ -6,6 +6,7 @@
  * 支持PDF导出、分享功能、Skeleton加载状态和EmptyState错误状态
  */
 
+import { logger } from '@/shared/lib/logger';
 import { useState, useMemo } from 'react';
 
 import { StatCard } from '../../analytics/components/StatCard';
@@ -805,8 +806,8 @@ function FindingsList({ findings }: FindingsListProps): JSX.Element {
  *   report={reportData}
  *   detailData={detailData}
  *   onBack={() => navigate(-1)}
- *   onExportPDF={(id) => console.log('Export PDF', id)}
- *   onShare={(id, method) => console.log('Share', id, method)}
+ *   onExportPDF={(id) => logger.info('Export PDF', id)}
+ *   onShare={(id, method) => logger.info('Share', id, method)}
  * />
  * ```
  */

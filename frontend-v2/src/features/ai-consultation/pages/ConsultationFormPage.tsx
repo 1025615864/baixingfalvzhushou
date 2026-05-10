@@ -1,9 +1,10 @@
-/**
+﻿/**
  * ConsultationFormPage - 法律咨询表单页面
  *
  * 用户填写法律咨询表单的页面
  */
 
+import { logger } from '@/shared/lib/logger';
 import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -45,7 +46,7 @@ export function ConsultationFormPage(): JSX.Element {
         navigate(`/consultation/${newSession.id}`);
       }, 2000);
     } catch {
-      console.error('创建咨询失败');
+      logger.error('创建咨询失败');
       setIsSubmitting(false);
     }
   };

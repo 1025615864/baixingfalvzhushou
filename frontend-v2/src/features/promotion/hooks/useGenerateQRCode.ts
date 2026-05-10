@@ -1,7 +1,8 @@
-/**
+﻿/**
  * useGenerateQRCode - 二维码生成逻辑 Hook
  */
 
+import { logger } from '@/shared/lib/logger';
 import { useState, useCallback } from 'react';
 
 // QRCode 模块类型定义
@@ -103,7 +104,7 @@ export function useGenerateQRCode(): UseGenerateQRCodeResult {
       const errorMsg = '生成二维码失败';
       setError(errorMsg);
       setIsGenerating(false);
-      console.error('QR Code generation error:', err);
+      logger.error('QR Code generation error:', err);
       return '';
     }
   }, []);
@@ -140,7 +141,7 @@ export function useGenerateQRCode(): UseGenerateQRCodeResult {
       const errorMsg = '生成二维码失败';
       setError(errorMsg);
       setIsGenerating(false);
-      console.error('QR Code generation error:', err);
+      logger.error('QR Code generation error:', err);
       return '';
     }
   }, []);
@@ -256,7 +257,7 @@ export function useGenerateQRCodeWithLogo(): {
         const errorMsg = '生成带 Logo 二维码失败';
         setError(errorMsg);
         setIsGenerating(false);
-        console.error('QR Code with logo generation error:', err);
+        logger.error('QR Code with logo generation error:', err);
         return '';
       }
     },

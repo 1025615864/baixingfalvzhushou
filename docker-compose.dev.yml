@@ -1,112 +1,172 @@
-# ============================================
-# 开发环境 Docker Compose
-# 简化版 - 用于本地开发测试
-# ============================================
+# 开发环境 Docker Compose - 仅包含核心服务
+# 使用方式：docker compose -f docker-compose.dev.yml up -d
+# 
+# 完整微服务集群请使用：docker compose -f docker-compose.yml up -d
 
 name: baixing-dev
+
+x-base-logging: &base-logging
+  driver: "json-file"
+  options:
+    max-size: "50m"
+    max-file: "3"
+
+x-common-resource-limits: &common-resource-limits
+  reservations:
+    cpus: "0.25"
+    memory: 256M
+
+x-backend-logging: &backend-logging
+  driver: "json-file"
+  options:
+    max-size: "100m"
+    max-file: "5"
 
 services:
   # PostgreSQL数据库
   db:
     image: postgres:15-alpine
-    container_name: baixing_dev_db
+    container_name: baixing_db_dev
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-baixing_dev_2024}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       POSTGRES_DB: ${POSTGRES_DB:-baixing_law}
-      POSTGRES_HOST_AUTH_METHOD: trust
     volumes:
-      - baixing_dev_postgres:/var/lib/postgresql/data
+      - postgres_data_dev:/var/lib/postgresql/data
     ports:
       - "5433:5432"
-    networks:
-      - baixing-dev-backend-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: ${DB_CPU_LIMIT:-1}
+          memory: ${DB_MEMORY_LIMIT:-1G}
+        <<: *common-resource-limits
+    logging: *base-logging
+    networks:
+      - dev-network
 
   # Redis缓存
   redis:
     image: redis:7-alpine
-    container_name: baixing_dev_redis
-    command: redis-server --requirepass ${REDIS_PASSWORD:-baixing_redis_2024} --maxmemory 256mb
+    container_name: baixing_redis_dev
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set} --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
-      - baixing_dev_redis:/data
+      - redis_data_dev:/data
     ports:
       - "16379:6379"
-    networks:
-      - baixing-dev-backend-network
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-baixing_redis_2024}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis123}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: ${REDIS_CPU_LIMIT:-0.5}
+          memory: ${REDIS_MEMORY_LIMIT:-512M}
+        <<: *common-resource-limits
+    logging: *base-logging
+    networks:
+      - dev-network
 
   # 后端服务
   backend:
-    image: baixing-dev-backend:latest
-    container_name: baixing_dev_backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: baixing_backend_dev
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-baixing_dev_2024}@db:5432/${POSTGRES_DB:-baixing_law}
-      PGSSLMODE: disable
-      SECRET_KEY: ${JWT_SECRET_KEY:-dev-jwt-secret-key-for-local-testing-only-32chars}
-      ALGORITHM: HS256
-      DEBUG: "true"
-      REDIS_URL: redis://:${REDIS_PASSWORD:-baixing_redis_2024}@redis:6379/0
-      CSRF_SECRET_KEY: ${CSRF_SECRET_KEY:-dev-csrf-secret-key-for-local-testing-32chars}
-      PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-dev-webhook-secret}
-      METRICS_AUTH_TOKEN: ${METRICS_AUTH_TOKEN:-dev-metrics-token}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-baixing_law}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      CSRF_SECRET_KEY: ${CSRF_SECRET_KEY}
+      PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET}
+      DEBUG: ${DEBUG:-true}
+      CORS_ALLOW_ORIGINS: '["http://localhost:3000","http://localhost:5173"]'
+      DB_ALLOW_RUNTIME_DDL: "1"
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/0
+      AI_QUALITY_REDIS_ENABLED: ${AI_QUALITY_REDIS_ENABLED:-true}
+      AI_QUALITY_REDIS_KEY_PREFIX: ${AI_QUALITY_REDIS_KEY_PREFIX:-ai_quality:}
+      AI_QUALITY_MAX_RECENT_LOGS: ${AI_QUALITY_MAX_RECENT_LOGS:-1000}
+      AI_QUALITY_TTL_SECONDS: ${AI_QUALITY_TTL_SECONDS:-604800}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-placeholder}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
-      AI_MODEL: ${AI_MODEL:-gpt-3.5-turbo}
-      ENVIRONMENT: development
-      # CORS 配置 - JSON格式
-      CORS_ALLOW_ORIGINS: '["http://localhost:3000","http://localhost:5173","http://127.0.0.1:3000"]'
+      AI_MODEL: ${AI_MODEL:-deepseek-chat}
+      SENTRY_DSN: ${SENTRY_DSN}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-1.0.0}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+      SENTRY_PROFILES_SAMPLE_RATE: ${SENTRY_PROFILES_SAMPLE_RATE:-0.0}
+      PROMETHEUS_ENABLED: ${PROMETHEUS_ENABLED:-true}
+      PROMETHEUS_PORT: ${PROMETHEUS_PORT:-8001}
+      METRICS_AUTH_TOKEN: ${METRICS_AUTH_TOKEN}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      VERSION: ${VERSION:-2.0.0}
     ports:
       - "8000:8000"
+      - "8001:8001"
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # volumes:
-    #   - baixing_dev_uploads:/app/uploads
-    networks:
-      - baixing-dev-backend-network
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - ./backend:/app
+      - ./data/sherpa_models:/app/data/sherpa_models:ro
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: ${BACKEND_CPU_LIMIT:-2}
+          memory: ${BACKEND_MEMORY_LIMIT:-2G}
+    logging: *backend-logging
+    networks:
+      - dev-network
 
-  # 前端服务
+  # 前端服务 (frontend-v2) - 开发模式
   frontend:
     build:
       context: ./frontend-v2
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
       args:
-        VITE_API_BASE_URL: /api
-        VITE_WS_URL: ws://backend:8000/ws
-    container_name: baixing_dev_frontend
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+        VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:8000/ws}
+    container_name: baixing_frontend_dev
+    image: baixing-assistant-frontend-v2:dev
     ports:
       - "3000:3000"
     depends_on:
       - backend
     environment:
-      - VITE_API_BASE_URL=/api
-      - VITE_WS_URL=ws://backend:8000/ws
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
+      - VITE_WS_URL=${VITE_WS_URL:-ws://localhost:8000/ws}
+    volumes:
+      - ./frontend-v2:/app
+      - /app/node_modules
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    logging: *base-logging
     networks:
-      - baixing-dev-backend-network
-
-networks:
-  baixing-dev-backend-network:
-    driver: bridge
+      - dev-network
 
 volumes:
-  baixing_dev_postgres:
-  baixing_dev_redis:
-  baixing_dev_uploads:
+  postgres_data_dev:
+  redis_data_dev:
+
+networks:
+  dev-network:
+    driver: bridge

@@ -37,12 +37,16 @@ export interface LoginRequest {
   password: string;
 }
 
-/** 注册请求 - 与后端 UserCreate 模式完全匹配 */
+/** 注册请求 - 发送到后端的数据（不含协议同意字段） */
 export interface RegisterRequest {
   username: string;
   password: string;
   email: string;
-  nickname?: string;  // 可选，如果不提供，后端会默认使用 username
+  nickname?: string;
+}
+
+/** 注册请求（含协议同意，仅前端验证用） */
+export interface RegisterFormData extends RegisterRequest {
   agree_terms: boolean;
   agree_privacy: boolean;
   agree_ai_disclaimer: boolean;
@@ -63,9 +67,10 @@ export interface LoginResponse {
   message?: string;
 }
 
-/** 注册响应 - 后端直接返回 {user, message} */
+/** 注册响应 - 后端返回 {user, token, message} */
 export interface RegisterResponse {
   user: User;
+  token?: Token;
   message?: string;
 }
 

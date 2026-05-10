@@ -23,7 +23,7 @@ async def settlement_job_wrapper() -> object:
     ok = True
     try:
         async with AsyncSessionLocal() as session:
-            from .services.settlement_service import settlement_service
+            from app.services.settlement_service import settlement_service
 
             return await settlement_service.settle_due_income_records(session)
     except Exception:
@@ -52,7 +52,7 @@ async def wechatpay_platform_certs_refresh_job_wrapper(settings) -> object:
                 return {"skipped": True, "reason": "wechatpay config missing"}
 
             from app.models.system import SystemConfig
-            from app.utils.wechatpay_v3 import fetch_platform_certificates, dump_platform_certs_json
+            from app.utils.payment.wechatpay_v3 import fetch_platform_certificates, dump_platform_certs_json
 
             certs = await fetch_platform_certificates(
                 certificates_url=settings.wechatpay_certificates_url,
@@ -101,7 +101,7 @@ async def review_task_sla_job_wrapper() -> object:
     ok = True
     try:
         async with AsyncSessionLocal() as session:
-            from .services.review_task_sla_service import scan_and_notify_review_task_sla
+            from app.services.review_task_sla_service import scan_and_notify_review_task_sla
 
             return await scan_and_notify_review_task_sla(session)
     except Exception:

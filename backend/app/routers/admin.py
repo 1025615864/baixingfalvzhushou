@@ -35,38 +35,36 @@ def _log_export_action(user_id: int, export_type: str, record_count: int) -> Non
 async def get_stats(
     current_user: Annotated[User, Depends(require_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
-):
+) -> dict[str, int]:
     """获取系统统计数据（需要管理员权限）"""
     _ = current_user
-    # 用户统计
-    user_count = await db.execute(select(func.count()).select_from(User))
-    total_users = user_count.scalar() or 0
+    try:
+        user_count = await db.execute(select(func.count()).select_from(User))
+        total_users = user_count.scalar() or 0
 
-    # 新闻统计 (已迁移到news-service)
-    total_news = 0
+        total_news = 0
+        total_posts = 0
+        total_comments = 0
 
-    # 帖子统计 (已迁移到community-service)
-    total_posts = 0
+        consultation_count = await db.execute(select(func.count()).select_from(Consultation))
+        total_consultations = consultation_count.scalar() or 0
 
-    # 评论统计 (已迁移到community-service)
-    total_comments = 0
+        firm_count = await db.execute(select(func.count()).select_from(LawFirm))
+        total_firms = firm_count.scalar() or 0
 
-    # AI咨询统计
-    consultation_count = await db.execute(select(func.count()).select_from(Consultation))
-    total_consultations = consultation_count.scalar() or 0
-
-    # 律所统计
-    firm_count = await db.execute(select(func.count()).select_from(LawFirm))
-    total_firms = firm_count.scalar() or 0
-
-    return {
-        "users": total_users,
-        "news": total_news,
-        "posts": total_posts,
-        "lawfirms": total_firms,
-        "comments": total_comments,
-        "consultations": total_consultations,
-    }
+        return {
+            "users": total_users,
+            "news": total_news,
+            "posts": total_posts,
+            "lawfirms": total_firms,
+            "comments": total_comments,
+            "consultations": total_consultations,
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取统计数据失败: {str(e)}",
+        )
 
 
 # ============ 数据导出 API ============

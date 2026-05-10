@@ -1,91 +1,88 @@
-# 百姓助手
+# 百姓法律助手
 
-面向法律服务场景的全栈 Web 项目，采用微服务架构。
+面向法律服务场景的全栈 Web 应用，采用微服务 + BFF 架构。
+
+## 项目状态
+
+- **当前版本**: v2.1
+- **最后更新**: 2026-05-09
+- **项目状态**: 生产就绪
 
 ## 技术栈
 
-- **后端**: FastAPI + SQLAlchemy + PostgreSQL + Redis
-- **前端**: React 18 + TypeScript + Vite + Ant Design
-- **微服务**: 11 个独立服务（用户、支付、法律、AI、新闻、社区等）
-- **部署**: Docker + Kubernetes
+| 层级 | 技术 |
+|------|------|
+| 前端 | React 18 + TypeScript + Vite + Tailwind CSS + Zustand |
+| BFF | FastAPI + SQLAlchemy 2.0 (异步) |
+| 微服务 | FastAPI + PostgreSQL + Redis + Kafka |
+| AI | OpenAI API + LangChain + RAG + pgvector |
+| 网关 | APISIX |
+| 部署 | Docker Compose + Kubernetes (Helm) |
+| 监控 | Prometheus + Grafana + OpenTelemetry |
 
 ## 目录结构
 
 ```
 .
-├── backend/              # FastAPI 后端 (单体保留部分)
-├── frontend-v2/         # React 前端
-├── services/            # 11 个微服务
-│   ├── user-service/    # 用户服务 (8001)
-│   ├── payment-channel-service/   # 支付通道 (8002)
-│   ├── payment-accounting-service/ # 账务服务 (8003)
-│   ├── legal-service/   # 法律服务 (8004)
-│   ├── ai-service/      # AI服务 (8005)
-│   ├── news-service/    # 新闻服务 (8006)
-│   ├── community-service/ # 社区服务 (8007)
-│   ├── points-service/  # 积分服务 (8008)
-│   ├── notification-service/ # 通知服务 (8009)
-│   ├── recommendation-service/ # 推荐服务 (8010)
-│   └── search-service/ # 搜索服务 (8011)
-├── docs/                # 项目文档
-├── scripts/             # 辅助脚本
-└── services/k8s/       # K8s 部署配置
+├── backend/              # BFF 层 (FastAPI :8000)
+├── frontend-v2/          # 前端应用 (React + Vite)
+├── services/             # 微服务集群
+│   ├── common/           # 共享模块 (gRPC, Kafka, Auth...)
+│   ├── ai-service/       # AI 对话服务
+│   ├── legal-service/    # 法律咨询服务
+│   ├── community-service/# 社区论坛服务
+│   ├── news-service/     # 新闻资讯服务
+│   ├── user-service/     # 用户管理服务
+│   ├── order-service/    # 订单支付服务
+│   ├── search-service/   # 搜索服务
+│   ├── points-service/   # 积分服务
+│   ├── knowledge-service/# 知识库服务
+│   └── archive-service/  # 档案服务
+├── deploy/               # 部署配置 (APISIX / systemd)
+├── docs/                 # 项目文档
+├── scripts/              # 运维脚本
+├── helm/                 # Kubernetes Helm Charts
+├── nginx/                # Nginx 反向代理配置
+├── prometheus/           # Prometheus 监控配置
+└── .github/workflows/    # CI/CD 流水线
 ```
 
-## 快速启动
+## 快速开始
 
-### 后端 (单体)
+### Docker Compose 一键启动
 
 ```bash
+cp .env.example .env
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+```
+
+### 本地开发
+
+```bash
+# 后端
 cd backend
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8080
-```
+uvicorn app.main:app --reload --port 8000
 
-### 前端
-
-```bash
+# 前端
 cd frontend-v2
 npm install
 npm run dev
 ```
 
-### 微服务
-
-```bash
-# 每个服务需要单独启动
-cd services/user-service && uvicorn app.main:app --port 8001
-cd services/news-service && uvicorn app.main:app --port 8006
-# ... 其他服务
-```
-
-### 联调测试
-
-```bash
-bash scripts/test-microservices.sh
-```
-
 ## 文档
 
-- [API 文档](docs/API.md)
-- [架构文档](docs/ARCHITECTURE.md)
-- [功能清单](docs/FEATURES.md)
-- [项目快照](docs/PROJECT_SNAPSHOT.md)
-- [开发规范](docs/DEVELOPMENT.md)
+详细文档请参阅 [docs/](docs/) 目录：
 
-## 微服务端口
+| 文档 | 说明 |
+|------|------|
+| [项目概览](docs/README.md) | 完整项目介绍与文档导航 |
+| [架构设计](docs/ARCHITECTURE.md) | 系统架构与设计模式 |
+| [API 参考](docs/API.md) | API 接口文档 |
+| [开发指南](docs/DEVELOPMENT.md) | 本地开发流程与规范 |
+| [功能清单](docs/FEATURES.md) | 功能特性列表 |
+| [v2.1 迭代计划](docs/V2.1_ITERATION_PLAN.md) | 当前迭代进度 |
 
-| 服务 | 端口 | 说明 |
-|------|------|------|
-| backend | 8080 | 核心业务 API |
-| user-service | 8001 | 用户、认证、会员 |
-| payment-channel | 8002 | 支付通道 |
-| payment-accounting | 8003 | 账务结算 |
-| legal-service | 8004 | 律师、法律知识 |
-| ai-service | 8005 | AI 对话 |
-| news-service | 8006 | 新闻资讯 |
-| community-service | 8007 | 社区论坛 |
-| points-service | 8008 | 积分系统 |
-| notification-service | 8009 | 通知推送 |
-| recommendation | 8010 | 推荐系统 |
-| search-service | 8011 | 搜索服务 |
+## 许可证
+
+MIT License

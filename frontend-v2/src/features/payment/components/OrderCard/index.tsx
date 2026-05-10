@@ -1,5 +1,5 @@
 import { statusConfig } from '../../hooks/usePayments';
-import type { Order } from '../../types';
+import type { Order, PaymentMethod } from '../../types';
 
 interface OrderCardProps {
   order: Order;
@@ -62,10 +62,9 @@ export function OrderCard({ order, onPay, onCancel, onViewDetail: _onViewDetail 
                 ({
                   wechat: '微信支付',
                   alipay: '支付宝',
-                  card: '银行卡',
                   balance: '余额',
-                  ikunpay: 'IKunPay',
-                } as Record<string, string>)[order.payment_method] || order.payment_method
+                  ikunpay: '爱坤支付',
+                } as Record<PaymentMethod, string>)[order.payment_method]
               }
             </div>
           )}

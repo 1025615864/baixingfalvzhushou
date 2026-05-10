@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from ..utils.rate_limiter import get_client_ip
+from app.utils.cache.rate_limiter import get_client_ip
 from ..services.audit_service import AuditAction, AuditSeverity, log_audit
 
 

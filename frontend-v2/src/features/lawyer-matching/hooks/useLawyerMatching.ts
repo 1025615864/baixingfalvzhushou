@@ -20,6 +20,7 @@ import type {
   SubmitReviewRequest,
   CancelBookingRequest,
   SearchLawyersRequest,
+  SearchLawyersResponse,
   MatchingCriteria,
 } from '../types';
 import {
@@ -86,23 +87,11 @@ export function useLawyerDetail(lawyerId: string) {
  * 搜索律师 Hook
  */
 export function useLawyerSearch(request: SearchLawyersRequest) {
-  return useQuery<{
-    lawyers: LawyerDetail[];
-    total: number;
-    hasMore: boolean;
-  }>({
+  return useQuery<SearchLawyersResponse>({
     queryKey: queryKeys.lawyers.search(request),
     queryFn: async () => {
       const response = await apiSearchLawyers(request);
-      return {
-        lawyers: response.lawyers.map((lawyer) => ({
-          ...lawyer,
-          phone: undefined,
-          email: undefined,
-        })),
-        total: response.total,
-        hasMore: response.hasMore,
-      };
+      return response;
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -181,7 +170,9 @@ export function useLawyerReviews(lawyerId: string, params?: Omit<GetReviewsReque
     queryFn: async () => {
       const request: GetReviewsRequest = {
         lawyerId,
-        ...params,
+        limit: params?.limit,
+        offset: params?.offset,
+        sortBy: params?.sortBy,
       };
       const response = await apiGetReviews(request);
       return {

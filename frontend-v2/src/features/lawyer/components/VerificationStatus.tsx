@@ -5,7 +5,7 @@
 
 import React from 'react';
 
-import { useVerificationStatus, useVerificationStatusText } from '../hooks/useVerification';
+import { useVerificationStatus } from '../hooks/useVerification';
 
 interface VerificationStatusProps {
   onApplyClick?: () => void;
@@ -15,7 +15,6 @@ export const VerificationStatus: React.FC<VerificationStatusProps> = ({
   onApplyClick,
 }) => {
   const { data: status, isLoading, isError } = useVerificationStatus();
-  void useVerificationStatusText;
 
   if (isLoading) {
     return (

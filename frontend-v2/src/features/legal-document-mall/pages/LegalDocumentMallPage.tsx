@@ -1,8 +1,9 @@
-/**
+﻿/**
  * 法律文书商城页面
  * 整合所有组件，实现完整的商城功能
  */
 
+import { logger } from '@/shared/lib/logger';
 import { useState, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -395,7 +396,7 @@ export default function LegalDocumentMallPage() {
         documentId: doc.id,
         isFavorited: doc.is_favorited || false,
       }).catch(() => {
-        console.error('收藏操作失败');
+        logger.error('收藏操作失败');
       });
     },
     [isAuthenticated, favoriteMutation, navigate]
@@ -553,7 +554,7 @@ export default function LegalDocumentMallPage() {
           }}
           onSuccess={handlePurchaseSuccess}
           onError={(error) => {
-            console.error('购买失败', error);
+            logger.error('购买失败', error);
           }}
           userPoints={1000} // TODO: 从用户状态获取
           userMemberTier={null} // TODO: 从用户状态获取

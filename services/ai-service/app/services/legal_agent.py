@@ -66,6 +66,7 @@ class AgentState(TypedDict):
     user_query: str
     chat_history: list[dict[str, str]]
     intent: str
+    legal_domain: str
     search_query: str
     retrieved_docs: list[dict]
     draft_response: str
@@ -78,6 +79,9 @@ class AgentState(TypedDict):
     prompt_tokens: int
     completion_tokens: int
     model_name: str
+    lawyer_recommendations: list[dict]
+    suggested_actions: list[dict]
+    needs_lawyer: bool
 
 
 CHITCHAT_RESPONSES = [
@@ -93,6 +97,7 @@ class Stage:
     STAGE_RETRIEVAL = "retrieving_knowledge"
     STAGE_GENERATION = "generating"
     STAGE_HALLUCINATION_CHECK = "checking_hallucination"
+    STAGE_LAWYER_RECOMMEND = "recommending_lawyer"
     STAGE_DONE = "done"
 
 
@@ -116,7 +121,7 @@ async def send_token_event(writer: Optional[StreamWriter], token: str):
 
 
 def Intent_Analyzer(state: AgentState) -> AgentState:
-    """Node 1: 意图识别 - 判断是闲聊还是法律咨询"""
+    """Node 1: 意图识别 - 判断是闲聊还是法律咨询，并推断法律领域"""
     start_time = time.time()
     user_query = state["user_query"]
     legal_keywords = ["法律", "劳动", "合同", "工资", "赔偿", "纠纷", "权益", "违法",
@@ -124,8 +129,13 @@ def Intent_Analyzer(state: AgentState) -> AgentState:
                       "离婚", "继承", "房产", "债务", "侵权", "工伤", "补偿", "赔偿"]
 
     is_legal = any(keyword in user_query for keyword in legal_keywords)
-
     state["intent"] = "legal" if is_legal else "chitchat"
+
+    from app.services.lawyer_skill import infer_domain_from_query
+    state["legal_domain"] = infer_domain_from_query(user_query) if is_legal else ""
+
+    needs_lawyer_keywords = ["律师", "咨询", "帮忙", "怎么办", "如何处理", "起诉", "仲裁", "打官司"]
+    state["needs_lawyer"] = is_legal and any(kw in user_query for kw in needs_lawyer_keywords)
 
     latency_ms = int((time.time() - start_time) * 1000)
     try:
@@ -465,11 +475,72 @@ def route_after_intent(state: AgentState) -> Literal["Query_Rewriter", "chitchat
     return "chitchat_end"
 
 
-def route_after_hallucination(state: AgentState) -> Literal["Draft_Generator", END]:
+def route_after_hallucination(state: AgentState) -> Literal["Lawyer_Recommender", "Draft_Generator", END]:
     """幻觉校验后的路由"""
     if state["error_flag"] and state["iteration_count"] < 3:
         return "Draft_Generator"
+    if not state["error_flag"]:
+        return "Lawyer_Recommender"
     return END
+
+
+async def Lawyer_Recommender(state: AgentState) -> AgentState:
+    """Node 6: 律师推荐 - 根据法律领域推荐匹配律师"""
+    start_time = time.time()
+    writer = state.get("writer")
+    needs_lawyer = state.get("needs_lawyer", False)
+    legal_domain = state.get("legal_domain", "")
+
+    state["lawyer_recommendations"] = []
+    state["suggested_actions"] = []
+
+    if not needs_lawyer:
+        return state
+
+    await send_stage_event(writer, Stage.STAGE_LAWYER_RECOMMEND, {"status": "searching", "domain": legal_domain})
+
+    try:
+        from app.services.lawyer_skill import get_lawyer_skill
+        lawyer_skill = get_lawyer_skill()
+        result = await lawyer_skill.recommend(
+            user_query=state["user_query"],
+            domain=legal_domain,
+            max_results=3,
+        )
+
+        state["lawyer_recommendations"] = [
+            {
+                "lawyer_id": r.lawyer_id,
+                "name": r.name,
+                "specialty": r.specialty,
+                "rating": r.rating,
+                "experience_years": r.experience_years,
+                "hourly_rate": r.hourly_rate,
+                "law_firm": r.law_firm,
+                "match_reason": r.match_reason,
+            }
+            for r in result.recommendations
+        ]
+        state["suggested_actions"] = lawyer_skill.format_as_suggested_actions(result)
+
+        await send_stage_event(writer, Stage.STAGE_LAWYER_RECOMMEND, {
+            "status": "completed",
+            "count": len(result.recommendations),
+            "domain": legal_domain,
+        })
+
+    except Exception as e:
+        logger.warning(f"律师推荐失败: {e}")
+        await send_stage_event(writer, Stage.STAGE_LAWYER_RECOMMEND, {"status": "error", "error": str(e)})
+
+    latency_ms = int((time.time() - start_time) * 1000)
+    try:
+        metrics = get_metrics_collector()
+        asyncio.create_task(metrics.record_node_latency("Lawyer_Recommender", latency_ms))
+    except Exception:
+        pass
+
+    return state
 
 
 def chitchat_response(state: AgentState) -> AgentState:
@@ -498,6 +569,7 @@ def build_legal_agent_graph() -> StateGraph:
     graph.add_node("Legal_Retriever", Legal_Retriever)
     graph.add_node("Draft_Generator", Draft_Generator)
     graph.add_node("Hallucination_Checker", Hallucination_Checker)
+    graph.add_node("Lawyer_Recommender", Lawyer_Recommender)
     graph.add_node("chitchat_response", chitchat_response)
 
     graph.set_entry_point("Intent_Analyzer")
@@ -520,10 +592,12 @@ def build_legal_agent_graph() -> StateGraph:
         route_after_hallucination,
         {
             "Draft_Generator": "Draft_Generator",
+            "Lawyer_Recommender": "Lawyer_Recommender",
             END: END
         }
     )
 
+    graph.add_edge("Lawyer_Recommender", END)
     graph.add_edge("chitchat_response", END)
 
     return graph.compile()
@@ -548,6 +622,7 @@ async def stream_legal_agent(
         "user_query": user_query,
         "chat_history": chat_history or [],
         "intent": "",
+        "legal_domain": "",
         "search_query": "",
         "retrieved_docs": retrieved_docs or [],
         "draft_response": "",
@@ -556,7 +631,13 @@ async def stream_legal_agent(
         "hallucination_feedback": "",
         "iteration_count": 0,
         "stream_mode": True,
-        "writer": None
+        "writer": None,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "model_name": "",
+        "lawyer_recommendations": [],
+        "suggested_actions": [],
+        "needs_lawyer": False,
     }
 
     async for event in legal_agent_graph.astream_events(initial_state, version="v2"):
@@ -574,6 +655,8 @@ async def stream_legal_agent(
                 yield {"stage": Stage.STAGE_GENERATION, "status": "started"}
             elif node_name == "Hallucination_Checker":
                 yield {"stage": Stage.STAGE_HALLUCINATION_CHECK, "status": "started"}
+            elif node_name == "Lawyer_Recommender":
+                yield {"stage": Stage.STAGE_LAWYER_RECOMMEND, "status": "started"}
 
         elif event_type == "on_chain_end":
             if isinstance(event.get("data"), dict):
@@ -607,6 +690,17 @@ async def stream_legal_agent(
                     yield {"stage": Stage.STAGE_HALLUCINATION_CHECK, "status": "completed"}
                     if not error_flag:
                         yield {"stage": Stage.STAGE_DONE, "response": final, "iteration": iteration}
+
+                elif node_name == "Lawyer_Recommender":
+                    output_data = data.get("output", {}) if isinstance(data, dict) else {}
+                    recommendations = output_data.get("lawyer_recommendations", []) if isinstance(output_data, dict) else []
+                    suggested_actions = output_data.get("suggested_actions", []) if isinstance(output_data, dict) else []
+                    yield {
+                        "stage": Stage.STAGE_LAWYER_RECOMMEND,
+                        "status": "completed",
+                        "recommendations": recommendations,
+                        "suggested_actions": suggested_actions,
+                    }
 
                 elif node_name == "chitchat_response":
                     response = data.get("final_response", "")

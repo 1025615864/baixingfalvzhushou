@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from ..utils.structured_logger import (
+from app.utils.logging.structured_logger import (
     set_request_id,
     set_trace_id,
     set_user_id,

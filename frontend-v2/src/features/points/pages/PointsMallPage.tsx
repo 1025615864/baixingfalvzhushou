@@ -1,7 +1,8 @@
-/**
+﻿/**
  * PointsMallPage - 积分商城页面
  */
 
+import { logger } from '@/shared/lib/logger';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -29,7 +30,7 @@ export function PointsMallPage(): JSX.Element {
         const data = await apiGetPointsBalance();
         setBalanceData(data);
       } catch (error) {
-        console.error('获取积分余额失败:', error);
+        logger.error('获取积分余额失败:', error);
       } finally {
         setIsLoading(false);
       }

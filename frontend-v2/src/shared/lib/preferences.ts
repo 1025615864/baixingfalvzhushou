@@ -3,6 +3,8 @@
  * 提供统一的用户偏好设置管理，支持响应式更新
  */
 
+import { logger } from './logger';
+
 import { Persistence, EXPIRE_TIMES } from './persistence';
 
 // ==================== 类型定义 ====================
@@ -138,7 +140,7 @@ class PreferencesManager {
       try {
         callback(key, newValue, oldValue);
       } catch (error) {
-        console.error(`[Preferences] 回调执行错误: ${key}`, error);
+        logger.error(`回调执行错误: ${key}`, error);
       }
     });
   }
@@ -262,7 +264,7 @@ class PreferencesManager {
       this.setPreferences(filtered);
       return true;
     } catch (error) {
-      console.error('[Preferences] 导入失败:', error);
+      logger.error('导入失败:', error);
       return false;
     }
   }

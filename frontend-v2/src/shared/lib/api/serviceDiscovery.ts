@@ -15,18 +15,18 @@ export interface ServiceEndpoints {
 
 // 服务配置
 const SERVICE_CONFIGS: Record<string, ServiceConfig> = {
-  auth: { host: 'localhost', port: 8001, basePath: '/api/v1/auth' },
-  user: { host: 'localhost', port: 8001, basePath: '/api/v1/users' },
-  payment: { host: 'localhost', port: 8002, basePath: '/api/v1/payment' },
-  accounting: { host: 'localhost', port: 8003, basePath: '/api/v1' },
-  legal: { host: 'localhost', port: 8004, basePath: '/api/v1/legal' },
-  ai: { host: 'localhost', port: 8005, basePath: '/api/v1/ai' },
-  news: { host: 'localhost', port: 8006, basePath: '/api/v1/news' },
-  community: { host: 'localhost', port: 8007, basePath: '/api/v1/community' },
-  points: { host: 'localhost', port: 8008, basePath: '/api/v1/points' },
-  notification: { host: 'localhost', port: 8009, basePath: '/api/v1/notifications' },
-  recommendation: { host: 'localhost', port: 8010, basePath: '/api/v1/recommendations' },
-  search: { host: 'localhost', port: 8011, basePath: '/api/v1/search' },
+  auth: { host: 'localhost', port: 8000, basePath: '/api/v1/auth' },
+  user: { host: 'localhost', port: 8000, basePath: '/api/v1/users' },
+  payment: { host: 'localhost', port: 8000, basePath: '/api/v1/payment' },
+  accounting: { host: 'localhost', port: 8000, basePath: '/api/v1' },
+  legal: { host: 'localhost', port: 8000, basePath: '/api/v1/legal' },
+  ai: { host: 'localhost', port: 8000, basePath: '/api/v1/ai' },
+  news: { host: 'localhost', port: 8000, basePath: '/api/v1/news' },
+  community: { host: 'localhost', port: 8000, basePath: '/api/v1/community' },
+  points: { host: 'localhost', port: 8000, basePath: '/api/v1/points' },
+  notification: { host: 'localhost', port: 8000, basePath: '/api/v1/notifications' },
+  recommendation: { host: 'localhost', port: 8000, basePath: '/api/v1/recommendations' },
+  search: { host: 'localhost', port: 8000, basePath: '/api/v1/search' },
 };
 
 // 生产环境服务URL（通过API Gateway）

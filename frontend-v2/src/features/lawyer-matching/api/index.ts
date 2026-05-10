@@ -28,6 +28,11 @@ import type {
   GetOnlineStatusResponse,
   LawyerOnlineInfo,
   Lawyer,
+  LawyerDetail,
+  LawyerMatchResult,
+  Booking,
+  LawyerReview,
+  ReviewStats,
   ReviewDimensions,
 } from '../types';
 
@@ -207,7 +212,11 @@ function transformLawyerBase(backend: BackendLawyerBase): Lawyer {
     avatar: backend.avatar,
     title: backend.title,
     firmName: backend.firm_name,
-    specialties: backend.specialties,
+    specialties: typeof backend.specialties === 'string'
+      ? (backend.specialties as string).split(',').map((s: string) => s.trim())
+      : Array.isArray(backend.specialties)
+        ? backend.specialties
+        : [],
     rating: backend.rating,
     completedCount: backend.completed_count,
     status: backend.status,
@@ -224,7 +233,7 @@ function transformLawyerDetail(backend: BackendLawyerDetail): LawyerDetail {
     phone: backend.phone,
     email: backend.email,
     introduction: backend.introduction,
-    experience: backend.experience_years || backend.experience,
+    experience: backend.experience_years || backend.experience || 0,
     education: backend.education,
     certifications: backend.certifications,
     casesHandled: backend.case_count || backend.cases_handled,
@@ -240,7 +249,7 @@ function transformMatchResult(backend: BackendMatchResult): LawyerMatchResult {
   return {
     lawyerId: backend.lawyer_id,
     lawyerName: backend.lawyer_name,
-    specialties: backend.specialties,
+    specialties: backend.specialties.split(',').map((s: string) => s.trim()),
     rating: backend.rating,
     completedCount: backend.completed_count,
     matchScore: backend.match_score,

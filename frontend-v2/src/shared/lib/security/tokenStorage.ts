@@ -6,6 +6,8 @@
  * 长期建议：迁移到httpOnly cookie存储方案
  */
 
+import { logger } from '../logger';
+
 const TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const TOKEN_CHANGE_EVENT = 'auth-token-changed';
@@ -49,7 +51,7 @@ export function setToken(token: string): void {
     localStorage.setItem(TOKEN_KEY, token);
     notifyTokenChange();
   } catch (e) {
-    console.error('Failed to store token:', e);
+    logger.error('Failed to store token:', e);
   }
 }
 
@@ -66,7 +68,7 @@ export function removeToken(): void {
     localStorage.removeItem(TOKEN_KEY);
     notifyTokenChange();
   } catch (e) {
-    console.error('Failed to remove token:', e);
+    logger.error('Failed to remove token:', e);
   }
 }
 
@@ -76,7 +78,7 @@ export function setRefreshToken(token: string): void {
     localStorage.setItem(REFRESH_TOKEN_KEY, token);
     notifyTokenChange();
   } catch (e) {
-    console.error('Failed to store refresh token:', e);
+    logger.error('Failed to store refresh token:', e);
   }
 }
 
@@ -93,7 +95,7 @@ export function removeRefreshToken(): void {
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     notifyTokenChange();
   } catch (e) {
-    console.error('Failed to remove refresh token:', e);
+    logger.error('Failed to remove refresh token:', e);
   }
 }
 

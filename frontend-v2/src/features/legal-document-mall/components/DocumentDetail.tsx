@@ -3,6 +3,7 @@
  * 支持详情展示、预览、购买和收藏功能
  */
 
+import { logger } from '@/shared/lib/logger';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -434,7 +435,7 @@ export default function DocumentDetail({
       });
       setIsFavorited(!isFavorited);
     } catch (error) {
-      console.error('收藏操作失败', error);
+      logger.error('收藏操作失败', error);
     }
   }, [documentId, isAuthenticated, isFavorited, favoriteMutation, navigate]);
 
@@ -652,9 +653,9 @@ export default function DocumentDetail({
                 <Tag className="w-3 h-3 mr-1" />
                 {document.category_name}
               </Badge>
-              {document.tags?.map((tag, index) => (
+              {document.tags?.map((tag) => (
                 <Badge
-                  key={index}
+                  key={tag}
                   variant="default"
                   className="text-gray-500 bg-gray-50"
                 >

@@ -191,38 +191,47 @@ DATABASE_URL = "postgresql+asyncpg://user:pass@host:5432/baixing"
 **前端目录结构：**
 ```
 frontend-v2/src/
-├── api/                    # API 请求封装
-│   └── index.ts           # Axios 实例配置
 ├── app/                    # 应用入口
 │   ├── App.tsx            # 根组件
-│   └── routes.tsx         # 路由配置
-├── components/            # 通用组件
-│   ├── Layout/            # 布局组件
-│   └── UI/                # 基础UI组件
+│   └── styles/            # 全局样式
+├── components/            # 通用UI组件
+│   └── ui/                # 基础UI组件 (Badge, Card, Form...)
 ├── features/              # 功能模块 (按领域组织)
-│   ├── home/             # 首页
-│   ├── chat/             # AI咨询
-│   ├── lawyer/          # 律师服务
-│   ├── consultation/    # 预约咨询
-│   ├── contracts/        # 合同审查
-│   ├── forum/            # 法律论坛
-│   ├── points/          # 积分商城
+│   ├── faq/              # 常见问题
+│   ├── news/             # 新闻资讯
+│   ├── notification/     # 通知中心
+│   ├── search/           # 搜索
+│   ├── security/         # 安全设置
+│   ├── points/           # 积分系统
 │   ├── promotion/        # 推广中心
 │   ├── enterprise/       # 企业服务
-│   └── admin_monitor/   # 管理后台
-├── lib/                  # 工具库
-│   ├── axios.ts         # HTTP客户端
-│   └── utils.ts         # 通用工具函数
+│   ├── settlement/       # 结算
+│   ├── payment/          # 支付
+│   ├── post/             # 帖子
+│   ├── forum/            # 论坛
+│   ├── legal-document-mall/ # 法律文书商城
+│   ├── video-consultation/ # 视频咨询
+│   ├── vertical-channel/ # 垂直频道
+│   ├── static-pages/     # 静态页面
+│   └── membership/       # 会员中心
 ├── pages/                # 页面组件
+│   ├── Chat/            # AI咨询
+│   ├── Home/            # 首页
+│   ├── Lawyer/          # 律师服务
+│   ├── News/            # 新闻
+│   ├── Payment/         # 支付
+│   ├── Profile/         # 个人中心
+│   ├── Knowledge/       # 知识库
+│   ├── ContractReviewPage/ # 合同审查
+│   └── auth/            # 登录注册
 ├── shared/               # 共享资源
 │   ├── hooks/           # 自定义Hooks
-│   ├── types/           # TypeScript类型
-│   └── constants/       # 常量定义
-├── store/                # Zustand状态存储
-│   ├── authStore.ts     # 认证状态
-│   └── appStore.ts      # 应用状态
-├── test/                 # 测试配置
-└── widgets/              # 可复用小部件
+│   ├── lib/             # 工具库 (API, logger, prefetch)
+│   ├── store/           # 状态管理
+│   ├── components/      # 共享组件 (VirtualList, Loading)
+│   └── utils/           # 通用工具
+├── test/                 # 测试配置与工具
+└── types/                # TypeScript 类型定义
 ```
 
 ---
@@ -344,13 +353,10 @@ frontend-v2/src/
 
 | 工作流 | 触发条件 | 说明 |
 |--------|----------|------|
-| [CI/CD Pipeline](.github/workflows/ci-cd.yml:1) | push/pr | 主CI/CD流程 |
-| [CI](.github/workflows/ci.yml:1) | push | 持续集成 |
-| [Test](.github/workflows/test.yml:1) | push/pr | 自动化测试 |
-| [Code Quality](.github/workflows/code-quality.yml:1) | push/pr | 代码质量检查 |
-| [Security Scan](.github/workflows/security-scan.yml:1) | push | 安全扫描 |
-| [Type Check](.github/workflows/type-check.yml:1) | push/pr | TypeScript类型检查 |
-| [Release](.github/workflows/release.yml:1) | tag | 版本发布 |
+| [CI](../.github/workflows/ci.yml) | push/pr | 主流水线 (CI + 测试 + 类型检查) |
+| [Code Quality](../.github/workflows/code-quality.yml) | push/pr | 代码质量 + 安全扫描 |
+| [Release](../.github/workflows/release.yml) | tag | 版本发布 |
+| [Pact](../.github/workflows/pact.yml) | push | 契约测试 |
 
 **CI/CD流程阶段：**
 ```
@@ -559,20 +565,20 @@ backend/
 
 ### 12.2 服务列表
 
-| 服务 | 端口 | 前缀 | 数据库 | 说明 |
-|------|------|------|--------|------|
-| Backend (Legacy) | 8080 | /api/v1 | 主数据库 | 核心业务API |
-| User Service | 8001 | /api/v1 | user_db | 用户、认证、会员 |
-| Payment Channel | 8002 | /api/v1 | payment_db | 支付通道 |
-| Accounting | 8003 | /api/v1 | accounting_db | 账务结算 |
-| Legal Service | 8004 | /api/v1 | legal_db | 律师、法律知识 |
-| AI Service | 8005 | /api/v1 | ai_db | AI对话 |
-| News Service | 8006 | /api/v1 | news_db | 新闻资讯 |
-| Community | 8007 | /api/v1 | community_db | 社区论坛 |
-| Points | 8008 | /api/v1 | points_db | 积分系统 |
-| Notification | 8009 | /api/v1 | notification_db | 通知推送 |
-| Recommendation | 8010 | /api/v1 | recommendation_db | 推荐系统 |
-| Search | 8011 | /api/v1 | search_db | 搜索服务 |
+| 服务 | 端口 | 前缀 | 说明 |
+|------|------|------|------|
+| Backend (BFF) | 8000 | /api | BFF 聚合层 |
+| User Service | 8001 | /api/v1 | 用户、认证、会员 |
+| Legal Service | 8004 | /api/v1 | 律师、法律知识 |
+| AI Service | 8005 | /api/v1 | AI 对话 |
+| News Service | 8006 | /api/v1 | 新闻资讯 |
+| Community Service | 8007 | /api/v1 | 社区论坛 |
+| Points Service | 8008 | /api/v1 | 积分系统 |
+| Search Service | 8009 | /api/v1 | 搜索服务 |
+| Order Service | 8010 | /api/v1 | 订单/支付 |
+| Knowledge Service | 8081 | /api/v1 | 知识库 |
+| Archive Service | 8013 | /api/v1 | 档案服务 |
+| Embedding Service | 8082 | /api/v1 | 向量嵌入 |
 
 ### 12.3 前端代理配置
 
@@ -654,7 +660,7 @@ python -m scripts.migrations.migrate_to_microservices --service notification
 | 日志 | log-rotate | 日志滚动 |
 | 监控 | prometheus | 指标导出 |
 
-详细配置见: [API_GATEWAY_DESIGN.md](API_GATEWAY_DESIGN.md)
+详细配置见: [APISIX 配置](../apisix/config.yaml)
 
 ---
 
@@ -681,7 +687,7 @@ python -m scripts.migrations.migrate_to_microservices --service notification
 | baixing.payment.events | 支付事件 | Order, Points |
 | baixing.legal.events | 法律事件 | Notification |
 
-详细设计见: [SERVICE_COMMUNICATION_DESIGN.md](SERVICE_COMMUNICATION_DESIGN.md)
+详细设计见: [服务通信规范](./service-communication-spec.md)
 
 ---
 
@@ -721,4 +727,4 @@ UserService (Consumer) → Pact Broker ← LegalService (Provider)
 
 ---
 
-*文档最后更新：2026-03-22*
+*文档最后更新：2026-05-09*

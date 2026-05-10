@@ -9,19 +9,26 @@ export const API_VERSION = 'v1';
 export const API_BASE = `/api/${API_VERSION}`;
 
 // 服务发现
+function getServiceUrl(name: string, defaultPort: number): string {
+  const envUrl = import.meta.env[`VITE_SERVICE_${name.toUpperCase()}`];
+  if (envUrl) return envUrl;
+  const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost';
+  return `${base}:${defaultPort}`;
+}
+
 export const services = new ServiceDiscovery({
-  auth: 'http://localhost:8001',
-  user: 'http://localhost:8001',
-  payment: 'http://localhost:8002',
-  accounting: 'http://localhost:8003',
-  legal: 'http://localhost:8004',
-  ai: 'http://localhost:8005',
-  news: 'http://localhost:8006',
-  community: 'http://localhost:8007',
-  points: 'http://localhost:8008',
-  notification: 'http://localhost:8009',
-  recommendation: 'http://localhost:8010',
-  search: 'http://localhost:8011',
+  auth: getServiceUrl('auth', 8000),
+  user: getServiceUrl('user', 8000),
+  payment: getServiceUrl('payment', 8000),
+  accounting: getServiceUrl('accounting', 8000),
+  legal: getServiceUrl('legal', 8000),
+  ai: getServiceUrl('ai', 8000),
+  news: getServiceUrl('news', 8000),
+  community: getServiceUrl('community', 8000),
+  points: getServiceUrl('points', 8000),
+  notification: getServiceUrl('notification', 8000),
+  recommendation: getServiceUrl('recommendation', 8000),
+  search: getServiceUrl('search', 8000),
 });
 
 // API 基础配置

@@ -1,7 +1,8 @@
-/**
+﻿/**
  * WeChat（微信生态）Hooks
  */
 
+import { logger } from '@/shared/lib/logger';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 
@@ -326,7 +327,7 @@ export function useWechatPay() {
       const result = await apiUnifiedOrder(request);
       return result;
     } catch (error) {
-      console.error('创建支付订单失败:', error);
+      logger.error('创建支付订单失败:', error);
       return null;
     } finally {
       setIsPaying(false);
@@ -370,7 +371,7 @@ export function useWechatPay() {
       setPayResult(result);
       return result;
     } catch (error) {
-      console.error('查询支付状态失败:', error);
+      logger.error('查询支付状态失败:', error);
       return null;
     }
   }, []);

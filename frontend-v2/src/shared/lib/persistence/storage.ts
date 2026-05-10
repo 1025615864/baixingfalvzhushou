@@ -2,6 +2,8 @@
 // 本地存储持久化工具
 // ============================================
 
+import { logger } from '../logger';
+
 /**
  * 存储类型
  */
@@ -103,7 +105,7 @@ export function createPersistence<T>(options: StorageOptions<T>) {
       };
       storageEngine.setItem(getFullKey(), serialize(data));
     } catch (error) {
-      console.error('Storage set error:', error);
+      logger.error('Storage set error:', error);
     }
   };
 

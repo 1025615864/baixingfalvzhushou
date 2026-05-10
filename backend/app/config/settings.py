@@ -4,7 +4,7 @@ import secrets
 import sys
 from datetime import timedelta
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, TYPE_CHECKING
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import AliasChoices, Field, field_validator, model_validator
@@ -54,6 +54,7 @@ class AppConfig(BaseSettings):
 
     app_name: str = "百姓法律助手"
     debug: bool = Field(default_factory=_running_tests)
+    environment: str = Field(default="development", validation_alias=AliasChoices("ENVIRONMENT", "APP_ENV"))
     frontend_base_url: str = "http://localhost:5173"
 
 
@@ -88,7 +89,10 @@ class SecurityConfig(BaseSettings):
         validation_alias=AliasChoices("SECRET_KEY", "JWT_SECRET_KEY"),
         json_schema_extra={"writeOnly": True},
     )
-    algorithm: str = Field(default_factory=lambda: "HS256" if _running_tests() else "RS256")
+    algorithm: str = Field(
+        default_factory=lambda: "HS256" if _running_tests() else "RS256",
+        validation_alias=AliasChoices("JWT_ALGORITHM"),
+    )
     access_token_expire_minutes: int = 60
     refresh_token_expire_days: int = 7
 
@@ -393,6 +397,34 @@ class Settings:
 
     保持向后兼容：所有字段仍可通过 settings.xxx 访问。
     """
+
+    app: AppConfig
+    db: DatabaseConfig
+    security: SecurityConfig
+    payment: PaymentConfig
+    ai: AIConfig
+    ws: WebSocketConfig
+    storage: StorageConfig
+    infra: InfraConfig
+
+    # 向后兼容：扁平化属性（类型提示）
+    app_name: str
+    debug: bool
+    environment: str
+    frontend_base_url: str
+    postgres_url: str
+    redis_url: str
+    jwt_secret_key: str
+    jwt_algorithm: str
+    jwt_access_token_expire: int
+    jwt_refresh_token_expire: int
+    cors_allow_origins: list[str]
+    cors_allow_credentials: bool
+    trusted_proxies: list[str]
+    ai_provider: str
+    ai_api_key: str
+    ai_model: str
+    ai_base_url: str
 
     def __init__(self):
         self.app = AppConfig()

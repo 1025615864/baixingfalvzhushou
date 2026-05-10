@@ -43,8 +43,11 @@ export function LawyerMatchingPage(): JSX.Element {
 
   const { data: searchResults, isLoading: isSearchLoading } = useLawyerSearch({
     query: searchQuery,
-    filters: criteria,
-    sortBy: 'match',
+    filters: {
+      domains: criteria.domains,
+      minRating: criteria.minRating,
+      maxPrice: criteria.maxPrice,
+    },
     limit: 20,
   });
 

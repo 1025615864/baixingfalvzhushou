@@ -1,9 +1,10 @@
-/**
+﻿/**
  * QRCodeGenerator - 二维码生成器组件
  * 功能：动态生成二维码、支持下载 PNG/SVG、分享文案生成
  * 使用 qrcode 库
  */
 
+import { logger } from '@/shared/lib/logger';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 
 // QRCode 模块类型定义
@@ -105,7 +106,7 @@ export function QRCodeGenerator({
       setSvgString(svg);
     } catch (err) {
       setError('生成二维码失败');
-      console.error('QR Code generation error:', err);
+      logger.error('QR Code generation error:', err);
     } finally {
       setIsGenerating(false);
     }
@@ -182,7 +183,7 @@ export function QRCodeGenerator({
     } catch (err) {
       setError('生成二维码失败');
       setIsGenerating(false);
-      console.error('QR Code generation error:', err);
+      logger.error('QR Code generation error:', err);
     }
   }, [value, size, fgColor, bgColor, includeLogo, logoUrl]);
 
@@ -416,7 +417,7 @@ export function QRCodeDisplay({ value, size = 150, className = '' }: QRCodeDispl
         });
         setSvgString(svg);
       } catch (err) {
-        console.error('Failed to generate QR code:', err);
+        logger.error('Failed to generate QR code:', err);
       }
     };
 

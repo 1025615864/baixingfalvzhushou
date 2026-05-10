@@ -1,10 +1,11 @@
-/**
+﻿/**
  * ComplianceReportGenerator - 合规报告生成器组件
  *
  * 提供多步骤向导式报告生成功能，支持 GDPR、ISO 27001、HIPAA、SOC 2、PCI DSS 等合规报告类型
  * 步骤流程：配置 -> 预览 -> 生成中 -> 完成/失败
  */
 
+import { logger } from '@/shared/lib/logger';
 import { useState, useMemo, useCallback } from 'react';
 
 import { EmptyState } from '../../../components/ui/EmptyState';
@@ -779,7 +780,7 @@ function getDefaultConfig(): ReportConfig {
  * // 基本使用
  * <ComplianceReportGenerator
  *   accountId={123}
- *   onSubmit={(config) => console.log(config)}
+ *   onSubmit={(config) => logger.info(config)}
  * />
  *
  * // 带状态控制

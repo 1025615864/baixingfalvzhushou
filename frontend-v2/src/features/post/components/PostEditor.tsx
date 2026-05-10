@@ -8,6 +8,7 @@ import type { PostCategory, CreatePostRequest, UpdatePostRequest } from '../type
 
 interface PostEditorProps {
   initialData?: {
+    id?: string;
     title?: string;
     content?: string;
     summary?: string;
@@ -82,17 +83,30 @@ export function PostEditor({
       return;
     }
 
-    const data: CreatePostRequest = {
-      title: title.trim(),
-      content: content.trim(),
-      summary: summary.trim() || undefined,
-      category,
-      tags: tags.length > 0 ? tags : undefined,
-      coverImage: coverImage || undefined,
-      status: publish ? 'published' : 'draft',
-    };
-
-    void onSubmit(data);
+    if (mode === 'edit' && initialData?.id) {
+      const data: UpdatePostRequest = {
+        id: initialData.id,
+        title: title.trim(),
+        content: content.trim(),
+        summary: summary.trim() || undefined,
+        category,
+        tags: tags.length > 0 ? tags : undefined,
+        coverImage: coverImage || undefined,
+        status: publish ? 'published' : 'draft',
+      };
+      void onSubmit(data);
+    } else {
+      const data: CreatePostRequest = {
+        title: title.trim(),
+        content: content.trim(),
+        summary: summary.trim() || undefined,
+        category,
+        tags: tags.length > 0 ? tags : undefined,
+        coverImage: coverImage || undefined,
+        status: publish ? 'published' : 'draft',
+      };
+      void onSubmit(data);
+    }
   };
 
   /**

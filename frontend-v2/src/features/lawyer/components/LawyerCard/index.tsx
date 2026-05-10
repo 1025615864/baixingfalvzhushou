@@ -1,20 +1,33 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-import { Lawyer } from '../../types';
+import type { Lawyer } from '../../types';
 
 interface LawyerCardProps {
   lawyer: Lawyer;
-  onClick?: (_id: string) => void;
-  onConsult?: (_id: string) => void;
+  onClick?: (id: string) => void;
+  onConsult?: (id: string) => void;
 }
 
-export const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onClick: _onClick, onConsult: _onConsult }) => {
-  // 将 specialties 字符串转换为数组
+export const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onClick, onConsult }) => {
   const specialtyList = lawyer.specialties ? lawyer.specialties.split(/[,，]/).map((s: string) => s.trim()).filter(Boolean) : [];
 
+  const handleCardClick = (): void => {
+    onClick?.(lawyer.id);
+  };
+
+  const handleConsultClick = (e: React.MouseEvent): void => {
+    e.stopPropagation();
+    onConsult?.(lawyer.id);
+  };
+
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+    <div
+      className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow cursor-pointer"
+      onClick={handleCardClick}
+      role="button"
+      tabIndex={0}
+    >
       <div className="flex items-start gap-4">
         {/* Avatar */}
         <div className="flex-shrink-0">
@@ -82,12 +95,22 @@ export const LawyerCard: React.FC<LawyerCardProps> = ({ lawyer, onClick: _onClic
               ¥{lawyer.consultationFee}
               <span className="text-gray-400 text-sm font-normal">/次</span>
             </div>
-            <Link
-              to={`/lawyers/${lawyer.id}`}
-              className="px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-            >
-              立即咨询
-            </Link>
+            {onConsult ? (
+              <button
+                type="button"
+                onClick={handleConsultClick}
+                className="px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              >
+                立即咨询
+              </button>
+            ) : (
+              <Link
+                to={`/lawyers/${lawyer.id}`}
+                className="px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              >
+                立即咨询
+              </Link>
+            )}
           </div>
         </div>
       </div>

@@ -1,8 +1,9 @@
-/**
+﻿/**
  * OnboardingPage - 新用户引导问卷页面
  * 收集用户兴趣信息，构建个性化推荐画像
  */
 
+import { logger } from '@/shared/lib/logger';
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -133,7 +134,7 @@ export function OnboardingPage(): JSX.Element {
         navigate('/recommendation', { replace: true });
       })
       .catch((error) => {
-        console.error('Failed to complete onboarding:', error);
+        logger.error('Failed to complete onboarding:', error);
       })
       .finally(() => {
         setIsSubmitting(false);

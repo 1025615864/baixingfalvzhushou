@@ -4,11 +4,13 @@
 
 import React, { useEffect, useState } from 'react';
 
+import type { PaymentMethod } from '../types';
+
 export interface PaymentQRCodeProps {
   payUrl: string;
   orderNo: string;
   amount: number;
-  paymentMethod: string;
+  paymentMethod: PaymentMethod;
   onTimeout?: () => void;
   onSuccess?: () => void;
 }
@@ -68,9 +70,10 @@ export const PaymentQRCode: React.FC<PaymentQRCodeProps> = ({
   }, []);
 
   // 支付方式名称映射
-  const methodNameMap: Record<string, string> = {
+  const methodNameMap: Record<PaymentMethod, string> = {
     alipay: '支付宝',
     wechat: '微信支付',
+    balance: '余额支付',
     ikunpay: '爱坤支付',
   };
 

@@ -1,4 +1,5 @@
 import { QueryKey } from '@tanstack/react-query';
+import { logger } from './logger';
 
 export {
   CACHE_TIMINGS,
@@ -91,7 +92,7 @@ export async function prefetchQuery<TData = unknown>(
       new Promise<void>((_, reject) => setTimeout(() => reject(new Error('Prefetch timeout')), timeout)),
     ]);
   } catch (error) {
-    console.warn(`Prefetch failed for ${JSON.stringify(queryKey)}:`, error);
+    logger.warn(`Prefetch failed for ${JSON.stringify(queryKey)}:`, error);
   }
 }
 
@@ -105,7 +106,7 @@ export async function prefetchQueries(
   try {
     await Promise.all(queries.map(({ queryKey, queryFn, config }) => prefetchQuery(queryKey, queryFn, config)));
   } catch (error) {
-    console.warn('Some prefetch operations failed:', error);
+    logger.warn('Some prefetch operations failed:', error);
   }
 }
 
@@ -130,7 +131,7 @@ export async function prefetchInfiniteQuery<TData extends { hasNext?: boolean; n
       new Promise<void>((_, reject) => setTimeout(() => reject(new Error('Prefetch timeout')), timeout)),
     ]);
   } catch (error) {
-    console.warn(`Infinite prefetch failed for ${JSON.stringify(queryKey)}:`, error);
+    logger.warn(`Infinite prefetch failed for ${JSON.stringify(queryKey)}:`, error);
   }
 }
 

@@ -229,7 +229,7 @@ export function ArticleList({
                     <div className="flex flex-wrap gap-1 mt-2">
                       {article.keywords.split(',').map((keyword, idx) => (
                         <span
-                          key={idx}
+                          key={`kw-${keyword.trim()}-${idx}`}
                           className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded"
                         >
                           {keyword.trim()}

@@ -75,8 +75,12 @@ export const VerificationForm: React.FC<VerificationFormProps> = ({
   };
 
   const handleChange = (field: keyof SubmitVerificationRequest, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // 清除对应字段的错误
+    if (field === 'experienceYears') {
+      const numValue = value === '' ? undefined : Number(value);
+      setFormData(prev => ({ ...prev, experienceYears: numValue }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
     if (errors[field as keyof FormErrors]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }

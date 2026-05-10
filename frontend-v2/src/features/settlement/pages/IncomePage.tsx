@@ -1,9 +1,10 @@
-/**
+﻿/**
  * IncomePage - 收入记录页面
  *
  * 功能：收入记录列表、筛选、导出
  */
 
+import { logger } from '@/shared/lib/logger';
 import { useState } from 'react';
 
 import { useIncomeRecords, useWalletBalance } from '../hooks/useSettlements';
@@ -166,7 +167,7 @@ function IncomeTable({
       link.click();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('导出失败:', err);
+      logger.error('导出失败:', err);
       alert('导出失败，请稍后重试');
     }
   };

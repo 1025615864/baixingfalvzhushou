@@ -150,9 +150,9 @@ export function ChannelContent({ news, isLoading, onNewsClick }: ChannelContentP
             {/* 关键词标签 */}
             {item.keywords.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-3">
-                {item.keywords.slice(0, 5).map((keyword, index) => (
+                {item.keywords.slice(0, 5).map((keyword) => (
                   <span
-                    key={index}
+                    key={keyword}
                     className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs"
                   >
                     #{keyword}

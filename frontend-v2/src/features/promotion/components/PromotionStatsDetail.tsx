@@ -54,7 +54,7 @@ interface ConversionRateItem {
 }
 
 /** 推广统计详情 */
-interface PromotionStatsDetail {
+interface PromotionStatsDetailData {
   funnel: {
     stages: FunnelStage[];
     totalConversionRate: number;
@@ -76,7 +76,7 @@ interface PromotionStatsDetail {
 
 /** 组件 Props */
 interface PromotionStatsDetailProps {
-  stats: PromotionStatsDetail;
+  stats: PromotionStatsDetailData;
   timeRange?: '24h' | '7d' | '30d';
   isLoading?: boolean;
   className?: string;

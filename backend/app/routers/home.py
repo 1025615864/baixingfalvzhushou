@@ -443,9 +443,13 @@ async def track_click(
     request: Request,
     data: dict[str, Any],
     current_user: Any = Depends(get_current_user_optional),
-):
+) -> dict[str, bool]:
     """追踪用户点击行为，用于优化推荐"""
-    # 这里可以记录点击日志，用于后续分析
+    if not isinstance(data, dict) or "item_id" not in data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="缺少必要参数: item_id",
+        )
     return {"success": True}
 
 
@@ -454,7 +458,12 @@ async def update_interests(
     request: Request,
     data: dict[str, list[str]],
     current_user: Any = Depends(get_current_user_optional),
-):
+) -> dict[str, Any]:
     """更新用户兴趣标签"""
     interests = data.get("interests", [])
+    if not isinstance(interests, list):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="interests 必须是字符串数组",
+        )
     return {"success": True, "interests": interests}

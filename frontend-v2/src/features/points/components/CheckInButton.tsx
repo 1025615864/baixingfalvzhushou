@@ -1,9 +1,10 @@
-/**
+﻿/**
  * CheckInButton - 独立签到按钮组件
  * 功能：可嵌入其他页面的签到按钮
  * 显示连续签到天数和动画效果
  */
 
+import { logger } from '@/shared/lib/logger';
 import { useState, useEffect, useCallback } from 'react';
 
 import { useCheckIn } from '../hooks/usePoints';
@@ -88,7 +89,7 @@ export function CheckInButton({
       onCheckInSuccess?.(result.pointsEarned, result.continuousDays);
     } catch (err) {
       // 错误处理
-      console.error('签到失败:', err);
+      logger.error('签到失败:', err);
     }
   };
 
@@ -232,7 +233,7 @@ export function CheckInButtonCompact({
       setIsAnimating(true);
       onCheckInSuccess?.(result.pointsEarned, result.continuousDays);
     } catch (err) {
-      console.error('签到失败:', err);
+      logger.error('签到失败:', err);
     }
   };
 

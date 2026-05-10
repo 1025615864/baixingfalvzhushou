@@ -352,9 +352,9 @@ export const ModerationDetail: React.FC<ModerationDetailProps> = ({
                   <Card title="关键词匹配" style={{ marginBottom: 16 }}>
                     {aiReview.keywords.length > 0 ? (
                       <div>
-                        {aiReview.keywords.map((keyword, index) => (
+                        {aiReview.keywords.map((keyword) => (
                           <Tag
-                            key={index}
+                            key={`${keyword.keyword}-${keyword.category}`}
                             color={
                               keyword.severity === 'high'
                                 ? 'red'
@@ -379,8 +379,8 @@ export const ModerationDetail: React.FC<ModerationDetailProps> = ({
 
                   <Card title="分类检测">
                     <Space wrap>
-                      {aiReview.categories.map((category, index) => (
-                        <Tag key={index} color="blue">
+                      {aiReview.categories.map((category) => (
+                        <Tag key={category} color="blue">
                           {category}
                         </Tag>
                       ))}

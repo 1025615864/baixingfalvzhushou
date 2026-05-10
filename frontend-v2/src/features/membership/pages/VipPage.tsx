@@ -331,8 +331,8 @@ export function VipPage(): JSX.Element {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">
-                        {conversionHistory?.items.map((item, index) => (
-                          <tr key={index} className="hover:bg-slate-50">
+                        {conversionHistory?.items.map((item) => (
+                          <tr key={item.orderNo} className="hover:bg-slate-50">
                             <td className="px-4 py-3 text-sm text-slate-900 font-mono">
                               {item.orderNo}
                             </td>

@@ -1,7 +1,8 @@
-/**
+﻿/**
  * 支付弹窗组件 - 增强版
  */
 
+import { logger } from '@/shared/lib/logger';
 import React, { useState, useCallback, useMemo } from 'react';
 
 import type { Order, PaymentMethod, PaymentError } from '../types';
@@ -95,7 +96,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     },
     (error) => {
       // 支付失败
-      console.error('支付轮询失败:', error);
+      logger.error('支付轮询失败:', error);
     }
   );
 

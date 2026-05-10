@@ -1,7 +1,8 @@
-/**
+﻿/**
  * Admin Monitor（系统监控）API 层
  */
 
+import { logger } from '@/shared/lib/logger';
 import { apiClient } from "@/shared/lib/api/client";
 
 import type {
@@ -533,7 +534,7 @@ export async function apiGetDashboard(): Promise<DashboardStats> {
       if (result.status === 'fulfilled') {
         return result.value;
       }
-      console.error('API调用失败:', result.reason);
+      logger.error('API调用失败:', result.reason);
       return defaultValue;
     };
 
@@ -585,7 +586,7 @@ export async function apiGetDashboard(): Promise<DashboardStats> {
       }),
     };
   } catch (error) {
-    console.error('获取Dashboard数据失败:', error);
+    logger.error('获取Dashboard数据失败:', error);
     throw error;
   }
 }

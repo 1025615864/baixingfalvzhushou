@@ -49,8 +49,13 @@ export function useRegister() {
   return useMutation({
     mutationFn: (data: RegisterRequest) => authApi.register(data),
     onSuccess: (response) => {
-      // 后端直接返回 { user, message }
-      const { user } = response;
+      const { user, token } = response;
+      if (token?.access_token) {
+        setToken(token.access_token);
+      }
+      if ('refresh_token' in (token ?? {}) && typeof (token as { refresh_token?: unknown }).refresh_token === 'string') {
+        setRefreshToken((token as { refresh_token: string }).refresh_token);
+      }
       setAuth(user);
       queryClient.setQueryData(authKeys.user(), user);
       navigate('/');

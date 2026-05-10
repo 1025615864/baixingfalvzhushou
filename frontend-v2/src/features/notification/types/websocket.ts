@@ -371,6 +371,8 @@ export interface WebSocketEventHandlers {
   onReconnected?: () => void;
   /** 心跳超时 */
   onHeartbeatTimeout?: () => void;
+  /** 状态变化 */
+  onStateChange?: (prevState: WebSocketConnectionState, newState: WebSocketConnectionState) => void;
 }
 
 /**

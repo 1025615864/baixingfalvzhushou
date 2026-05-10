@@ -6,14 +6,14 @@ import re
 import uuid
 import logging
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from fastapi.responses import FileResponse, RedirectResponse
 
 from ..models.user import User
 from ..services.storage_service import LocalStorageProvider, get_storage_provider
-from ..utils.deps import get_current_user
+from ..utils.deps import get_current_user, get_current_user_optional
 from ..utils.rate_limiter import rate_limit_upload
 from ..config import get_settings
 
@@ -119,7 +119,7 @@ def _env_enabled(name: str, default: bool = False) -> bool:
 
 
 async def _moderate_image_via_webhook(
-        *, content: bytes, content_type: str | None):
+        *, content: bytes, content_type: str | None) -> tuple[bool, str | None]:
     """图片内容审核（模拟实现）
     
     生产环境应集成真实的审核服务（如阿里云内容安全、腾讯云天御等）
@@ -233,7 +233,7 @@ async def upload_avatar(
     request: Request,
     file: Annotated[UploadFile, File(...)],
     current_user: Annotated[User, Depends(get_current_user)],
-):
+) -> dict[str, Any]:
     """
     上传用户头像（安全加固版本）
     
@@ -308,8 +308,12 @@ async def upload_avatar(
 
 
 @router.get("/avatars/{filename}", summary="获取头像")
-async def get_avatar(filename: str):
-    """获取头像文件"""
+async def get_avatar(
+    filename: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> FileResponse | RedirectResponse:
+    """获取头像文件（需要登录）"""
+    _ = current_user
     if not _is_safe_filename(filename):
         raise HTTPException(status_code=400, detail="非法文件名")
     storage = get_storage_provider()
@@ -330,7 +334,7 @@ async def upload_file(
     request: Request,
     file: Annotated[UploadFile, File(...)],
     current_user: Annotated[User, Depends(get_current_user)],
-):
+) -> dict[str, Any]:
     """
     上传附件（安全加固版本）
     
@@ -424,7 +428,12 @@ async def upload_file(
 
 
 @router.get("/files/{filename}", summary="获取附件")
-async def get_file(filename: str):
+async def get_file(
+    filename: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> FileResponse | RedirectResponse:
+    """获取附件文件（需要登录）"""
+    _ = current_user
     if not _is_safe_file_filename(filename):
         raise HTTPException(status_code=400, detail="非法文件名")
     storage = get_storage_provider()
@@ -444,9 +453,9 @@ async def upload_image(
     request: Request,
     file: Annotated[UploadFile, File(...)],
     current_user: Annotated[User, Depends(get_current_user)],
-):
+) -> dict[str, Any]:
     """
-    上传通用图片（需登录，安全加固版本）
+    上传通用图片（安全加固版本）
     
     安全特性：
     - 仅允许安全的位图格式（拒绝SVG等潜在危险格式）
@@ -552,8 +561,12 @@ async def upload_image(
 
 
 @router.get("/images/{filename}", summary="获取图片")
-async def get_image(filename: str):
-    """获取图片文件"""
+async def get_image(
+    filename: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> FileResponse | RedirectResponse:
+    """获取图片文件（需要登录）"""
+    _ = current_user
     if not _is_safe_image_filename(filename):
         raise HTTPException(status_code=400, detail="非法文件名")
     storage = get_storage_provider()

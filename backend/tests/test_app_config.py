@@ -193,22 +193,24 @@ class TestSettings:
         assert result == ["http://localhost:3000", "http://localhost:8080"]
 
     def test_parse_ai_fallback_models_none(self):
-        """Test _parse_ai_fallback_models with None"""
+        """Test ai_fallback_models_list with empty value"""
         settings = Settings()
-        result = settings._parse_ai_fallback_models(None)
-        assert result == ""
+        result = settings.ai_fallback_models_list
+        assert result == []
 
     def test_parse_ai_fallback_models_string(self):
-        """Test _parse_ai_fallback_models with string"""
+        """Test ai_fallback_models_list with comma-separated string"""
         settings = Settings()
-        result = settings._parse_ai_fallback_models("model1,model2")
-        assert result == "model1,model2"
+        settings.ai.ai_fallback_models = "model1,model2"
+        result = settings.ai_fallback_models_list
+        assert result == ["model1", "model2"]
 
     def test_parse_ai_fallback_models_list(self):
-        """Test _parse_ai_fallback_models with list"""
+        """Test ai_fallback_models_list with JSON list string"""
         settings = Settings()
-        result = settings._parse_ai_fallback_models(["model1", "model2"])
-        assert result == "model1,model2"
+        settings.ai.ai_fallback_models = '["model1", "model2"]'
+        result = settings.ai_fallback_models_list
+        assert result == ["model1", "model2"]
 
     def test_ai_fallback_models_list_empty(self):
         """Test ai_fallback_models_list with empty value"""

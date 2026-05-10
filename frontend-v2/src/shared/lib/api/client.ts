@@ -6,6 +6,7 @@ import axios, {
   InternalAxiosRequestConfig
 } from 'axios';
 
+import { logger } from '../logger';
 import { camelKeysToSnake, convertPaginationParams } from '@/utils/transformers';
 
 import { clearAuthStorage, getToken } from '../security/tokenStorage';
@@ -80,11 +81,7 @@ function normalizeApiError(error: AxiosError<ApiError>): ApiError {
 }
 
 function logApiError(error: ApiError, method?: string, url?: string): void {
-  if (!import.meta.env.DEV) {
-    return;
-  }
-
-  console.error('[API Error Normalized]', {
+  logger.error('API Error Normalized', {
     code: error.code,
     message: error.message,
     details: error.details,
@@ -110,7 +107,7 @@ async function getCsrfToken(): Promise<string | null> {
   }
   
   try {
-    const response = await axios.get<ApiResponse<{ csrf_token: string; expires_in_hours: number }>>(
+    const response = await axios.get<{ csrf_token: string; expires_in_hours: number }>(
       `${import.meta.env.VITE_API_BASE_URL || '/api'}/user/me/csrf-token`,
       { 
         withCredentials: true,
@@ -120,15 +117,15 @@ async function getCsrfToken(): Promise<string | null> {
       }
     );
     
-    // 后端返回的字段名是 csrf_token（下划线），不是 token
-    if (response.data?.data?.csrf_token) {
-      csrfTokenCache = response.data.data.csrf_token;
+    // 后端直接返回 { csrf_token: "...", expires_in_hours: 1 }
+    if (response.data?.csrf_token) {
+      csrfTokenCache = response.data.csrf_token;
       csrfTokenFetchTime = now;
       return csrfTokenCache;
     }
   } catch (error) {
     // 记录 CSRF token 获取错误，但不阻断流程
-    console.warn('获取 CSRF token 失败:', error instanceof Error ? error.message : '未知错误');
+    logger.warn('获取 CSRF token 失败:', error instanceof Error ? error.message : '未知错误');
   }
   
   return null;
@@ -149,8 +146,7 @@ apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     // 开发环境调试日志
     if (import.meta.env.DEV) {
-      // eslint-disable-next-line no-console
-      console.debug(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, {
+      logger.debug(`API Request ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, {
         params: config.params as unknown,
         data: config.data as unknown,
       });
@@ -213,7 +209,7 @@ apiClient.interceptors.response.use(
 
     // 开发环境错误日志
     if (import.meta.env.DEV) {
-      console.error(`[API Error] ${error.response?.status} ${error.config?.url}`, {
+      logger.error(`API Error ${error.response?.status} ${error.config?.url}`, {
         message: error.message,
         response: error.response?.data,
       });

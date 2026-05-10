@@ -15,12 +15,13 @@ api_router = APIRouter()
 # 微服务代理路由（业务逻辑在微服务中）
 # ==========================================
 try:
-    from .microservice_proxy import MICROSERVICES, create_proxy_router
+    from .microservice_proxy import MICROSERVICES, create_proxy_router, router as proxy_router
 
     for service_name in MICROSERVICES.keys():
         router = create_proxy_router(service_name)
         api_router.include_router(router)
         logger.info(f"BFF代理路由已注册: {service_name}-service")
+    api_router.include_router(proxy_router)
 except ImportError:
     logger.warning("微服务代理模块未加载")
 

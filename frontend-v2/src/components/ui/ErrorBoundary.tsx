@@ -3,6 +3,8 @@
  *
  * 捕获渲染错误，提供优雅的错误处理界面
  */
+
+import { logger } from '@/shared/lib/logger';
 /* eslint-disable react-refresh/only-export-components */
 
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
@@ -121,8 +123,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   private reportError(error: Error, errorInfo: ErrorInfo): void {
     // 在开发环境下输出到控制台
     if (process.env.NODE_ENV === 'development') {
-      console.error('ErrorBoundary caught an error:', error);
-      console.error('Component stack:', errorInfo.componentStack);
+      logger.error('ErrorBoundary caught an error:', error);
+      logger.error('Component stack:', errorInfo.componentStack);
     }
 
     // TODO: 可以在这里集成 Sentry、LogRocket 等监控服务

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PurchaseFlow 会员购买流程组件
  * 实现完整的会员购买流程：选择等级 -> 确认订单 -> 支付
  * 
@@ -9,6 +9,7 @@
  * - lifetime: 终身会员 ¥999 (一次购买终身权益)
  */
 
+import { logger } from '@/shared/lib/logger';
 import { useState, useCallback, useMemo } from 'react';
 import {
   Crown,
@@ -182,7 +183,7 @@ export function PurchaseFlow({
       setPaymentOrder(order);
       setShowPaymentModal(true);
     } catch {
-      console.error('创建订单失败');
+      logger.error('创建订单失败');
     }
   }, [selectedTier, billingCycle, paymentMethod, createOrderMutation]);
 

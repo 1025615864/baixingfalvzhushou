@@ -47,8 +47,7 @@ def verify_token(token: str) -> Optional[dict]:
     except Exception as e:
         logger.warning(f"JWTKeyManager decode failed: {e}")
 
-    # Fallback: 尝试环境变量中的 HS256 密钥
-    hs256_secret = os.getenv("JWT_SECRET_KEY", "")
+    hs256_secret = os.getenv("JWT_SECRET_KEY")
     if hs256_secret:
         try:
             from jose import jwt
@@ -57,6 +56,7 @@ def verify_token(token: str) -> Optional[dict]:
         except Exception as e:
             logger.warning(f"HS256 fallback decode failed: {e}")
 
+    logger.warning("JWT verification failed: no valid key found")
     return None
 
 
@@ -158,10 +158,14 @@ def create_access_token(user_id: int, role: str = "user") -> str:
     try:
         return manager.create_token(payload, expires_minutes=60)
     except Exception:
-        # Fallback to HS256 if JWTKeyManager fails
+        hs256_secret = os.getenv("JWT_SECRET_KEY")
+        if not hs256_secret:
+            raise RuntimeError(
+                "JWT token creation failed: JWTKeyManager unavailable and "
+                "JWT_SECRET_KEY not set. Configure JWT_SECRET_KEY or fix "
+                "JWTKeyManager database connection."
+            )
         from jose import jwt
-
-        hs256_secret = os.getenv("JWT_SECRET_KEY", "test-secret")
         return jwt.encode(payload, hs256_secret, algorithm="HS256")
 
 

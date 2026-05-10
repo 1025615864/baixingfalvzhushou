@@ -3,6 +3,8 @@
  * 提供统一的 Zustand Store 持久化中间件配置
  */
 
+import { logger } from './logger';
+
 import { StateCreator } from 'zustand';
 import { persist, createJSONStorage, PersistOptions } from 'zustand/middleware';
 
@@ -227,8 +229,8 @@ function createMigrateFunction<T>(
 
     // 版本不匹配时返回空对象（让 store 使用默认值）
     if (globalConfig.debug) {
-      console.warn(
-        `[ZustandPersistence] 版本不匹配: 期望 ${targetVersion}，实际 ${version}`
+      logger.warn(
+        `版本不匹配: 期望 ${targetVersion}，实际 ${version}`
       );
     }
     return {} as T;

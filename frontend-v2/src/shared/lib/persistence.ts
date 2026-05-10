@@ -3,6 +3,8 @@
  * 提供类型安全的本地存储操作，支持过期时间和多种存储后端
  */
 
+import { logger } from './logger';
+
 // ==================== 类型定义 ====================
 
 /** 持久化存储选项 */
@@ -65,7 +67,7 @@ function getStorage(storageType: 'local' | 'session'): Storage | null {
     return storage;
   } catch {
      
-    console.warn(`[Persistence] ${storageType}Storage 不可用`);
+    logger.warn(`${storageType}Storage 不可用`);
     return null;
   }
 }
@@ -169,10 +171,10 @@ export class Persistence {
           }
           storage.setItem(fullKey, serialized);
         } catch {
-          console.error(`[Persistence] 存储空间不足，无法保存: ${key}`);
+          logger.error(`存储空间不足，无法保存: ${key}`);
         }
       } else {
-        console.error(`[Persistence] 保存数据失败: ${key}`, error);
+        logger.error(`保存数据失败: ${key}`, error);
       }
     }
   }
@@ -215,7 +217,7 @@ export class Persistence {
 
       return data.value;
     } catch (error) {
-      console.error(`[Persistence] 读取数据失败: ${key}`, error);
+      logger.error(`读取数据失败: ${key}`, error);
       return null;
     }
   }

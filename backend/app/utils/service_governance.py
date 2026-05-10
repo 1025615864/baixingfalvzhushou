@@ -362,7 +362,7 @@ class ServiceRegistry:
     管理服务的注册、发现和健康检查
     """
     
-    def __init__(self):
+    def __init__(self) -> None:
         self._services: dict[str, ServiceConfig] = {}
         self._instances: dict[str, list[ServiceInstance]] = {}
         self._lock = asyncio.Lock()

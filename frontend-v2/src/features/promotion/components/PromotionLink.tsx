@@ -93,11 +93,11 @@ export function PromotionLink({ className = '' }: PromotionLinkProps): JSX.Eleme
           {/* 统计信息 */}
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center p-3 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">{link.clickCount}</div>
+              <div className="text-2xl font-bold text-blue-600">{link.clickCount ?? 0}</div>
               <div className="text-sm text-gray-500">点击次数</div>
             </div>
             <div className="text-center p-3 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">{link.conversionCount}</div>
+              <div className="text-2xl font-bold text-green-600">{link.conversionCount ?? 0}</div>
               <div className="text-sm text-gray-500">转化次数</div>
             </div>
           </div>

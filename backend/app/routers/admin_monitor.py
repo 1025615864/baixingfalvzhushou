@@ -19,6 +19,7 @@ from ..services.enhanced_websocket import enhanced_manager
 from ..config import get_settings
 from ..database import get_db
 from ..models.user import User
+from ..utils.deps import get_current_user
 
 try:
     import redis.asyncio as redis  # type: ignore[import-not-found]
@@ -277,7 +278,7 @@ async def enable_alert_rule(rule_name: str, user: User) -> dict[str, Any]:
 @router.post("/alert-rules/{rule_name}/enable", summary="启用告警规则")
 async def enable_alert_rule_endpoint(
     rule_name: str,
-    user: User = Depends(lambda: User(id=1, username="admin"))  # 简化权限检查
+    user: User = Depends(get_current_user)
 ) -> dict[str, Any]:
     """启用告警规则"""
     return await enable_alert_rule(rule_name, user)
@@ -301,7 +302,7 @@ async def disable_alert_rule(rule_name: str, user: User) -> dict[str, Any]:
 @router.post("/alert-rules/{rule_name}/disable", summary="禁用告警规则")
 async def disable_alert_rule_endpoint(
     rule_name: str,
-    user: User = Depends(lambda: User(id=1, username="admin"))  # 简化权限检查
+    user: User = Depends(get_current_user)
 ) -> dict[str, Any]:
     """禁用告警规则"""
     return await disable_alert_rule(rule_name, user)

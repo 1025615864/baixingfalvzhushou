@@ -1,8 +1,9 @@
-/**
+﻿/**
  * Analytics（数据分析统计）API 层
  * 基于统一的 apiClient，对接后端 /api/v1/analytics 端点
  */
 
+import { logger } from '@/shared/lib/logger';
 import { apiClient } from "@/shared/lib/api/client";
 
 import type {
@@ -219,7 +220,7 @@ export async function apiGetOverview(): Promise<OverviewData> {
       },
     };
   } catch (error) {
-    console.error('获取概览数据失败:', error);
+    logger.error('获取概览数据失败:', error);
     // 返回默认数据
     return {
       users: {

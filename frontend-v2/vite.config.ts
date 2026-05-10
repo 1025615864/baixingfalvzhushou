@@ -200,121 +200,18 @@ export default defineConfig({
     target: 'es2020',
   },
   server: {
-    port: 5173,
+    port: 3000,
     host: true,
     proxy: {
-      // ==================== 微服务代理 (必须放在前面，精确匹配优先) ====================
-      // 开发环境直接代理到各服务端口
-
-      // 用户服务 (8001) - 认证
-      '/api/v1/auth': {
-        target: 'http://127.0.0.1:8001',
-        changeOrigin: true,
-      },
-      // 用户服务 (8001) - 用户管理
-      '/api/v1/users': {
-        target: 'http://127.0.0.1:8001',
-        changeOrigin: true,
-      },
-      // 用户服务 (8001) - 用户画像
-      '/api/v1/profiles': {
-        target: 'http://127.0.0.1:8001',
-        changeOrigin: true,
-      },
-      // 用户服务 (8001) - 会员
-      '/api/v1/membership': {
-        target: 'http://127.0.0.1:8001',
-        changeOrigin: true,
-      },
-
-      // AI服务 (8005)
-      '/api/v1/ai': {
-        target: 'http://127.0.0.1:8005',
-        changeOrigin: true,
-      },
-
-      // 支付通道服务 (8002)
-      '/api/v1/payment': {
-        target: 'http://127.0.0.1:8002',
-        changeOrigin: true,
-      },
-
-      // 账务服务 (8003)
-      '/api/v1/balance': {
-        target: 'http://127.0.0.1:8003',
-        changeOrigin: true,
-      },
-      '/api/v1/settlement': {
-        target: 'http://127.0.0.1:8003',
-        changeOrigin: true,
-      },
-
-      // 法律服务 (8004)
-      '/api/v1/legal': {
-        target: 'http://127.0.0.1:8004',
-        changeOrigin: true,
-      },
-      '/api/v1/lawyers': {
-        target: 'http://127.0.0.1:8004',
-        changeOrigin: true,
-      },
-      '/api/v1/firms': {
-        target: 'http://127.0.0.1:8004',
-        changeOrigin: true,
-      },
-
-      // 新闻服务 (8006)
-      '/api/v1/news': {
-        target: 'http://127.0.0.1:8006',
-        changeOrigin: true,
-      },
-
-      // 社区服务 (8007)
-      '/api/v1/community': {
-        target: 'http://127.0.0.1:8007',
-        changeOrigin: true,
-      },
-
-      // 积分服务 (8008)
-      '/api/v1/points': {
-        target: 'http://127.0.0.1:8008',
-        changeOrigin: true,
-      },
-
-      // 通知服务 (8009)
-      '/api/v1/notifications': {
-        target: 'http://127.0.0.1:8009',
-        changeOrigin: true,
-      },
-
-      // 推荐服务 (8010)
-      '/api/v1/recommendations': {
-        target: 'http://127.0.0.1:8010',
-        changeOrigin: true,
-      },
-
-      // 搜索服务 (8011)
-      '/api/v1/search': {
-        target: 'http://127.0.0.1:8011',
-        changeOrigin: true,
-      },
-
-      // 知识库服务
-      '/api/v1/knowledge': {
-        target: 'http://127.0.0.1:8004',
-        changeOrigin: true,
-      },
-
-      // ==================== 默认API代理 ====================
-      // 兜底：未匹配上面的路由走到主Backend (8080)
+      // ==================== 所有 API 统一代理到 BFF 后端 (8000) ====================
+      // Docker 容器内通过服务名 backend 访问后端
+      // 本地开发时通过环境变量 VITE_BACKEND_URL 或默认 localhost:8000 访问
       '/api': {
-        target: 'http://127.0.0.1:8080',
+        target: process.env.VITE_BACKEND_URL || 'http://backend:8000',
         changeOrigin: true,
       },
-
-      // ==================== WebSocket代理 ====================
       '/ws': {
-        target: 'ws://127.0.0.1:8080',
+        target: (process.env.VITE_WS_URL || 'ws://backend:8000').replace('http', 'ws'),
         changeOrigin: true,
         ws: true,
       },

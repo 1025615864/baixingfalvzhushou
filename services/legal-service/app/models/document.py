@@ -35,6 +35,7 @@ class LegalDocument(Base):
         Index("idx_document_consultation", "consultation_id", "created_at"),
         Index("idx_document_lawyer", "lawyer_id", "status"),
         Index("idx_document_type_status", "document_type", "status"),
+        Index("idx_document_user_created", "user_id", "created_at"),
     )
 
     def __repr__(self) -> str:

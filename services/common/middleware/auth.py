@@ -158,6 +158,7 @@ def create_access_token(user_id: int, role: str = "user") -> str:
     try:
         return manager.create_token(payload, expires_minutes=60)
     except Exception:
+        logger.warning("JWTKeyManager创建token失败，回退到HS256")
         hs256_secret = os.getenv("JWT_SECRET_KEY")
         if not hs256_secret:
             raise RuntimeError(

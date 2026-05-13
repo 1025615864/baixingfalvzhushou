@@ -5,8 +5,27 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.services.archive_service import ArchiveService
-from services.common.middleware import check_vector_rebuild_rate_limit
-from services.common.vector import PGVectorStore, VectorStore, VectorSearchResult
+try:
+    from services.common.middleware import check_vector_rebuild_rate_limit
+except ImportError:
+    def check_vector_rebuild_rate_limit(*args, **kwargs):
+        return True, 999
+
+try:
+    from services.common.vector import PGVectorStore, VectorStore, VectorSearchResult
+except ImportError:
+    class VectorSearchResult:
+        def __init__(self, id="", text="", metadata=None, distance=0.0):
+            self.id = id
+            self.text = text
+            self.metadata = metadata or {}
+            self.distance = distance
+
+    class VectorStore:
+        pass
+
+    class PGVectorStore(VectorStore):
+        pass
 
 router = APIRouter(prefix="/api/v1/vector", tags=["向量操作"])
 

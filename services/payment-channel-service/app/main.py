@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config.settings import get_settings
 from .database import engine, AsyncSessionLocal, Base
+from sqlalchemy import text
 from .routers import order_router, callback_router, refund_router
 from .services.channels import init_adapters
 
@@ -16,7 +17,7 @@ try:
 except ImportError:
     def get_cors_config():
         return {
-            "allow_origins": ["*"],
+            "allow_origins": os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(","),
             "allow_credentials": True,
             "allow_methods": ["*"],
             "allow_headers": ["*"],
@@ -100,7 +101,13 @@ def create_app() -> FastAPI:
 
     @app.get("/health/ready")
     async def readiness_check():
-        return {"status": "ready"}
+        try:
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            return {"status": "ready"}
+        except Exception as e:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(status_code=503, content={"status": "not_ready", "error": str(e)})
 
     @app.get("/health/live")
     async def liveness_check():

@@ -13,7 +13,7 @@ try:
 except ImportError:
     def get_cors_config():
         return {
-            "allow_origins": ["*"],
+            "allow_origins": os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(","),
             "allow_credentials": True,
             "allow_methods": ["*"],
             "allow_headers": ["*"],
@@ -90,6 +90,7 @@ def create_app() -> FastAPI:
                 await conn.execute(text("SELECT 1"))
             return {"status": "ready"}
         except Exception:
+            logger.error("Readiness check failed: database connection error")
             raise HTTPException(status_code=503, detail="Service not ready")
 
     @app.get("/health/live")

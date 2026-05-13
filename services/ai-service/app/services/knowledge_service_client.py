@@ -115,6 +115,7 @@ class KnowledgeServiceClient:
                 response = await client.get(f"{self.base_url}/health")
                 return response.status_code == 200
         except Exception:
+            logger.error("Failed to check knowledge service health")
             return False
 
     async def get_stats(self) -> dict:

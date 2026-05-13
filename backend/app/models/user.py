@@ -32,6 +32,8 @@ class User(Base):
     phone_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     phone_verified_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True)
+    wechat_openid: Mapped[str | None] = mapped_column(
+        String(128), nullable=True, unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     avatar: Mapped[str | None] = mapped_column(String(255), nullable=True)
     role: Mapped[str] = mapped_column(

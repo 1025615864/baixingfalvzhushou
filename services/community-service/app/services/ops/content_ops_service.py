@@ -7,7 +7,7 @@ from sqlalchemy import select, update, and_
 from app.models.moderation import ModerationQueue
 from app.models.post import Post
 from app.models.comment import Comment
-from app.models.user_penalty import UserPenalty
+from app.models.ops_models import UserPenalty
 
 
 class ContentOpsService:

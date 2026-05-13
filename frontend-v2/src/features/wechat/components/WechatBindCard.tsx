@@ -117,15 +117,11 @@ export function WechatBindCard({
    * 处理绑定操作
    */
   const handleBind = (): void => {
-    // 实际实现中应该调用微信OAuth授权
-    // 这里模拟授权码流程
-    const mockAuthCode = `mock_auth_code_${Date.now()}`;
-    
-    void bindMutation.mutateAsync({
-      userId,
-      accountType,
-      authCode: mockAuthCode,
-    });
+    const appId = import.meta.env.VITE_WECHAT_APP_ID || '';
+    const redirectUri = encodeURIComponent(`${window.location.origin}/wechat/callback`);
+    const state = `${accountType}_${userId}_${Date.now()}`;
+    const oauthUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_userinfo&state=${state}#wechat_redirect`;
+    window.location.href = oauthUrl;
   };
 
   /**

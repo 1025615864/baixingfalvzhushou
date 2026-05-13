@@ -1,4 +1,5 @@
 """数据模型"""
+from .base import TimestampMixin
 from .user import User
 from .user_quota import UserQuotaDaily, UserQuotaPackBalance
 from .user_consent import UserConsent
@@ -24,8 +25,10 @@ from .video_consultation import VideoConsultation, VideoConsultationUsage, Video
 from .payment import PaymentOrder, PaymentStatus, RefundStatus, PaymentMethod, OrderType, UserBalance, BalanceTransaction
 from .forum import Post, Comment
 from .news import News, NewsTopic, NewsTopicItem, NewsComment, NewsSubscription
+from .points import PointsUser, PointsDailyCount, PointsHistory
 
 __all__ = [
+    "TimestampMixin",
     "User",
     "UserQuotaDaily",
     "UserQuotaPackBalance",
@@ -87,4 +90,7 @@ __all__ = [
     "NewsTopicItem",
     "NewsComment",
     "NewsSubscription",
+    "PointsUser",
+    "PointsDailyCount",
+    "PointsHistory",
 ]

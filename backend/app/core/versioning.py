@@ -128,8 +128,11 @@ class VersionInfo:
                         headers["Link"] = f'<{successor_path}>; rel="successor-version"'
             
             if self.deprecation_message:
-                # 使用 Warning 头传递废弃消息
-                headers["Warning"] = f'299 - "{self.deprecation_message}"'
+                try:
+                    headers["Warning"] = f'299 - "{self.deprecation_message}"'
+                except (UnicodeEncodeError, UnicodeDecodeError):
+                    import urllib.parse
+                    headers["Warning"] = f'299 - "{urllib.parse.quote(self.deprecation_message, safe="")}"'
         
         return headers
 
@@ -646,14 +649,6 @@ class VersionNegotiator:
         return version
 
     def _extract_version_from_path(self, path: str) -> Optional[APIVersion]:
-        """从路径中提取版本
-
-        Args:
-            path: 请求路径
-
-        Returns:
-            API版本，如果无法提取则返回None
-        """
         parts = path.strip("/").split("/")
         if len(parts) >= 2 and parts[0] == "api":
             version_str = parts[1]
@@ -662,6 +657,11 @@ class VersionNegotiator:
             try:
                 return APIVersion(version_str)
             except ValueError:
+                if self.strict_mode and parts[1].startswith("v"):
+                    raise ValueError(
+                        f"不支持的 API 版本: {parts[1]}。"
+                        f"支持的版本: {', '.join(v.value for v in self.supported_versions)}"
+                    )
                 pass
         return None
 
@@ -888,7 +888,20 @@ def create_versioned_response(
     # 添加废弃相关响应头
     if include_deprecation_headers and (deprecated or is_api_deprecated(request)):
         version_info = get_version_info(request)
-        deprecation_headers = version_info.to_response_headers(request.url.path)
+        if not isinstance(version_info, VersionInfo):
+            version_info = VersionInfo(
+                version=get_current_api_version(request).value,
+                is_deprecated=True,
+            )
+        if deprecated and not version_info.is_deprecated:
+            version_info = VersionInfo(
+                version=version_info.version,
+                is_deprecated=True,
+                successor_version=version_info.successor_version,
+            )
+        deprecation_headers = version_info.to_response_headers(
+            getattr(request.url, "path", "")
+        )
         for header_name, header_value in deprecation_headers.items():
             response.headers[header_name] = header_value
 
@@ -937,7 +950,11 @@ def create_deprecation_warning_response(
         response.headers["X-API-Latest-Version"] = successor_version
     
     if deprecation_message:
-        response.headers["Warning"] = f'299 - "{deprecation_message}"'
+        try:
+            response.headers["Warning"] = f'299 - "{deprecation_message}"'
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            import urllib.parse
+            response.headers["Warning"] = f'299 - "{urllib.parse.quote(deprecation_message, safe="")}"'
     
     return response
 

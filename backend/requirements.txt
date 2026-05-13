@@ -17,10 +17,10 @@ pyotp>=2.9.0
 # AI & LLM
 langchain>=0.3.0
 langchain-openai>=0.2.0
-langchain-chroma>=0.2.0
 langchain-text-splitters>=0.3.0
 openai>=1.50.0
-chromadb>=0.5.0
+qrcode>=7.4
+Pillow>=10.0
 tiktoken>=0.8.0
 
 # Utilities
@@ -44,7 +44,6 @@ docx2txt==0.8
 reportlab>=4.2.0
 bleach>=6.2.0
 tinycss2>=1.4.0
-weasyprint>=62.0
 python-docx>=1.1.0
 markdown2>=2.5.0
 

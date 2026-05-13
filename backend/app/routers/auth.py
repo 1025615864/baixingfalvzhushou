@@ -195,6 +195,83 @@ async def register(
     )
 
 
+class WechatLoginRequest(BaseModel):
+    code: str = Field(..., description="微信授权码或模拟code")
+    state: str = Field(default="", description="状态参数")
+
+
+@router.post("/wechat/login", response_model=AuthResponse, summary="微信扫码登录")
+async def wechat_login(
+    data: WechatLoginRequest,
+    response: Response,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """微信扫码登录接口
+
+    支持真实微信OAuth Code和模拟code（mock_开头）
+    """
+    from ..services.wechat_service import wechat_auth_service
+
+    result = wechat_auth_service.exchange_code_for_token(data.code, data.state)
+
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=result.get("error", "微信登录失败"),
+        )
+
+    openid = result["openid"]
+
+    existing = await db.execute(
+        select(User).where(User.wechat_openid == openid)
+    )
+    user = existing.scalar_one_or_none()
+
+    if not user:
+        nickname = f"微信用户_{openid[-8:]}"
+        user = User(
+            username=f"wx_{openid[-12:]}",
+            email=f"{openid[-12:]}@wechat.local",
+            hashed_password=hash_password(openid),
+            nickname=nickname,
+            wechat_openid=openid,
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+    access_token = create_access_token(
+        data={"sub": str(user.id)},
+        expires_delta=access_token_expires,
+    )
+
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=settings.environment == "production",
+        samesite="lax",
+        max_age=settings.access_token_expire_minutes * 60,
+    )
+
+    return AuthResponse(
+        message="微信登录成功",
+        user={
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "nickname": user.nickname,
+            "avatar_url": user.avatar,
+            "role": user.role,
+        },
+        token=TokenResponse(
+            access_token=access_token,
+            expires_in=settings.access_token_expire_minutes * 60,
+        ),
+    )
+
+
 @router.post("/logout", response_model=SuccessResponse, summary="用户登出")
 async def logout(response: Response):
     """用户登出接口"""

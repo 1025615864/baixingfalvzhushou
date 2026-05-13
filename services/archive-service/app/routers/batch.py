@@ -8,13 +8,52 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.archive_service import ArchiveService
 from app.routers.archive import CaseCreateRequest, CaseResponse
-from services.common.middleware import check_batch_rate_limit
-from services.common.events import (
-    EventType,
-    EventTopic,
-    VectorSyncEvent,
-    create_archive_event,
-)
+try:
+    from services.common.middleware import check_batch_rate_limit
+except ImportError:
+    def check_batch_rate_limit(*args, **kwargs):
+        return True, 999
+
+try:
+    from services.common.events import (
+        EventType,
+        EventTopic,
+        VectorSyncEvent,
+        create_archive_event,
+    )
+except ImportError:
+    import json as _json
+
+    class EventType:
+        PUBLISHED = "published"
+        DELETED = "deleted"
+        UPDATED = "updated"
+
+    class EventTopic:
+        ARCHIVE = "archive"
+
+    class VectorSyncEvent:
+        def __init__(self, topic, event_type, entity_id, data):
+            self.topic = topic
+            self.event_type = event_type
+            self.entity_id = entity_id
+            self.data = data
+
+        def to_json(self):
+            return _json.dumps({
+                "topic": self.topic,
+                "event_type": self.event_type,
+                "entity_id": self.entity_id,
+                "data": self.data,
+            })
+
+    def create_archive_event(event_type, case_id, data):
+        return VectorSyncEvent(
+            topic=EventTopic.ARCHIVE,
+            event_type=event_type,
+            entity_id=case_id,
+            data=data,
+        )
 
 router = APIRouter(prefix="/api/v1/archive", tags=["批量操作"])
 

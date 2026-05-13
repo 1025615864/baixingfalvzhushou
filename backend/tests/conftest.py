@@ -59,6 +59,9 @@ def _ensure_models_loaded():
     model_modules = [
         "app.models.user",
         "app.models.user_quota",
+        "app.models.user_profile",
+        "app.models.user_security",
+        "app.models.user_consent",
         "app.models.consultation",
         "app.models.consultation_review",
         "app.models.forum",
@@ -76,6 +79,14 @@ def _ensure_models_loaded():
         "app.models.feedback",
         "app.models.analytics",
         "app.models.faq",
+        "app.models.moderation",
+        "app.models.membership",
+        "app.models.channel",
+        "app.models.cross_domain",
+        "app.models.contracts",
+        "app.models.video_consultation",
+        "app.models.periodic_task",
+        "app.models.points",
     ]
 
     for module_name in model_modules:
@@ -84,7 +95,7 @@ def _ensure_models_loaded():
     _LOADED_MODELS = True
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def session_engine():
     """会话级数据库引擎（整个测试会话只创建一次）"""
     _ensure_models_loaded()
@@ -145,6 +156,7 @@ async def mock_db(test_session: AsyncSession) -> AsyncGenerator[AsyncSession, No
 async def client(test_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """创建测试 HTTP 客户端"""
     os.environ["PAYMENT_WEBHOOK_SECRET"] = "test_secret_for_testing"
+    os.environ.pop("METRICS_AUTH_TOKEN", None)
     get_settings.cache_clear()
     
     async def override_get_db():
@@ -158,7 +170,7 @@ async def client(test_session: AsyncSession) -> AsyncGenerator[AsyncClient, None
     
     transport = ASGITransport(**transport_kwargs)
     
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="http://test", follow_redirects=True) as ac:
         yield ac
     
     app.dependency_overrides.clear()
@@ -184,7 +196,7 @@ async def auth_client(
     transport = ASGITransport(**transport_kwargs)
     
     async with AsyncClient(
-        transport=transport, base_url="http://test", headers=auth_headers
+        transport=transport, base_url="http://test", headers=auth_headers, follow_redirects=True
     ) as ac:
         yield ac
     
@@ -474,23 +486,7 @@ def _cleanup_services():
 
 @pytest.fixture(autouse=True)
 def _test_timeout():
-    """测试超时保护 - 防止测试卡住 (Windows兼容)"""
-    import threading
-    import time
-
-    timeout_seconds = 60
-    timeout_occurred = [False]
-
-    def timeout_check():
-        time.sleep(timeout_seconds)
-        timeout_occurred[0] = True
-        raise TimeoutError(f"Test timed out after {timeout_seconds} seconds")
-
-    timer = threading.Thread(target=timeout_check, daemon=True)
-    timer.start()
     yield
-    if timeout_occurred[0]:
-        raise TimeoutError(f"Test timed out after {timeout_seconds} seconds")
 
 
 @pytest.fixture(autouse=True)

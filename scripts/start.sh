@@ -132,7 +132,7 @@ start_full() {
     print_info "  新闻服务 (news-service)：http://localhost:8006"
     print_info "  搜索服务 (search-service)：http://localhost:8009"
     print_info "  推荐服务 (recommendation-service)：http://localhost:8010"
-    print_info "  通知服务 (notification-service)：http://localhost:8005"
+    print_info "  通知服务 (notification-service)：http://localhost:8011"
     print_info "  用户服务 (user-service)：http://localhost:8001"
     print_info "  订单服务 (order-service)：http://localhost:8004"
     print_info "  积分服务 (points-service)：http://localhost:8012"

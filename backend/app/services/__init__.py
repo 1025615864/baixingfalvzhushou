@@ -27,7 +27,7 @@
 """
 
 from . import cache_service
-from . import prometheus_metrics
+from .prometheus_metrics import prometheus_metrics
 from . import periodic_jobs
 
 __all__ = ["cache_service", "prometheus_metrics", "periodic_jobs"]

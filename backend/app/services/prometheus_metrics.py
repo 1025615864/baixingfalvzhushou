@@ -110,6 +110,17 @@ class DbPoolAgg:
     overflow: int = 0
 
 
+@dataclass(frozen=True)
+class AiErrorKey:
+    provider: str
+    error_type: str
+
+
+@dataclass
+class AiErrorAgg:
+    count: int = 0
+
+
 class PrometheusMetrics:
     def __init__(self) -> None:
         self.started_at: float = float(time.time())
@@ -122,6 +133,7 @@ class PrometheusMetrics:
                                       PaymentCallbackAgg] = {}
         self._sql_slow: SqlSlowAgg = SqlSlowAgg()
         self._db_pools: dict[DbPoolKey, DbPoolAgg] = {}
+        self._ai_errors: dict[AiErrorKey, AiErrorAgg] = {}
         self._lock: threading.Lock = threading.Lock()
 
         # HTTP请求持续时间桶（秒）
@@ -216,6 +228,21 @@ class PrometheusMetrics:
                 checked_out=int(v.checked_out),
                 overflow=int(v.overflow),
             ) for k, v in self._db_pools.items()}
+
+    def record_ai_error(self, *, provider: str, error_type: str) -> None:
+        p = str(provider or "").strip() or "unknown"
+        et = str(error_type or "").strip() or "unknown"
+        key = AiErrorKey(provider=p, error_type=et)
+        with self._lock:
+            agg = self._ai_errors.get(key)
+            if agg is None:
+                agg = AiErrorAgg()
+                self._ai_errors[key] = agg
+            agg.count = int(agg.count) + 1
+
+    def snapshot_ai_errors(self) -> dict[AiErrorKey, AiErrorAgg]:
+        with self._lock:
+            return {k: AiErrorAgg(count=int(v.count)) for k, v in self._ai_errors.items()}
 
     def record_http(self, *, method: str, route: str,
                     status_code: int, duration_seconds: float) -> None:
@@ -684,6 +711,20 @@ class PrometheusMetrics:
         for key, agg in db_pool_snap.items():
             lines.append(
                 f"baixing_db_pool_overflow{{pool_name=\"{_prom_escape_label_value(key.pool_name)}\"}} {int(agg.overflow)}")
+
+        ai_errors_snap = self.snapshot_ai_errors()
+        lines.append(
+            "# HELP baixing_ai_errors_total Total AI service errors")
+        lines.append("# TYPE baixing_ai_errors_total counter")
+        for key in sorted(ai_errors_snap.keys(), key=lambda x: (x.provider, x.error_type)):
+            agg = ai_errors_snap[key]
+            if int(agg.count) <= 0:
+                continue
+            lines.append(
+                "baixing_ai_errors_total"
+                + f"{{provider=\"{_prom_escape_label_value(key.provider)}\","
+                + f"error_type=\"{_prom_escape_label_value(key.error_type)}\"}} {int(agg.count)}"
+            )
 
         if extra_lines:
             lines.extend([str(x) for x in list(extra_lines) if str(x).strip()])

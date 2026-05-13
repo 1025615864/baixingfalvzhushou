@@ -7,8 +7,27 @@ from sqlalchemy import or_, func
 
 from app.database import get_db
 from app.models.archive import LegalCase
-from services.common.vector import PGVectorStore, VectorStore, VectorSearchResult
-from services.common.middleware import check_search_rate_limit
+try:
+    from services.common.vector import PGVectorStore, VectorStore, VectorSearchResult
+except ImportError:
+    class VectorSearchResult:
+        def __init__(self, id="", text="", metadata=None, distance=0.0):
+            self.id = id
+            self.text = text
+            self.metadata = metadata or {}
+            self.distance = distance
+
+    class VectorStore:
+        pass
+
+    class PGVectorStore(VectorStore):
+        pass
+
+try:
+    from services.common.middleware import check_search_rate_limit
+except ImportError:
+    def check_search_rate_limit(*args, **kwargs):
+        return True, 999
 
 router = APIRouter(prefix="/api/v1/archive", tags=["案例检索"])
 

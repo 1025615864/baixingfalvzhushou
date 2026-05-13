@@ -8,7 +8,11 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.services.knowledge_vector_store import search_knowledge_async, get_knowledge_async
-from services.common.middleware import check_vector_search_rate_limit
+try:
+    from services.common.middleware import check_vector_search_rate_limit
+except ImportError:
+    def check_vector_search_rate_limit(*args, **kwargs):
+        return True, 999
 
 logger = logging.getLogger(__name__)
 

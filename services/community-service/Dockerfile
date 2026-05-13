@@ -1,18 +1,31 @@
-FROM python:3.12-slim
+FROM python:3.11-slim
+
+LABEL maintainer="baixingfalvzhushou"
+LABEL service="community-service"
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /app
+
+RUN apt-get update -o Acquire::Retries=3 || apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
 EXPOSE 8007
 
-ENV SERVICE_PORT=8007
-ENV DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/community
-ENV REDIS_URL=redis://localhost:6379
-ENV KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-ENV CONSUL_ENABLED=false
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8007/health', timeout=5)" || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8007"]
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8007"]

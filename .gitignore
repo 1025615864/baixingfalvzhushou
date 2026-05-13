@@ -2,10 +2,13 @@
 .env
 .env.local
 .env.production
+.env.docker
+.env.prod
 env.local
 backend/env.local
 # Allow .env.example as template
 !.env.example
+!.env.jwt.example
 
 # JWT密钥文件 - 包含敏感的RSA私钥，不应提交到版本控制
 .env.jwt
@@ -136,6 +139,9 @@ frontend-v2/.eslintcache
 frontend-v2/eslint_output.json
 frontend-v2/lint-output*.txt
 frontend-v2/tsc-output*.txt
+
+# E2E test dependencies
+backend/tests/e2e/node_modules/
 
 # IDE
 .idea/

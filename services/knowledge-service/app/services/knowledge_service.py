@@ -10,15 +10,50 @@ try:
 except ImportError:
     AIOKafkaProducer = None
 
+try:
+    from services.common.events import (
+        EventType,
+        EventTopic,
+        VectorSyncEvent,
+        create_knowledge_event,
+    )
+except ImportError:
+    import json as _json
+
+    class EventType:
+        PUBLISHED = "published"
+        DELETED = "deleted"
+        UPDATED = "updated"
+
+    class EventTopic:
+        KNOWLEDGE = "knowledge"
+
+    class VectorSyncEvent:
+        def __init__(self, topic, event_type, entity_id, data):
+            self.topic = topic
+            self.event_type = event_type
+            self.entity_id = entity_id
+            self.data = data
+
+        def to_json(self):
+            return _json.dumps({
+                "topic": self.topic,
+                "event_type": self.event_type,
+                "entity_id": self.entity_id,
+                "data": self.data,
+            })
+
+    def create_knowledge_event(event_type, knowledge_id, data):
+        return VectorSyncEvent(
+            topic=EventTopic.KNOWLEDGE,
+            event_type=event_type,
+            entity_id=knowledge_id,
+            data=data,
+        )
+
 from sqlalchemy.orm import Session
 from app.models.knowledge import LegalKnowledge
 from app.services.knowledge_vector_store import add_knowledge, delete_knowledge
-from services.common.events import (
-    EventType,
-    EventTopic,
-    VectorSyncEvent,
-    create_knowledge_event,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +153,7 @@ class KnowledgeService:
             jurisdiction=request.jurisdiction,
             weight=request.weight,
             created_by=request.created_by,
-            metadata=request.metadata,
+            meta_data=request.metadata,
             status="draft"
         )
         self.db.add(knowledge)

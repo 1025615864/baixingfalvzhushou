@@ -12,15 +12,10 @@ httpx>=0.27.0
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
 alembic>=1.13.0
+psycopg2-binary>=2.9.9
 
 # OpenTelemetry (与 common 版本对齐)
 opentelemetry-api>=1.22.0
 opentelemetry-sdk>=1.22.0
 opentelemetry-exporter-otlp>=1.22.0
 opentelemetry-instrumentation-fastapi>=0.43b0
-
-# Consul (服务发现)
-aioconsul>=0.14.1
-
-# common 公共组件
-syspaths>=1.0.0

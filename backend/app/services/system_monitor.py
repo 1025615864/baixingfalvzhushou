@@ -39,7 +39,7 @@ class Alert:
     rule_name: str
     level: AlertLevel
     message: str
-    timestamp: datetime = field(default_factory=datetime.now)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     resolved: bool = False
 
 

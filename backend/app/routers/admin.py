@@ -6,7 +6,7 @@ import io
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -16,6 +16,8 @@ from ..models.user import User
 from ..models.lawfirm import LawFirm
 from ..models.consultation import Consultation, ChatMessage
 from ..models.knowledge import LegalKnowledge
+from ..models.news import News
+from ..models.forum import Post, Comment
 from ..utils.deps import require_admin
 from ..utils.pii import sanitize_pii
 
@@ -42,9 +44,14 @@ async def get_stats(
         user_count = await db.execute(select(func.count()).select_from(User))
         total_users = user_count.scalar() or 0
 
-        total_news = 0
-        total_posts = 0
-        total_comments = 0
+        news_count = await db.execute(select(func.count()).select_from(News))
+        total_news = news_count.scalar() or 0
+
+        post_count = await db.execute(select(func.count()).select_from(Post))
+        total_posts = post_count.scalar() or 0
+
+        comment_count = await db.execute(select(func.count()).select_from(Comment))
+        comment_count_val = comment_count.scalar() or 0
 
         consultation_count = await db.execute(select(func.count()).select_from(Consultation))
         total_consultations = consultation_count.scalar() or 0
@@ -57,7 +64,7 @@ async def get_stats(
             "news": total_news,
             "posts": total_posts,
             "lawfirms": total_firms,
-            "comments": total_comments,
+            "comments": comment_count_val,
             "consultations": total_consultations,
         }
     except Exception as e:
@@ -168,6 +175,87 @@ async def export_users(
         _log_export_action(user_id, "users", record_count)
 
     filename = f"users_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    return StreamingResponse(
+        generate_csv_stream(fieldnames, row_generator()),
+        media_type="text/csv; charset=utf-8-sig",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@router.get("/export/posts", summary="导出帖子数据")
+async def export_posts(
+    current_user: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """导出所有帖子数据为CSV"""
+    _ = current_user
+    fieldnames = ["id", "title", "author", "category", "view_count", "like_count", "created_at"]
+
+    async def row_generator():
+        batch_size = 1000
+        offset = 0
+        while True:
+            result = await db.execute(
+                select(Post, User.username)
+                .outerjoin(User, Post.user_id == User.id)
+                .order_by(Post.id)
+                .offset(offset)
+                .limit(batch_size)
+            )
+            rows = result.all()
+            if not rows:
+                break
+            for post, username in rows:
+                yield {
+                    "id": post.id,
+                    "title": post.title,
+                    "author": username or "",
+                    "category": post.category or "",
+                    "view_count": post.view_count or 0,
+                    "like_count": post.like_count or 0,
+                    "created_at": post.created_at,
+                }
+            offset += batch_size
+
+    filename = f"posts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    return StreamingResponse(
+        generate_csv_stream(fieldnames, row_generator()),
+        media_type="text/csv; charset=utf-8-sig",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@router.get("/export/news", summary="导出新闻数据")
+async def export_news(
+    current_user: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """导出所有新闻数据为CSV"""
+    _ = current_user
+    fieldnames = ["id", "title", "category", "view_count", "is_published", "created_at"]
+
+    async def row_generator():
+        batch_size = 1000
+        offset = 0
+        while True:
+            result = await db.execute(
+                select(News).order_by(News.id).offset(offset).limit(batch_size)
+            )
+            news_list = result.scalars().all()
+            if not news_list:
+                break
+            for n in news_list:
+                yield {
+                    "id": n.id,
+                    "title": n.title,
+                    "category": n.category or "",
+                    "view_count": n.view_count or 0,
+                    "is_published": "是" if n.is_published else "否",
+                    "created_at": n.created_at,
+                }
+            offset += batch_size
+
+    filename = f"news_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
     return StreamingResponse(
         generate_csv_stream(fieldnames, row_generator()),
         media_type="text/csv; charset=utf-8-sig",

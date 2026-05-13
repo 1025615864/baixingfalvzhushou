@@ -4,79 +4,159 @@ from typing import Optional, Any
 from dataclasses import dataclass, field
 
 
-@dataclass
-class ConfigItem:
-    key: str
-    value: Any
-    description: str = ""
-    category: str = "general"
-    is_public: bool = False
-
-
-class SystemConfigService:
-    def __init__(self):
-        self._configs: dict[str, ConfigItem] = {}
-
-    def get(self, key: str, default: Any = None) -> Any:
-        item = self._configs.get(key)
-        if item is None:
-            return default
-        return item.value
-
-    def set(self, key: str, value: Any, description: str = "", category: str = "general", is_public: bool = False) -> ConfigItem:
-        item = ConfigItem(key=key, value=value, description=description, category=category, is_public=is_public)
-        self._configs[key] = item
-        return item
-
-    def delete(self, key: str) -> bool:
-        if key in self._configs:
-            del self._configs[key]
-            return True
-        return False
-
-    def list_configs(self, category: Optional[str] = None) -> list[ConfigItem]:
-        configs = list(self._configs.values())
-        if category:
-            configs = [c for c in configs if c.category == category]
-        return configs
-
-    def get_public_configs(self) -> list[ConfigItem]:
-        return [c for c in self._configs.values() if c.is_public]
-
-    def bulk_set(self, configs: dict[str, Any]) -> list[ConfigItem]:
-        results = []
-        for key, value in configs.items():
-            results.append(self.set(key, value))
-        return results
+_SECRET_KEYWORDS = ("password", "secret", "token", "key", "private", "credential")
 
 
 def _mask_secret_value(value: Optional[str]) -> Optional[str]:
     if value is None or value == "":
         return None
-    if len(value) <= 4:
-        return "****"
-    return value[:2] + "****" + value[-2:]
+    if not value.strip():
+        return None
+    return "***"
+
+
+class SystemConfigService:
+    @staticmethod
+    def is_secret_key(key: str) -> bool:
+        lower = key.lower()
+        return any(kw in lower for kw in _SECRET_KEYWORDS)
+
+    @classmethod
+    async def get_config(cls, db: Any, key: str) -> Any:
+        from sqlalchemy import select
+        from app.models.system import SystemConfig
+        result = await db.execute(select(SystemConfig).where(SystemConfig.key == key))
+        return result.scalar_one_or_none()
+
+    @classmethod
+    async def get_all_configs(cls, db: Any, category: Optional[str] = None) -> list:
+        from sqlalchemy import select
+        from app.models.system import SystemConfig
+        stmt = select(SystemConfig)
+        if category:
+            stmt = stmt.where(SystemConfig.category == category)
+        result = await db.execute(stmt)
+        return result.scalars().all()
+
+    @classmethod
+    async def set_config(
+        cls,
+        db: Any,
+        key: str,
+        value: str,
+        description: str = "",
+        category: str = "general",
+        updated_by: int = 0,
+    ) -> Any:
+        from app.models.system import SystemConfig
+        existing = await cls.get_config(db, key)
+        if existing:
+            existing.value = value
+            if description:
+                existing.description = description
+            if category:
+                existing.category = category
+            existing.updated_by = updated_by
+            await db.commit()
+            await db.refresh(existing)
+            return existing
+        config = SystemConfig(
+            key=key,
+            value=value,
+            description=description,
+            category=category,
+            updated_by=updated_by,
+        )
+        db.add(config)
+        await db.commit()
+        await db.refresh(config)
+        return config
+
+    @classmethod
+    async def delete_config(cls, db: Any, key: str) -> bool:
+        config = await cls.get_config(db, key)
+        if config is None:
+            return False
+        await db.delete(config)
+        await db.commit()
+        return True
+
+    @classmethod
+    async def batch_update(cls, db: Any, configs: list[dict], updated_by: int = 0) -> list:
+        results = []
+        for item in configs:
+            config = await cls.set_config(
+                db,
+                key=item["key"],
+                value=item["value"],
+                updated_by=updated_by,
+            )
+            results.append(config)
+        return results
 
 
 class SystemSecretService:
-    def __init__(self):
-        self._secrets: dict[str, str] = {}
+    @classmethod
+    async def get_all(cls, db: Any) -> list:
+        from sqlalchemy import select
+        from app.models.system import SystemSecret
+        result = await db.execute(select(SystemSecret))
+        return result.scalars().all()
 
-    def set_secret(self, key: str, value: str) -> None:
-        self._secrets[key] = value
+    @classmethod
+    async def get(cls, db: Any, key: str) -> Any:
+        from sqlalchemy import select
+        from app.models.system import SystemSecret
+        result = await db.execute(select(SystemSecret).where(SystemSecret.key == key))
+        return result.scalar_one_or_none()
 
-    def get_secret(self, key: str, default: Optional[str] = None) -> Optional[str]:
-        return self._secrets.get(key, default)
+    @classmethod
+    async def set(
+        cls,
+        db: Any,
+        key: str,
+        value: str,
+        description: str = "",
+        updated_by: int = 0,
+    ) -> Any:
+        from app.models.system import SystemSecret
+        existing = await cls.get(db, key)
+        if existing:
+            existing.encrypted_value = value
+            if description:
+                existing.description = description
+            existing.updated_by = updated_by
+            await db.commit()
+            await db.refresh(existing)
+            return existing
+        secret = SystemSecret(
+            key=key,
+            encrypted_value=value,
+            description=description,
+            updated_by=updated_by,
+        )
+        db.add(secret)
+        await db.commit()
+        await db.refresh(secret)
+        return secret
 
-    def delete_secret(self, key: str) -> bool:
-        if key in self._secrets:
-            del self._secrets[key]
-            return True
-        return False
+    @classmethod
+    async def delete(cls, db: Any, key: str) -> bool:
+        secret = await cls.get(db, key)
+        if secret is None:
+            return False
+        await db.delete(secret)
+        await db.commit()
+        return True
 
-    def mask_secret(self, key: str) -> Optional[str]:
-        value = self._secrets.get(key)
-        return _mask_secret_value(value)
+    @classmethod
+    async def exists(cls, db: Any, key: str) -> bool:
+        from sqlalchemy import select
+        from app.models.system import SystemSecret
+        result = await db.execute(
+            select(SystemSecret.key).where(SystemSecret.key == key)
+        )
+        return result.scalar_one_or_none() is not None
 
 
 system_config_service = SystemConfigService()

@@ -17,7 +17,11 @@ class Notification(Base):
     sent_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
-    __table_args__ = (Index("idx_notifications_user_read", "user_id", "is_read"),)
+    __table_args__ = (
+        Index("idx_notifications_user_read", "user_id", "is_read"),
+        Index("idx_notifications_user_created", "user_id", "created_at"),
+        Index("idx_notifications_type", "type"),
+    )
 
 
 class NotificationSettings(Base):

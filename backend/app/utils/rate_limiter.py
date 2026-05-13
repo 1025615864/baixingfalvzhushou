@@ -11,3 +11,5 @@ from app.utils.cache.rate_limiter import (  # noqa: F401
     rate_limit_upload,
     rate_limiter,
 )
+from app.utils.cache.rate_limiter import cache_service, prometheus_metrics, settings  # noqa: F401
+from app.utils.cache.rate_limiter import HTTPException, status  # noqa: F401

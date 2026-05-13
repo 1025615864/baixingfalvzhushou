@@ -9,9 +9,9 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import AsyncSessionLocal
-from ..models.export_task import ExportTask, ExportStatus
+from ..models import ExportTask, ExportStatus
 from ..models import User, UserProfile, LoginAudit, AuditLog
-from .data_export_service import DataExportService
+from ..services.data_export_service import DataExportService
 
 logger = logging.getLogger(__name__)
 

@@ -33,71 +33,64 @@ test_service() {
 
 # 测试后端主服务
 echo ""
-echo "--- 后端主服务 (8080) ---"
-test_service "Backend Health" "$BASE_URL:8080/health"
-test_service "Backend API v1" "$BASE_URL:8080/api/v1/home/recommendations" "404" # 预期404但服务正常
+echo "--- 后端主服务 (8000) ---"
+test_service "Backend Health" "$BASE_URL:8000/health"
+test_service "Backend API v1" "$BASE_URL:8000/api/v1/home/recommendations" "404"
 
-# 测试用户服务
 echo ""
 echo "--- 用户服务 (8001) ---"
 test_service "User Service Health" "$BASE_URL:8001/health"
-test_service "User Service Auth" "$BASE_URL:8001/api/v1/auth/login" "422" # 预期422(参数验证失败)但服务正常
+test_service "User Service Auth" "$BASE_URL:8001/api/v1/auth/login" "422"
 
-# 测试支付通道服务
 echo ""
 echo "--- 支付通道服务 (8002) ---"
-test_service "Payment Service Health" "$BASE_URL:8002/health"
-test_service "Payment Service Orders" "$BASE_URL:8002/api/v1/payment/orders" "422"
+test_service "Payment Channel Service Health" "$BASE_URL:8002/health"
+test_service "Payment Channel Service Orders" "$BASE_URL:8002/api/v1/payment/orders" "422"
 
-# 测试账务服务
 echo ""
-echo "--- 账务服务 (8003) ---"
-test_service "Accounting Service Health" "$BASE_URL:8003/health"
+echo "--- 向量嵌入服务 (8003) ---"
+test_service "Embedding Service Health" "$BASE_URL:8003/health"
 
-# 测试法律服务
 echo ""
-echo "--- 法律服务 (8004) ---"
-test_service "Legal Service Health" "$BASE_URL:8004/health"
-test_service "Legal Service Lawyers" "$BASE_URL:8004/api/v1/legal/lawyers" "422"
+echo "--- 订单服务 (8004) ---"
+test_service "Order Service Health" "$BASE_URL:8004/health"
 
-# 测试AI服务
 echo ""
 echo "--- AI服务 (8005) ---"
 test_service "AI Service Health" "$BASE_URL:8005/health"
 test_service "AI Service Chat" "$BASE_URL:8005/api/v1/ai/chat" "422"
 
-# 测试新闻服务
 echo ""
 echo "--- 新闻服务 (8006) ---"
 test_service "News Service Health" "$BASE_URL:8006/health"
 test_service "News Service List" "$BASE_URL:8006/api/v1/news" "422"
 
-# 测试社区服务
 echo ""
 echo "--- 社区服务 (8007) ---"
 test_service "Community Service Health" "$BASE_URL:8007/health"
 test_service "Community Service Posts" "$BASE_URL:8007/api/v1/community/posts" "422"
 
-# 测试积分服务
 echo ""
-echo "--- 积分服务 (8008) ---"
-test_service "Points Service Health" "$BASE_URL:8008/health"
+echo "--- 法律服务 (8008) ---"
+test_service "Legal Service Health" "$BASE_URL:8008/health"
+test_service "Legal Service Lawyers" "$BASE_URL:8008/api/v1/legal/lawyers" "422"
 
-# 测试通知服务
 echo ""
-echo "--- 通知服务 (8009) ---"
-test_service "Notification Service Health" "$BASE_URL:8009/health"
+echo "--- 搜索服务 (8009) ---"
+test_service "Search Service Health" "$BASE_URL:8009/health"
+test_service "Search Service Global" "$BASE_URL:8009/api/v1/search" "422"
 
-# 测试推荐服务
 echo ""
 echo "--- 推荐服务 (8010) ---"
 test_service "Recommendation Service Health" "$BASE_URL:8010/health"
 
-# 测试搜索服务
 echo ""
-echo "--- 搜索服务 (8011) ---"
-test_service "Search Service Health" "$BASE_URL:8011/health"
-test_service "Search Service Global" "$BASE_URL:8011/api/v1/search" "422"
+echo "--- 通知服务 (8011) ---"
+test_service "Notification Service Health" "$BASE_URL:8011/health"
+
+echo ""
+echo "--- 积分服务 (8012) ---"
+test_service "Points Service Health" "$BASE_URL:8012/health"
 
 # 测试前端代理
 echo ""

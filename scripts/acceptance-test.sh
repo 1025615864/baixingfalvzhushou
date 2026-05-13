@@ -205,7 +205,7 @@ main() {
         declare -A services_map=(
             ["user-service"]="http://localhost:8001/health"
             ["order-service"]="http://localhost:8004/health"
-            ["notification-service"]="http://localhost:8005/health"
+            ["notification-service"]="http://localhost:8011/health"
             ["news-service"]="http://localhost:8006/health"
             ["community-service"]="http://localhost:8007/health"
             ["legal-service"]="http://localhost:8008/health"

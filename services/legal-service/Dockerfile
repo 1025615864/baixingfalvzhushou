@@ -1,21 +1,31 @@
-FROM python:3.12-slim
+FROM python:3.11-slim
+
+LABEL maintainer="baixingfalvzhushou"
+LABEL service="legal-service"
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /app
+
+RUN apt-get update -o Acquire::Retries=3 || apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-EXPOSE 8008 50052
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
 
-ENV SERVICE_PORT=8008
-ENV GRPC_PORT=50052
-ENV DATABASE_URL=postgresql+asyncpg://user:pass@db:5432/legal_service
-ENV REDIS_URL=redis://redis:6379
-ENV KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-ENV CONSUL_ENABLED=false
-ENV KAFKA_ENABLED=false
-ENV RATE_LIMIT_ENABLED=true
+USER appuser
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8008"]
+EXPOSE 8008
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8008/health', timeout=5)" || exit 1
+
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8008"]

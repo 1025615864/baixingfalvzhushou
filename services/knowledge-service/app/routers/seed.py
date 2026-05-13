@@ -3,7 +3,11 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import List, Optional
 
-from services.common.middleware.rate_limit import check_seed_rate_limit
+try:
+    from services.common.middleware.rate_limit import check_seed_rate_limit
+except ImportError:
+    def check_seed_rate_limit(*args, **kwargs):
+        return True, 999
 
 router = APIRouter(prefix="/api/v1/admin", tags=["系统管理"])
 
@@ -102,7 +106,7 @@ async def seed_knowledge(force: bool = False, http_request: Request = None):
                     metadata={"title": item["title"], "category": item["category"]}
                 )
             except Exception:
-                pass
+                logger.exception("Failed to seed knowledge data")
 
         return SeedResult(
             success=True,

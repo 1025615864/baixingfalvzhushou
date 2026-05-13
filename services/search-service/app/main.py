@@ -11,6 +11,10 @@ from app.services.client_service import client_service
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from app.database import engine, Base
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
     yield
     await cache_service.close()
     await client_service.close()

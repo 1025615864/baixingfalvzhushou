@@ -1,10 +1,13 @@
 """内容审核服务 - 三级审核流水线"""
+import logging
 from dataclasses import dataclass
 from typing import Optional, List
 import asyncio
 
 from ..utils.sensitive_words import sensitive_filter
 from ..clients import ai_client
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -75,7 +78,7 @@ class ModerationService:
             try:
                 return await self.ai_client.check_legal_advice(content)
             except Exception:
-                pass
+                logger.exception("法律内容审核检查失败")
         return {"is_legal": True, "warnings": []}
 
 

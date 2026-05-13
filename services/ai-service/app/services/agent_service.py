@@ -1,6 +1,7 @@
 """AI Agent服务层 - 整合LegalAgent与远程会话API"""
 import json
 import time
+import logging
 from typing import Optional, AsyncIterator
 from app.config.settings import get_settings
 from app.services.legal_agent import legal_agent_graph, AgentState
@@ -8,6 +9,7 @@ from app.services.vector_store import search_legal_docs
 from app.services.user_service_client import get_user_service_client
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 class LegalAgentService:
@@ -27,7 +29,7 @@ class LegalAgentService:
                     session = await self.user_service.get_session(session_id)
                     return session
                 except Exception:
-                    pass
+                    logger.exception("Failed to get session from remote service")
 
             session = await self.user_service.create_session(
                 user_id=user_id,
@@ -76,6 +78,7 @@ class LegalAgentService:
                 result = await self.user_service.get_history(session_id, limit=limit)
                 return result.get("history", [])
             except Exception:
+                logger.error("Failed to get session history from remote service")
                 return []
         return []
 
@@ -152,6 +155,7 @@ class LegalAgentService:
                 result = await self.user_service.list_sessions(user_id=user_id)
                 return result.get("sessions", [])
             except Exception:
+                logger.error("Failed to list sessions from remote service")
                 return []
         return []
 
@@ -170,6 +174,7 @@ class LegalAgentService:
                     for m in result.get("messages", [])
                 ]
             except Exception:
+                logger.error("Failed to get history from remote service")
                 return []
         return []
 

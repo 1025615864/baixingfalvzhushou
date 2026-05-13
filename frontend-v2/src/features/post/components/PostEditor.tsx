@@ -5,6 +5,7 @@
 import { useState, useCallback } from 'react';
 
 import type { PostCategory, CreatePostRequest, UpdatePostRequest } from '../types';
+import { uploadFile } from '@/shared/lib/api/chunkedUpload';
 
 interface PostEditorProps {
   initialData?: {
@@ -142,10 +143,21 @@ export function PostEditor({
   /**
    * 处理图片上传（模拟）
    */
-  const handleImageUpload = (): void => {
-    // 实际项目中应该调用文件上传 API
-    const mockImageUrl = `https://picsum.photos/800/400?random=${Date.now()}`;
-    setCoverImage(mockImageUrl);
+  const handleImageUpload = async (): Promise<void> => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const result = await uploadFile(file);
+        setCoverImage(result.url);
+      } catch {
+        // Upload failed, keep current state
+      }
+    };
+    input.click();
   };
 
   return (
@@ -212,7 +224,7 @@ export function PostEditor({
           ) : (
             <button
               type="button"
-              onClick={handleImageUpload}
+              onClick={() => void handleImageUpload()}
               className="w-full h-48 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-500 hover:border-blue-500 hover:text-blue-500 transition-colors"
             >
               <svg className="w-12 h-12 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">

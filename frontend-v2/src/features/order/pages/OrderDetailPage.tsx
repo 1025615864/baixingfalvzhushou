@@ -1,65 +1,75 @@
-/**
- * OrderDetailPage - 订单详情页面
- */
-
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 
-import { OrderDetail } from '../components/OrderDetail';
+interface Order {
+  id: number;
+  order_no: string;
+  title: string;
+  order_type: string;
+  amount: number;
+  discount_amount: number;
+  actual_amount: number;
+  status: string;
+  description: string;
+  created_at: string;
+}
 
-/**
- * 订单详情页面
- */
-export function OrderDetailPage(): JSX.Element {
+const STATUS_FLOW = ['pending', 'paid', 'completed'];
+
+export function OrderDetailPage() {
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
   const { orderNo } = useParams<{ orderNo: string }>();
   const navigate = useNavigate();
 
-  const handleClose = (): void => {
-    navigate('/orders');
+  useEffect(() => {
+    fetchOrder();
+  }, [orderNo]);
+
+  const fetchOrder = async () => {
+    try {
+      const res = await fetch(`/api/v1/orders/${orderNo}`);
+      if (!res.ok) throw new Error('not found');
+      setOrder(await res.json());
+    } catch {
+      setOrder(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleOrderUpdate = (): void => {
-    // 订单更新后刷新页面
-    window.location.reload();
-  };
+  if (loading) return <div className="flex justify-center min-h-[50vh] items-center"><div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" /></div>;
+  if (!order) return <div className="text-center py-16 text-gray-400">订单不存在</div>;
 
-  if (!orderNo) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-500">无效的订单号</p>
-          <button
-            type="button"
-            onClick={handleClose}
-            className="mt-4 px-4 py-2 text-sm text-blue-600 hover:text-blue-700"
-          >
-            返回订单列表
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const statusIndex = STATUS_FLOW.indexOf(order.status);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        {/* 返回按钮 */}
-        <button
-          type="button"
-          onClick={handleClose}
-          className="mb-4 flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          返回订单列表
-        </button>
+    <div className="max-w-2xl mx-auto px-4 py-6">
+      <button onClick={() => navigate(-1)} className="text-blue-600 text-sm mb-4 hover:underline">&larr; 返回</button>
+      <div className="bg-white border rounded-lg p-6">
+        <h1 className="text-xl font-bold mb-1">{order.title}</h1>
+        <p className="text-sm text-gray-400 mb-4">订单号: {order.order_no}</p>
 
-        {/* 订单详情 */}
-        <OrderDetail 
-          orderNo={orderNo} 
-          onClose={handleClose}
-          onOrderUpdate={handleOrderUpdate}
-        />
+        <div className="flex items-center gap-2 mb-6">
+          {STATUS_FLOW.map((s, i) => (
+            <div key={s} className="flex items-center gap-2">
+              <span className={`w-3 h-3 rounded-full ${i <= statusIndex ? 'bg-blue-500' : 'bg-gray-300'}`} />
+              <span className={`text-xs ${i <= statusIndex ? 'text-blue-600' : 'text-gray-400'}`}>
+                {s === 'pending' ? '待支付' : s === 'paid' ? '已支付' : '已完成'}
+              </span>
+              {i < STATUS_FLOW.length - 1 && <div className={`w-8 h-px ${i < statusIndex ? 'bg-blue-500' : 'bg-gray-300'}`} />}
+            </div>
+          ))}
+        </div>
+
+        <div className="border-t pt-4 space-y-3">
+          <div className="flex justify-between text-sm"><span className="text-gray-500">订单金额</span><span>¥{order.amount}</span></div>
+          <div className="flex justify-between text-sm"><span className="text-gray-500">优惠金额</span><span className="text-green-600">-¥{order.discount_amount || 0}</span></div>
+          <div className="flex justify-between font-bold text-lg border-t pt-3"><span>实付金额</span><span className="text-orange-600">¥{order.actual_amount || order.amount}</span></div>
+        </div>
+
+        {order.description && <p className="text-sm text-gray-500 mt-4">{order.description}</p>}
+        <p className="text-xs text-gray-400 mt-4">创建时间: {order.created_at}</p>
       </div>
     </div>
   );

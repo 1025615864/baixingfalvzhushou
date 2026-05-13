@@ -28,6 +28,7 @@ class Topic(Base):
 
     __table_args__ = (
         Index("idx_topic_active_sort", "is_active", "sort_order"),
+        Index("idx_topic_active", "is_active"),
     )
 
 

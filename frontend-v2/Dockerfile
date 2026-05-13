@@ -13,8 +13,8 @@ WORKDIR /app
 RUN npm config set registry https://registry.npmmirror.com
 
 # 安装依赖（利用 Docker 缓存层）
-COPY package.json package-lock.json ./
-RUN npm ci --legacy-peer-deps
+COPY package.json package-lock.json* ./
+RUN npm install --legacy-peer-deps
 
 # 复制源代码
 COPY . .
@@ -28,8 +28,8 @@ ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 ENV VITE_WS_URL=$VITE_WS_URL
 ENV NODE_ENV=production
 
-# 执行构建
-RUN npm run build
+# 执行构建（使用本地 vite，跳过 tsc）
+RUN ./node_modules/.bin/vite build
 
 # 阶段2: 生产阶段 - 使用 Nginx 服务静态文件
 FROM nginx:alpine AS production

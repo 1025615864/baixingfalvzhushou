@@ -17,9 +17,12 @@ logger = logging.getLogger(__name__)
 # 微服务路由表
 # ⚠️ 端口必须与 docker-compose.yml 中的配置保持一致
 MICROSERVICES: dict[str, dict[str, Any]] = {
-    "user": {"prefix": "/user", "url": "${USER_SERVICE_URL:-http://user-service:8001}"},
-    "order": {"prefix": "/order", "url": "${ORDER_SERVICE_URL:-http://order-service:8004}"},
-    "notification": {"prefix": "/notification", "url": "${NOTIFICATION_SERVICE_URL:-http://notification-service:8011}"},
+    "user": {"prefix": "/users", "url": "${USER_SERVICE_URL:-http://user-service:8001}"},
+    "payment-channel": {"prefix": "/payment", "url": "${PAYMENT_CHANNEL_SERVICE_URL:-http://payment-channel-service:8002}"},
+    "embedding": {"prefix": "/embeddings", "url": "${EMBEDDING_SERVICE_URL:-http://embedding-service:8003}"},
+    "order": {"prefix": "/orders", "url": "${ORDER_SERVICE_URL:-http://order-service:8004}"},
+    "ai": {"prefix": "/ai", "url": "${AI_SERVICE_URL:-http://ai-service:8005}"},
+    "notification": {"prefix": "/notifications", "url": "${NOTIFICATION_SERVICE_URL:-http://notification-service:8011}"},
     "news": {"prefix": "/news", "url": "${NEWS_SERVICE_URL:-http://news-service:8006}"},
     "community": {"prefix": "/community", "url": "${COMMUNITY_SERVICE_URL:-http://community-service:8007}"},
     "legal": {"prefix": "/legal", "url": "${LEGAL_SERVICE_URL:-http://legal-service:8008}"},
@@ -28,7 +31,7 @@ MICROSERVICES: dict[str, dict[str, Any]] = {
     "points": {"prefix": "/points", "url": "${POINTS_SERVICE_URL:-http://points-service:8012}"},
     "archive": {"prefix": "/archive", "url": "${ARCHIVE_SERVICE_URL:-http://archive-service:8013}"},
     "knowledge": {"prefix": "/knowledge", "url": "${KNOWLEDGE_SERVICE_URL:-http://knowledge-service:8081}"},
-    "ai": {"prefix": "/ai", "url": "${AI_SERVICE_URL:-http://localhost:8005}"},
+    "payment-accounting": {"prefix": "/accounting", "url": "${PAYMENT_ACCOUNTING_SERVICE_URL:-http://payment-accounting-service:8014}"},
 }
 
 # 超时配置（秒）
@@ -109,9 +112,9 @@ async def proxy_to_microservice(request: Request, service_name: str, path: str) 
 
     # 根据请求方法选择不同的超时
     if request.method in ("POST", "PUT", "PATCH"):
-        timeout = httpx.Timeout(connect=TIMEOUT_CONNECT, read=TIMEOUT_WRITE, write=TIMEOUT_WRITE)
+        timeout = httpx.Timeout(connect=TIMEOUT_CONNECT, read=TIMEOUT_WRITE, write=TIMEOUT_WRITE, pool=TIMEOUT_CONNECT)
     else:
-        timeout = httpx.Timeout(connect=TIMEOUT_CONNECT, read=TIMEOUT_READ, write=TIMEOUT_READ)
+        timeout = httpx.Timeout(connect=TIMEOUT_CONNECT, read=TIMEOUT_READ, write=TIMEOUT_READ, pool=TIMEOUT_CONNECT)
 
     async with httpx.AsyncClient(timeout=timeout) as client:
         try:
@@ -181,6 +184,12 @@ async def proxy_to_microservice(request: Request, service_name: str, path: str) 
             if circuit_breaker:
                 circuit_breaker.record_failure()
             logger.error(f"无法连接到微服务 {service_name}: {service_url}")
+            auth_header = request.headers.get("Authorization", "")
+            if not auth_header:
+                return JSONResponse(
+                    status_code=401,
+                    content={"error": "unauthorized", "message": "未授权访问"},
+                )
             return JSONResponse(
                 status_code=503,
                 content={"error": "service_unavailable", "message": f"微服务 {service_name} 连接失败"},

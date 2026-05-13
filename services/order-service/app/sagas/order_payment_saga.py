@@ -1,7 +1,8 @@
 """Order Payment Saga - 带持久化的订单支付流程"""
 
-import asyncio
+import httpx
 import logging
+import os
 import uuid
 from typing import Dict, Any, Optional
 
@@ -18,6 +19,11 @@ from .persistent_saga import (
 )
 
 logger = logging.getLogger(__name__)
+
+ORDER_SERVICE_URL = os.getenv("ORDER_SERVICE_URL", "http://localhost:8004")
+PAYMENT_SERVICE_URL = os.getenv("PAYMENT_SERVICE_URL", "http://localhost:8002")
+POINTS_SERVICE_URL = os.getenv("POINTS_SERVICE_URL", "http://localhost:8012")
+USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://localhost:8001")
 
 
 class PaymentResult:
@@ -47,35 +53,27 @@ class OrderPaymentSaga:
         self.amount = amount
         self.items = items
         self.payment_result: Optional[PaymentResult] = None
-        self.inventory_result: Optional[Dict] = None
 
     def _create_steps(self):
         return [
             SagaStep(
                 name="create_order",
                 forward=self._create_order,
-                compensate=self._cancel_order,
+                compensate=self._compensate_order,
                 retry_count=3,
                 timeout=10.0,
             ),
             SagaStep(
-                name="reserve_inventory",
-                forward=self._reserve_inventory,
-                compensate=self._release_inventory,
-                retry_count=2,
-                timeout=15.0,
-            ),
-            SagaStep(
                 name="process_payment",
                 forward=self._process_payment,
-                compensate=self._refund_payment,
+                compensate=self._compensate_payment,
                 retry_count=3,
                 timeout=30.0,
             ),
             SagaStep(
                 name="award_points",
                 forward=self._award_points,
-                compensate=self._deduct_points,
+                compensate=self._compensate_points,
                 retry_count=2,
                 timeout=10.0,
             ),
@@ -95,90 +93,99 @@ class OrderPaymentSaga:
 
     async def _create_order(self) -> Dict[str, Any]:
         logger.info(f"[SAGA] Creating order: {self.order_id}")
-        await asyncio.sleep(0.1)
-
-        order = {
+        order_data = {
             "order_id": self.order_id,
             "user_id": self.user_id,
             "amount": self.amount,
             "items": self.items,
-            "status": "pending",
         }
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{ORDER_SERVICE_URL}/api/v1/orders",
+                json=order_data,
+            )
+            if response.status_code not in (200, 201):
+                raise Exception(f"Create order failed: {response.text}")
+            result = response.json()
+            return {"order_id": result.get("id"), "order_no": result.get("order_no")}
 
-        logger.info(f"[SAGA] Order created: {self.order_id}")
-        return order
-
-    async def _cancel_order(self, result: Dict[str, Any]):
-        logger.info(f"[SAGA] Cancelling order: {result.get('order_id')}")
-        await asyncio.sleep(0.1)
-        logger.info(f"[SAGA] Order cancelled")
-
-    async def _reserve_inventory(self) -> Dict[str, Any]:
-        logger.info(f"[SAGA] Reserving inventory for order: {self.order_id}")
-        await asyncio.sleep(0.1)
-
-        inventory_id = str(uuid.uuid4())
-        self.inventory_result = {
-            "inventory_id": inventory_id,
-            "order_id": self.order_id,
-            "items_reserved": len(self.items),
-        }
-
-        logger.info(f"[SAGA] Inventory reserved: {inventory_id}")
-        return self.inventory_result
-
-    async def _release_inventory(self, result: Dict[str, Any]):
-        inventory_id = result.get("inventory_id") if result else self.inventory_result.get("inventory_id")
-        logger.info(f"[SAGA] Releasing inventory: {inventory_id}")
-        await asyncio.sleep(0.1)
-        logger.info(f"[SAGA] Inventory released")
+    async def _compensate_order(self, result: Dict[str, Any]):
+        order_no = result.get("order_no") if result else None
+        if not order_no:
+            return
+        logger.info(f"[SAGA] Compensating order: {order_no}")
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                await client.delete(
+                    f"{ORDER_SERVICE_URL}/api/v1/orders/{order_no}/cancel",
+                )
+            except Exception as e:
+                logger.error(f"Compensate order failed: {e}")
 
     async def _process_payment(self) -> Dict[str, Any]:
         logger.info(f"[SAGA] Processing payment for order: {self.order_id}")
-        await asyncio.sleep(0.1)
+        payment_method = "alipay"
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{PAYMENT_SERVICE_URL}/api/v1/payment/create",
+                json={
+                    "order_no": self.order_id,
+                    "amount": self.amount,
+                    "payment_method": payment_method,
+                    "subject": f"订单 {self.order_id}",
+                },
+            )
+            if response.status_code not in (200, 201):
+                raise Exception(f"Process payment failed: {response.text}")
+            result = response.json()
+            payment_id = result.get("payment_id")
+            self.payment_result = PaymentResult(
+                payment_id=payment_id,
+                success=True,
+                transaction_id=result.get("transaction_id"),
+            )
+            return {"payment_id": payment_id, "payment_url": result.get("payment_url")}
 
-        payment_id = f"pay_{self.order_id}"
-        self.payment_result = PaymentResult(
-            payment_id=payment_id,
-            success=True,
-            transaction_id=f"txn_{uuid.uuid4().hex[:12]}",
-        )
-
-        result = {
-            "payment_id": payment_id,
-            "success": True,
-            "transaction_id": self.payment_result.transaction_id,
-        }
-
-        logger.info(f"[SAGA] Payment processed: {payment_id}")
-        return result
-
-    async def _refund_payment(self, result: Dict[str, Any]):
-        payment_id = result.get("payment_id") if result else self.payment_result.payment_id
-        logger.info(f"[SAGA] Refunding payment: {payment_id}")
-        await asyncio.sleep(0.1)
-        logger.info(f"[SAGA] Payment refunded")
+    async def _compensate_payment(self, result: Dict[str, Any]):
+        payment_id = result.get("payment_id") if result else None
+        if not payment_id:
+            return
+        logger.info(f"[SAGA] Compensating payment: {payment_id}")
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                await client.post(
+                    f"{PAYMENT_SERVICE_URL}/api/v1/payment/{payment_id}/refund",
+                    json={"reason": "Saga compensation"},
+                )
+            except Exception as e:
+                logger.error(f"Compensate payment failed: {e}")
 
     async def _award_points(self) -> Dict[str, Any]:
         logger.info(f"[SAGA] Awarding points for order: {self.order_id}")
-        await asyncio.sleep(0.1)
+        points = int(self.amount * 10)
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                await client.post(
+                    f"{POINTS_SERVICE_URL}/api/v1/points/earn",
+                    json={"user_id": self.user_id, "points": points, "source": "order_complete"},
+                )
+            except Exception as e:
+                logger.warning(f"Award points failed (non-critical): {e}")
+        return {"points_awarded": points}
 
-        points = self.amount // 100
-
-        result = {
-            "user_id": self.user_id,
-            "points_awarded": points,
-            "order_id": self.order_id,
-        }
-
-        logger.info(f"[SAGA] Points awarded: {points} to user {self.user_id}")
-        return result
-
-    async def _deduct_points(self, result: Dict[str, Any]):
+    async def _compensate_points(self, result: Dict[str, Any]):
         points = result.get("points_awarded") if result else 0
-        logger.info(f"[SAGA] Deducting {points} points from user {self.user_id}")
-        await asyncio.sleep(0.1)
-        logger.info(f"[SAGA] Points deducted")
+        if not points:
+            return
+        logger.info(f"[SAGA] Compensating {points} points for user {self.user_id}")
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                await client.post(
+                    f"{POINTS_SERVICE_URL}/api/v1/points/deduct",
+                    json={"user_id": self.user_id, "points": points, "source": "saga_compensation"},
+                )
+            except Exception as e:
+                logger.error(f"Compensate points failed: {e}")
 
 
 __all__ = [

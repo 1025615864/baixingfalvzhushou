@@ -134,6 +134,7 @@ class ArchiveServiceClient:
                 response = await client.get(f"{self.base_url}/health")
                 return response.status_code == 200
         except Exception:
+            logger.error("Failed to check archive service health")
             return False
 
     async def get_stats(self) -> dict:

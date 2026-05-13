@@ -47,6 +47,7 @@ class Post(Base):
         Index("idx_posts_status_hot", "status", "hot_score"),
         Index("idx_posts_status_created", "status", "created_at"),
         Index("idx_posts_category_status", "category", "status"),
+        Index("idx_posts_author_created", "user_id", "created_at"),
     )
 
 

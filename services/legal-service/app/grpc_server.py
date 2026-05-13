@@ -42,6 +42,7 @@ class LegalServiceServicer:
         try:
             return await self._redis.get(key)
         except Exception:
+            logger.error("获取Redis缓存失败")
             return None
 
     async def _set_cached(self, key: str, value: str, ttl: int = 300):
@@ -51,7 +52,7 @@ class LegalServiceServicer:
         try:
             await self._redis.set(key, value, ex=ttl)
         except Exception:
-            pass
+            logger.error("设置Redis缓存失败")
 
     async def _get_lawyer_by_id(self, lawyer_id: int):
         """从数据库获取律师信息"""

@@ -1,10 +1,20 @@
-version: "3.8"
+name: baixing-prod
 
-# 生产环境 Docker Compose 配置
-# 包含完整的 AI 质量监控栈：Redis + Prometheus + Grafana + Alertmanager
+x-base-logging: &base-logging
+  driver: "json-file"
+  options:
+    max-size: "50m"
+    max-file: "3"
+    compress: "true"
+
+x-backend-logging: &backend-logging
+  driver: "json-file"
+  options:
+    max-size: "100m"
+    max-file: "5"
+    compress: "true"
 
 services:
-  # PostgreSQL数据库
   db:
     image: postgres:15-alpine
     container_name: baixing_db_prod
@@ -22,7 +32,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    # 生产环境资源限制
     deploy:
       resources:
         limits:
@@ -32,15 +41,8 @@ services:
         reservations:
           cpus: '1'
           memory: 1G
-    # 日志配置
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "5"
-        compress: "true"
+    logging: *base-logging
 
-  # Redis缓存（用于AI质量监控持久化、限流、分布式锁）
   redis:
     image: redis:7-alpine
     container_name: baixing_redis_prod
@@ -55,7 +57,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    # 生产环境资源限制
     deploy:
       resources:
         limits:
@@ -65,15 +66,8 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
-    # 日志配置
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "3"
-        compress: "true"
+    logging: *base-logging
 
-  # 后端服务
   backend:
     build:
       context: ./backend
@@ -81,27 +75,23 @@ services:
     container_name: baixing_backend_prod
     restart: always
     environment:
-      # 数据库配置
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-baixing_law}
-      # 安全配置
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-      - PAYMENT_WEBHOOK_SECRET=${PAYMENT_WEBHOOK_SECRET}
-      - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS:-["http://localhost"]}
-      # AI 配置
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      # Redis 配置
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379/0
-      # 调试模式（生产必须为 false）
-      - DEBUG=false
-      # AI质量监控配置（生产环境启用Redis持久化）
-      - AI_QUALITY_REDIS_ENABLED=true
-      - AI_QUALITY_REDIS_KEY_PREFIX="ai_quality:"
-      - AI_QUALITY_MAX_RECENT_LOGS=5000
-      - AI_QUALITY_TTL_SECONDS=604800
-      # Sentry 配置（可选）
-      - SENTRY_DSN=${SENTRY_DSN:-}
-      - SENTRY_ENVIRONMENT=production
-      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-baixing_law}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-["http://localhost"]}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      AI_MODEL: ${AI_MODEL:-deepseek-chat}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DEBUG: "false"
+      AI_QUALITY_REDIS_ENABLED: "true"
+      AI_QUALITY_REDIS_KEY_PREFIX: "ai_quality:"
+      AI_QUALITY_MAX_RECENT_LOGS: 5000
+      AI_QUALITY_TTL_SECONDS: 604800
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: production
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+      ENVIRONMENT: production
     networks:
       - baixing_network
     depends_on:
@@ -110,7 +100,6 @@ services:
       redis:
         condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
-    # 生产环境资源限制
     deploy:
       resources:
         limits:
@@ -120,135 +109,14 @@ services:
         reservations:
           cpus: '1'
           memory: 1G
-    # 健康检查
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
-    # 日志配置
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "5"
-        compress: "true"
+    logging: *backend-logging
 
-  # Prometheus监控服务
-  prometheus:
-    image: prom/prometheus:v2.45.0
-    container_name: baixing_prometheus_prod
-    restart: always
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus/ai-quality-alerts.yml:/etc/prometheus/ai-quality-alerts.yml:ro
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=30d'
-      - '--web.enable-lifecycle'
-      - '--query.max-concurrency=10'
-      - '--query.timeout=2m'
-    networks:
-      - baixing_network
-    depends_on:
-      - backend
-    # 生产环境资源限制
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 1G
-          pids: 100
-        reservations:
-          cpus: '0.5'
-          memory: 512M
-    # 日志配置
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "3"
-        compress: "true"
-
-  # Grafana监控面板
-  grafana:
-    image: grafana/grafana:10.0.0
-    container_name: baixing_grafana_prod
-    restart: always
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
-    volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards:/etc/grafana/dashboards:ro
-      - grafana_data:/var/lib/grafana
-    networks:
-      - baixing_network
-    depends_on:
-      - prometheus
-    # 生产环境资源限制
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 1G
-          pids: 100
-        reservations:
-          cpus: '0.5'
-          memory: 512M
-    # 日志配置
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "3"
-        compress: "true"
-
-  # Alertmanager告警管理
-  alertmanager:
-    image: prom/alertmanager:v0.25.0
-    container_name: baixing_alertmanager_prod
-    restart: always
-    ports:
-      - "9093:9093"
-    volumes:
-      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-    command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
-      - '--storage.path=/alertmanager'
-      - '--cluster.listen-address=0.0.0.0:9094'
-    networks:
-      - baixing_network
-    depends_on:
-      - prometheus
-    # 生产环境资源限制
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-          pids: 50
-        reservations:
-          cpus: '0.25'
-          memory: 256M
-    # 日志配置
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "3"
-        compress: "true"
-
-  # 前端服务 (frontend-v2)
   frontend:
     build:
       context: ./frontend-v2
@@ -265,7 +133,6 @@ services:
       - baixing_network
     depends_on:
       - backend
-    # 生产环境资源限制
     deploy:
       resources:
         limits:
@@ -275,75 +142,98 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
-    # 日志配置
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "3"
-        compress: "true"
+    logging: *base-logging
 
-  # Nginx 反向代理（可选，用于生产环境HTTPStermination）
-  # nginx:
-  #   image: nginx:alpine
-  #   container_name: baixing_nginx_prod
-  #   restart: always
-  #   ports:
-  #     - "8080:80"
-  #     - "443:443"
-  #   volumes:
-  #     - ./nginx:/etc/nginx/conf.d:ro
-  #   networks:
-  #     - baixing_network
-  #   depends_on:
-  #     - frontend
-  #     - backend
-  #   # 生产环境资源限制
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '0.5'
-  #         memory: 256M
-  #   # 健康检查
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost/health"]
-  #     interval: 30s
-  #     timeout: 5s
-  #     retries: 3
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: baixing_prometheus_prod
+    restart: always
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/ai-quality-alerts.yml:/etc/prometheus/ai-quality-alerts.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    networks:
+      - baixing_network
+    depends_on:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+          pids: 100
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging: *base-logging
 
-networks:
-  baixing_network:
-    driver: bridge
-
-volumes:
-  postgres_data:
-  redis_data:
-  prometheus_data:
-  grafana_data:
-  # Schemathesis 测试结果持久化
-  schemathesis_results:
-    driver: local
-
-# ==========================================
-# 微服务扩展配置（可选，通过 extends 引用）
-# ==========================================
-
-services:
-  # 法律服务 (8008)
-  legal-service:
-    build:
-      context: ./services/legal-service
-      dockerfile: Dockerfile
-    container_name: baixing_legal_service_prod
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: baixing_grafana_prod
     restart: always
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/legal_service
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    networks:
+      - baixing_network
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+          pids: 100
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging: *base-logging
+
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: baixing_alertmanager_prod
+    restart: always
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    networks:
+      - baixing_network
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+          pids: 50
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging: *base-logging
+
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: baixing_user_service_prod
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/user_service
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
-      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       DEBUG: "false"
-      SENTRY_DSN: ${SENTRY_DSN:-}
-      SENTRY_ENVIRONMENT: production
     networks:
       - baixing_network
     depends_on:
@@ -352,7 +242,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -361,57 +251,16 @@ services:
         limits:
           cpus: '1'
           memory: 1G
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "5"
-        compress: "true"
+    logging: *backend-logging
 
-  # 社区服务 (8007)
-  community-service:
+  payment-channel-service:
     build:
-      context: ./services/community-service
+      context: ./services/payment-channel-service
       dockerfile: Dockerfile
-    container_name: baixing_community_service_prod
+    container_name: baixing_payment_channel_service_prod
     restart: always
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/community_service
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      DEBUG: "false"
-    networks:
-      - baixing_network
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8007/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 1G
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "5"
-
-  # 新闻服务 (8006)
-  news-service:
-    build:
-      context: ./services/news-service
-      dockerfile: Dockerfile
-    container_name: baixing_news_service_prod
-    restart: always
-    environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/news_service
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/payment_channel
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       DEBUG: "false"
     networks:
@@ -422,7 +271,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -431,21 +280,16 @@ services:
         limits:
           cpus: '0.5'
           memory: 512M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "5"
+    logging: *base-logging
 
-  # 搜索服务 (8009)
-  search-service:
+  embedding-service:
     build:
-      context: ./services/search-service
+      context: ./services/embedding-service
       dockerfile: Dockerfile
-    container_name: baixing_search_service_prod
+    container_name: baixing_embedding_service_prod
     restart: always
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/search_service
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/embedding_service
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       DEBUG: "false"
     networks:
@@ -456,7 +300,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8009/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health/live', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -465,81 +309,8 @@ services:
         limits:
           cpus: '0.5'
           memory: 512M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "5"
+    logging: *base-logging
 
-  # 推荐服务 (8010)
-  recommendation-service:
-    build:
-      context: ./services/recommendation-service
-      dockerfile: Dockerfile
-    container_name: baixing_recommendation_service_prod
-    restart: always
-    environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/recommendation_service
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
-      DEBUG: "false"
-    networks:
-      - baixing_network
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8010/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "5"
-
-  # 通知服务 (8005)
-  notification-service:
-    build:
-      context: ./services/notification-service
-      dockerfile: Dockerfile
-    container_name: baixing_notification_service_prod
-    restart: always
-    environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/notification_service
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
-      DEBUG: "false"
-    networks:
-      - baixing_network
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "5"
-
-  # 订单服务 (8004)
   order-service:
     build:
       context: ./services/order-service
@@ -558,7 +329,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -567,21 +338,53 @@ services:
         limits:
           cpus: '0.5'
           memory: 512M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "5"
+    logging: *base-logging
 
-  # 知识库服务 (8081)
-  knowledge-service:
+  ai-service:
     build:
-      context: ./services/knowledge-service
+      context: ./services/ai-service
       dockerfile: Dockerfile
-    container_name: baixing_knowledge_service_prod
+    container_name: baixing_ai_service_prod
     restart: always
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/knowledge_service
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/baixing_law
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      AI_MODEL: ${AI_MODEL:-deepseek-chat}
+      KNOWLEDGE_SERVICE_URL: http://knowledge-service:8081
+      ARCHIVE_SERVICE_URL: http://archive-service:8013
+      EMBEDDING_SERVICE_URL: http://embedding-service:8003
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+      USER_SERVICE_URL: http://user-service:8001
+      DEBUG: "false"
+    networks:
+      - baixing_network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    logging: *backend-logging
+
+  news-service:
+    build:
+      context: ./services/news-service
+      dockerfile: Dockerfile
+    container_name: baixing_news_service_prod
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/news_service
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       DEBUG: "false"
     networks:
@@ -592,7 +395,36 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8006/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    logging: *base-logging
+
+  community-service:
+    build:
+      context: ./services/community-service
+      dockerfile: Dockerfile
+    container_name: baixing_community_service_prod
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/community_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DEBUG: "false"
+    networks:
+      - baixing_network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8007/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -601,13 +433,162 @@ services:
         limits:
           cpus: '1'
           memory: 1G
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "5"
+    logging: *backend-logging
 
-  # 档案服务 (8013)
+  legal-service:
+    build:
+      context: ./services/legal-service
+      dockerfile: Dockerfile
+    container_name: baixing_legal_service_prod
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/legal_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DEBUG: "false"
+    networks:
+      - baixing_network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8008/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    logging: *backend-logging
+
+  search-service:
+    build:
+      context: ./services/search-service
+      dockerfile: Dockerfile
+    container_name: baixing_search_service_prod
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/search_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      COMMUNITY_SERVICE_URL: http://community-service:8007
+      LEGAL_SERVICE_URL: http://legal-service:8008
+      NEWS_SERVICE_URL: http://news-service:8006
+      KNOWLEDGE_SERVICE_URL: http://knowledge-service:8081
+      DEBUG: "false"
+    networks:
+      - baixing_network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8009/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    logging: *base-logging
+
+  recommendation-service:
+    build:
+      context: ./services/recommendation-service
+      dockerfile: Dockerfile
+    container_name: baixing_recommendation_service_prod
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/recommendation_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      NEWS_SERVICE_URL: http://news-service:8006
+      COMMUNITY_SERVICE_URL: http://community-service:8007
+      LEGAL_SERVICE_URL: http://legal-service:8008
+      DEBUG: "false"
+    networks:
+      - baixing_network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8010/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    logging: *base-logging
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: baixing_notification_service_prod
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/notification_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DEBUG: "false"
+    networks:
+      - baixing_network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8011/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    logging: *base-logging
+
+  points-service:
+    build:
+      context: ./services/points-service
+      dockerfile: Dockerfile
+    container_name: baixing_points_service_prod
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/points_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DEBUG: "false"
+    networks:
+      - baixing_network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8012/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    logging: *base-logging
+
   archive-service:
     build:
       context: ./services/archive-service
@@ -626,7 +607,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8013/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8013/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -635,8 +616,43 @@ services:
         limits:
           cpus: '0.5'
           memory: 512M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "5"
+    logging: *base-logging
+
+  knowledge-service:
+    build:
+      context: ./services/knowledge-service
+      dockerfile: Dockerfile
+    container_name: baixing_knowledge_service_prod
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/knowledge_service
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DEBUG: "false"
+    networks:
+      - baixing_network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    logging: *backend-logging
+
+networks:
+  baixing_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:

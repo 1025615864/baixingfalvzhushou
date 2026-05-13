@@ -63,3 +63,27 @@ class NewsTopicUpdate(BaseModel):
     is_active: bool | None = None
     auto_category: str | None = None
     auto_keyword: str | None = None
+
+
+class NewsCreate(BaseModel):
+    title: str
+    content: str | None = None
+    category: str | None = None
+    source: str | None = None
+    source_url: str | None = None
+    cover_image: str | None = None
+    author: str | None = None
+    is_published: bool = False
+    is_top: bool = False
+
+
+class NewsUpdate(BaseModel):
+    title: str | None = None
+    content: str | None = None
+    category: str | None = None
+    source: str | None = None
+    source_url: str | None = None
+    cover_image: str | None = None
+    author: str | None = None
+    is_published: bool | None = None
+    is_top: bool | None = None

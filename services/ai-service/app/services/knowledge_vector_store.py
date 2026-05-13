@@ -2,8 +2,15 @@
 import os
 import logging
 from typing import Optional
-import chromadb
-from chromadb.config import Settings as ChromaSettings
+
+try:
+    import chromadb
+    from chromadb.config import Settings as ChromaSettings
+    HAS_CHROMADB = True
+except ImportError:
+    HAS_CHROMADB = False
+    chromadb = None
+    ChromaSettings = None
 
 from app.config.settings import get_settings
 
@@ -150,6 +157,13 @@ class KnowledgeVectorStore:
     """知识库向量数据库封装 - 支持本地/远程Embedding、ChromaDB/pgvector"""
 
     def __init__(self):
+        if not HAS_CHROMADB:
+            logger.warning("chromadb not installed, knowledge vector store unavailable")
+            self.client = None
+            self.collection = None
+            self.collection_name = "knowledge_laws"
+            return
+
         self.persist_directory = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
             "data",
@@ -447,7 +461,7 @@ class KnowledgeVectorStore:
                 try:
                     return await store.count()
                 except Exception:
-                    pass
+                    logger.exception("Failed to count documents in pgvector store")
 
         collection = self.get_or_create_collection()
         return collection.count()
@@ -468,7 +482,7 @@ class KnowledgeVectorStore:
                     finally:
                         loop.close()
                 except Exception:
-                    pass
+                    logger.exception("Failed to count documents in pgvector store (sync)")
 
         collection = self.get_or_create_collection()
         return collection.count()

@@ -59,12 +59,8 @@ class AlipayAdapter(PaymentChannelAdapter):
                 "provider": "alipay",
             }
         except ImportError:
-            logger.warning("alipay-sdk-python not installed, using mock response")
-            return {
-                "payment_url": f"https://openapi.alipay.com/gateway.do?out_trade_no={order_no}",
-                "order_no": order_no,
-                "provider": "alipay",
-            }
+            logger.error("alipay-sdk-python not installed, cannot create payment")
+            raise RuntimeError("alipay-sdk-python is required for Alipay payments")
         except Exception as e:
             logger.error(f"Alipay create_payment failed: {e}")
             raise
@@ -92,8 +88,8 @@ class AlipayAdapter(PaymentChannelAdapter):
 
             return is_valid
         except ImportError:
-            logger.warning("alipay-sdk-python not installed, skipping verification")
-            return True
+            logger.error("alipay-sdk-python not installed, cannot verify callback - REJECTING")
+            return False
         except Exception as e:
             logger.error(f"Alipay verify_callback failed: {e}")
             return False
@@ -155,14 +151,8 @@ class AlipayAdapter(PaymentChannelAdapter):
                 "raw_response": result,
             }
         except ImportError:
-            logger.warning("alipay-sdk-python not installed, using mock refund")
-            return {
-                "refund_no": refund_no,
-                "order_no": order_no,
-                "success": True,
-                "provider_refund_no": "",
-                "raw_response": {},
-            }
+            logger.error("alipay-sdk-python not installed, cannot process refund")
+            raise RuntimeError("alipay-sdk-python is required for Alipay refunds")
         except Exception as e:
             logger.error(f"Alipay refund failed: {e}")
             raise

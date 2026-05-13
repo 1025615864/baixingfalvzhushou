@@ -6,6 +6,14 @@ import enum
 from typing import Optional, Any
 from dataclasses import dataclass, field
 
+try:
+    from app.services.system_config_service import SystemConfigService  # noqa: F401 - needed for test patching
+except ImportError:
+    try:
+        from app.services.system.config import SystemConfigService  # noqa: F401
+    except ImportError:
+        SystemConfigService = None  # type: ignore[assignment, misc]
+
 
 class ConfigParseError(ValueError):
     pass

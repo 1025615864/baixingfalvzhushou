@@ -11,6 +11,8 @@ from typing import cast
 
 from _pytest.monkeypatch import MonkeyPatch
 
+from tests.conftest import TEST_PASSWORD
+
 
 def _json_dict(res: Response) -> dict[str, object]:
     raw = cast(object, res.json())
@@ -103,7 +105,7 @@ class TestUserAPI:
         user_data = {
             "username": "testuser",
             "email": "test@example.com",
-            "password": "Test123456a",
+            "password": TEST_PASSWORD,
             "agree_terms": True,
             "agree_privacy": True,
             "agree_ai_disclaimer": True,
@@ -134,7 +136,7 @@ class TestUserAPI:
             username="u_update_me_phone",
             email="u_update_me_phone@example.com",
             nickname="u_update_me_phone",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -167,7 +169,7 @@ class TestUserAPI:
             username="u_update_me_nick",
             email="u_update_me_nick@example.com",
             nickname="old",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -274,7 +276,7 @@ class TestNewsAPI:
             username="a_news_ai",
             email="a_news_ai@example.com",
             nickname="a_news_ai",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -351,7 +353,7 @@ class TestNewsAPI:
             username="a_rss",
             email="a_rss@example.com",
             nickname="a_rss",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -489,7 +491,7 @@ class TestSystemConfigAPI:
             username="a_sys_cfg",
             email="a_sys_cfg@example.com",
             nickname="a_sys_cfg",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -518,7 +520,7 @@ class TestSystemConfigAPI:
             username="a_sys_cfg2_prod",
             email="a_sys_cfg2_prod@example.com",
             nickname="a_sys_cfg2_prod",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -555,7 +557,7 @@ class TestSystemConfigAPI:
             username="a_sys_cfg2",
             email="a_sys_cfg2@example.com",
             nickname="a_sys_cfg2",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -588,7 +590,7 @@ class TestSystemConfigAPI:
             username="a_sys_cfg3",
             email="a_sys_cfg3@example.com",
             nickname="a_sys_cfg3",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -617,7 +619,7 @@ class TestSystemConfigAPI:
             username="a_sys_cfg4",
             email="a_sys_cfg4@example.com",
             nickname="a_sys_cfg4",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -653,7 +655,7 @@ class TestSystemConfigAPI:
             username="a_sys_cfg4_prod",
             email="a_sys_cfg4_prod@example.com",
             nickname="a_sys_cfg4_prod",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -691,7 +693,7 @@ class TestSystemConfigAPI:
             username="a_sys_cfg5",
             email="a_sys_cfg5@example.com",
             nickname="a_sys_cfg5",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -725,7 +727,7 @@ class TestSystemConfigAPI:
             username="a_sys_cfg_batch_prod",
             email="a_sys_cfg_batch_prod@example.com",
             nickname="a_sys_cfg_batch_prod",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -790,7 +792,7 @@ class TestForumAPI:
             username="u_forum_cache",
             email="u_forum_cache@example.com",
             nickname="u_forum_cache",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -854,7 +856,7 @@ class TestForumAPI:
             username="u_forum_mod",
             email="u_forum_mod@example.com",
             nickname="u_forum_mod",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -862,7 +864,7 @@ class TestForumAPI:
             username="a_forum_mod",
             email="a_forum_mod@example.com",
             nickname="a_forum_mod",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -969,7 +971,7 @@ class TestLawFirmConsultationsAPI:
             username="u_lawfirm_consult_1",
             email="u_lawfirm_consult_1@example.com",
             nickname="u_lawfirm_consult_1",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -977,7 +979,7 @@ class TestLawFirmConsultationsAPI:
             username="u_lawfirm_consult_2",
             email="u_lawfirm_consult_2@example.com",
             nickname="u_lawfirm_consult_2",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -1082,7 +1084,7 @@ class TestLawFirmConsultationsAPI:
             username="u_consult_cancel_refund",
             email="u_consult_cancel_refund@example.com",
             nickname="u_consult_cancel_refund",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -1205,7 +1207,7 @@ class TestLawFirmConsultationsAPI:
             username="u_lawfirm_pay",
             email="u_lawfirm_pay@example.com",
             nickname="u_lawfirm_pay",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -1232,7 +1234,7 @@ class TestLawFirmConsultationsAPI:
             username="u_lawyer_pay",
             email="u_lawyer_pay@example.com",
             nickname="u_lawyer_pay",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="lawyer",
             is_active=True,
         )
@@ -1331,7 +1333,7 @@ class TestLawFirmConsultationMessagesAPI:
             username="u_lawfirm_msg_1",
             email="u_lawfirm_msg_1@example.com",
             nickname="u_lawfirm_msg_1",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -1339,7 +1341,7 @@ class TestLawFirmConsultationMessagesAPI:
             username="u_lawfirm_msg_2",
             email="u_lawfirm_msg_2@example.com",
             nickname="u_lawfirm_msg_2",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -1347,7 +1349,7 @@ class TestLawFirmConsultationMessagesAPI:
             username="u_lawfirm_msg_lawyer",
             email="u_lawfirm_msg_lawyer@example.com",
             nickname="u_lawfirm_msg_lawyer",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="lawyer",
             is_active=True,
         )
@@ -1446,7 +1448,7 @@ class TestLawFirmReviewsAPI:
             username="u_lawfirm_review_1",
             email="u_lawfirm_review_1@example.com",
             nickname="u_lawfirm_review_1",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -1454,7 +1456,7 @@ class TestLawFirmReviewsAPI:
             username="u_lawfirm_review_2",
             email="u_lawfirm_review_2@example.com",
             nickname="u_lawfirm_review_2",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -1591,7 +1593,7 @@ class TestPaymentAPI:
             username="u_payment_test",
             email="u_payment_test@example.com",
             nickname="u_payment_test",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -1643,7 +1645,7 @@ class TestPaymentAPI:
             username="u_payment_wechat_pay",
             email="u_payment_wechat_pay@example.com",
             nickname="u_payment_wechat_pay",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -1691,7 +1693,7 @@ class TestPaymentAPI:
             username="u_light_review_user",
             email="u_light_review_user@example.com",
             nickname="u_light_review_user",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -1757,7 +1759,7 @@ class TestPaymentAPI:
             username="u_light_review_lawyer",
             email="u_light_review_lawyer@example.com",
             nickname="u_light_review_lawyer",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="lawyer",
             is_active=True,
             phone_verified=True,
@@ -1870,7 +1872,7 @@ class TestPaymentAPI:
             username="u_wechat_ai_pack_test",
             email="u_wechat_ai_pack_test@example.com",
             nickname="u_wechat_ai_pack_test",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -2009,7 +2011,7 @@ class TestQuotaPackAPI:
             username="u_ai_pack_pay",
             email="u_ai_pack_pay@example.com",
             nickname="u_ai_pack_pay",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -2083,7 +2085,7 @@ class TestQuotaPackAPI:
             username="u_doc_pack_pay",
             email="u_doc_pack_pay@example.com",
             nickname="u_doc_pack_pay",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -2164,7 +2166,7 @@ class TestQuotaPackAPI:
             username="u_ai_pack_consume",
             email="u_ai_pack_consume@example.com",
             nickname="u_ai_pack_consume",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -2239,7 +2241,7 @@ class TestQuotaPackAPI:
             username="u_doc_pack_consume",
             email="u_doc_pack_consume@example.com",
             nickname="u_doc_pack_consume",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -2322,7 +2324,7 @@ class TestPaymentWeChatNotifyAPI:
             username="u_wechat_notify_test",
             email="u_wechat_notify_test@example.com",
             nickname="u_wechat_notify_test",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -2456,7 +2458,7 @@ class TestPaymentCallbackAdminAPI:
             username="a_cb_evt",
             email="a_cb_evt@example.com",
             nickname="a_cb_evt",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -2499,7 +2501,7 @@ class TestPaymentCallbackAdminAPI:
             username="a_pay_env",
             email="a_pay_env@example.com",
             nickname="a_pay_env",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -2557,7 +2559,7 @@ class TestPaymentCallbackAdminAPI:
             username="a_reconcile",
             email="a_reconcile@example.com",
             nickname="a_reconcile",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -2565,7 +2567,7 @@ class TestPaymentCallbackAdminAPI:
             username="u_reconcile",
             email="u_reconcile@example.com",
             nickname="u_reconcile",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -2681,7 +2683,7 @@ class TestPaymentCallbackAdminAPI:
             username="a_wx_cert",
             email="a_wx_cert@example.com",
             nickname="a_wx_cert",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -2728,7 +2730,7 @@ class TestPaymentCallbackAdminAPI:
             username="a_pay_status",
             email="a_pay_status@example.com",
             nickname="a_pay_status",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -2807,7 +2809,7 @@ class TestPaymentCallbackAdminAPI:
             username="a_wx_import",
             email="a_wx_import@example.com",
             nickname="a_wx_import",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -2862,7 +2864,7 @@ class TestPaymentCallbackAdminAPI:
             username="u_alipay_notify_test",
             email="u_alipay_notify_test@example.com",
             nickname="u_alipay_notify_test",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -2966,7 +2968,7 @@ class TestPaymentCallbackAdminAPI:
             username="u_alipay_bad_sig",
             email="u_alipay_bad_sig@example.com",
             nickname="u_alipay_bad_sig",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -3049,7 +3051,7 @@ class TestPaymentCallbackAdminAPI:
             username="u_ikunpay_notify_test",
             email="u_ikunpay_notify_test@example.com",
             nickname="u_ikunpay_notify_test",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -3160,7 +3162,7 @@ class TestPaymentCallbackAdminAPI:
             username="u_ikunpay_bad_sig",
             email="u_ikunpay_bad_sig@example.com",
             nickname="u_ikunpay_bad_sig",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -3227,7 +3229,7 @@ class TestPaymentCallbackAdminAPI:
             username="u_consult_pay",
             email="u_consult_pay@example.com",
             nickname="u_consult_pay",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -3301,7 +3303,7 @@ class TestPaymentCallbackAdminAPI:
             username="u_refund_test",
             email="u_refund_test@example.com",
             nickname="u_refund_test",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -3309,7 +3311,7 @@ class TestPaymentCallbackAdminAPI:
             username="a_refund_test",
             email="a_refund_test@example.com",
             nickname="a_refund_test",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -3404,7 +3406,7 @@ class TestPaymentCallbackAdminAPI:
             username="u_recharge_test",
             email="u_recharge_test@example.com",
             nickname="u_recharge_test",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -3412,7 +3414,7 @@ class TestPaymentCallbackAdminAPI:
             username="a_recharge_test",
             email="a_recharge_test@example.com",
             nickname="a_recharge_test",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -3472,7 +3474,7 @@ class TestPaymentCallbackAdminAPI:
             username="u_webhook_dup_test",
             email="u_webhook_dup_test@example.com",
             nickname="u_webhook_dup_test",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -3536,7 +3538,7 @@ class TestPaymentCallbackAdminAPI:
             username="u_webhook_test",
             email="u_webhook_test@example.com",
             nickname="u_webhook_test",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -3615,7 +3617,7 @@ class TestSystemAIOpsStatus:
             username="a_ai_ops",
             email="a_ai_ops@example.com",
             nickname="a_ai_ops",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -3654,7 +3656,7 @@ class TestSystemAiFeedbackStats:
             username="ai_fb_user",
             email="ai_fb_user@example.com",
             nickname="ai_fb_user",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -3662,7 +3664,7 @@ class TestSystemAiFeedbackStats:
             username="ai_fb_admin",
             email="ai_fb_admin@example.com",
             nickname="ai_fb_admin",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -3768,7 +3770,7 @@ class TestSystemFaqAutogen:
             username="faq_u",
             email="faq_u@example.com",
             nickname="faq_u",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -3776,7 +3778,7 @@ class TestSystemFaqAutogen:
             username="faq_admin",
             email="faq_admin@example.com",
             nickname="faq_admin",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -3882,7 +3884,7 @@ class TestCalendarAPI:
             username="calendar_u1",
             email="calendar_u1@example.com",
             nickname="calendar_u1",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -3890,7 +3892,7 @@ class TestCalendarAPI:
             username="calendar_u2",
             email="calendar_u2@example.com",
             nickname="calendar_u2",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -4000,7 +4002,7 @@ class TestKnowledgeAPI:
             username="kb_user",
             email="kb_user@example.com",
             nickname="kb_user",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -4008,7 +4010,7 @@ class TestKnowledgeAPI:
             username="kb_admin",
             email="kb_admin@example.com",
             nickname="kb_admin",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -4099,7 +4101,7 @@ class TestAIConsultationAPI:
             username="ai_u1",
             email="ai_u1@example.com",
             nickname="ai_u1",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -4107,7 +4109,7 @@ class TestAIConsultationAPI:
             username="ai_u2",
             email="ai_u2@example.com",
             nickname="ai_u2",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -4196,7 +4198,7 @@ class TestAIConsultationAPI:
             username="ai_meta_u1",
             email="ai_meta_u1@example.com",
             nickname="ai_meta_u1",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -4289,7 +4291,7 @@ class TestAIConsultationAPI:
             username="ai_profile_u1",
             email="ai_profile_u1@example.com",
             nickname="小明",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -4349,7 +4351,7 @@ class TestAIShareAPI:
             username="share_u1",
             email="share_u1@example.com",
             nickname="share_u1",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -4357,7 +4359,7 @@ class TestAIShareAPI:
             username="share_u2",
             email="share_u2@example.com",
             nickname="share_u2",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -4450,7 +4452,7 @@ class TestAIShareAPI:
             username="ai_profile_stream_u1",
             email="ai_profile_stream_u1@example.com",
             nickname=None,
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -4520,7 +4522,7 @@ class TestAIShareAPI:
             username="ai_search_u1",
             email="ai_search_u1@example.com",
             nickname="ai_search_u1",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -4528,7 +4530,7 @@ class TestAIShareAPI:
             username="ai_search_u2",
             email="ai_search_u2@example.com",
             nickname="ai_search_u2",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -4716,7 +4718,7 @@ class TestAIShareAPI:
             username="ai_report_u1",
             email="ai_report_u1@example.com",
             nickname="ai_report_u1",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -4772,7 +4774,7 @@ class TestAIShareAPI:
             username="ai_stream_u1",
             email="ai_stream_u1@example.com",
             nickname="ai_stream_u1",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -4858,7 +4860,7 @@ class TestAIShareAPI:
             username="ai_stream_owner",
             email="ai_stream_owner@example.com",
             nickname="ai_stream_owner",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -4866,7 +4868,7 @@ class TestAIShareAPI:
             username="ai_stream_other",
             email="ai_stream_other@example.com",
             nickname="ai_stream_other",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -4984,7 +4986,7 @@ class TestApiEnvelopeMiddleware:
             username="a_metrics",
             email="a_metrics@example.com",
             nickname="a_metrics",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="admin",
             is_active=True,
         )
@@ -5053,7 +5055,7 @@ class TestApiContracts:
             username="u_login_contract",
             email="u_login_contract@example.com",
             nickname="u_login_contract",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -5063,7 +5065,7 @@ class TestApiContracts:
 
         res = await client.post(
             "/api/user/login",
-            json={"username": "u_login_contract", "password": "Test123456"},
+            json={"username": "u_login_contract", "password": TEST_PASSWORD},
         )
         assert res.status_code == 200
         data = _json_dict(res)
@@ -5095,7 +5097,7 @@ class TestApiContracts:
             username="u_pay_contract",
             email="u_pay_contract@example.com",
             nickname="u_pay_contract",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )
@@ -5125,7 +5127,7 @@ class TestApiContracts:
             username="u_doc_contract",
             email="u_doc_contract@example.com",
             nickname="u_doc_contract",
-            hashed_password=hash_password("Test123456"),
+            hashed_password=hash_password(TEST_PASSWORD),
             role="user",
             is_active=True,
         )

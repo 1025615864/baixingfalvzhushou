@@ -9,10 +9,15 @@ from .payment_events import (
     PaymentEventTypes,
     create_payment_event,
 )
-from services.common.events import (
-    init_event_bus,
-    close_event_bus,
-)
+
+try:
+    from services.common.events import (
+        init_event_bus,
+        close_event_bus,
+    )
+except ImportError:
+    init_event_bus = None
+    close_event_bus = None
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +27,9 @@ _event_bus: Optional[PaymentEventBus] = None
 async def init_kafka_producer(bootstrap_servers: str = "kafka:9092"):
     """初始化 Kafka 生产者"""
     global _event_bus
+    if init_event_bus is None:
+        logger.warning("services.common.events not available, Kafka producer not initialized")
+        return None
     event_bus = await init_event_bus(bootstrap_servers)
     _event_bus = PaymentEventBus(event_bus._producer)
     logger.info(f"Payment channel service Kafka producer initialized: {bootstrap_servers}")
@@ -31,7 +39,7 @@ async def init_kafka_producer(bootstrap_servers: str = "kafka:9092"):
 async def close_kafka_producer():
     """关闭 Kafka 生产者"""
     global _event_bus
-    if _event_bus:
+    if _event_bus and close_event_bus is not None:
         await close_event_bus()
         _event_bus = None
         logger.info("Payment channel service Kafka producer closed")

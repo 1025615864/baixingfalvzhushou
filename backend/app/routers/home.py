@@ -1,469 +1,114 @@
-"""首页路由 - 提供首页数据API"""
+from datetime import datetime, timedelta
+from fastapi import APIRouter, Request
+from typing import Optional
 
-from datetime import datetime, timezone, timedelta
-from typing import Any
+router = APIRouter(prefix="/home", tags=["Home"])
 
-from fastapi import APIRouter, Depends, Request, HTTPException
-from pydantic import BaseModel
-from sqlalchemy import func, select, and_
-from sqlalchemy.ext.asyncio import AsyncSession
+_BANNERS = [
+    {"id": "1", "title": "AI 智能法律咨询", "subtitle": "专业律师 24 小时在线为您服务", "image_url": "/assets/banners/ai-banner.png", "link": "/ai-consultation", "sort_order": 1, "is_active": True},
+    {"id": "2", "title": "民法典专题解读", "subtitle": "了解与您生活息息相关的法律知识", "image_url": "/assets/banners/civil-code.png", "link": "/knowledge/civil-code", "sort_order": 2, "is_active": True},
+    {"id": "3", "title": "律师匹配服务", "subtitle": "智能匹配最适合您的专业律师", "image_url": "/assets/banners/lawyer-match.png", "link": "/lawyer-matching", "sort_order": 3, "is_active": True},
+    {"id": "4", "title": "积分商城上新", "subtitle": "法律文书模板、咨询服务积分兑换", "image_url": "/assets/banners/points-mall.png", "link": "/points/mall", "sort_order": 4, "is_active": True},
+]
 
-from ..database import get_db
-from ..models import User, Lawyer, Consultation, ContractReviewHistory
-from ..models.lawfirm import LawyerReview
-from ..utils.deps import get_current_user_optional
+_QUICK_ACTIONS = [
+    {"id": "ai", "label": "AI 咨询", "icon": "robot", "type": "feature", "link": "/ai-consultation", "badge": None, "content": "智能法律问答"},
+    {"id": "lawyer", "label": "找律师", "icon": "user-tie", "type": "feature", "link": "/lawyer-matching", "badge": None, "content": "专业律师匹配"},
+    {"id": "consult", "label": "法律咨询", "icon": "comment-dots", "type": "feature", "link": "/consultations", "badge": 3, "content": "在线法律咨询"},
+    {"id": "document", "label": "文书模板", "icon": "file-contract", "type": "feature", "link": "/legal-document-mall", "badge": None, "content": "法律文书生成"},
+    {"id": "contract", "label": "合同审查", "icon": "file-signature", "type": "feature", "link": "/contracts", "badge": None, "content": "合同审查工具"},
+    {"id": "points", "label": "积分商城", "icon": "gift", "type": "feature", "link": "/points", "badge": None, "content": "积分兑换好礼"},
+    {"id": "forum", "label": "法律社区", "icon": "users", "type": "community", "link": "/forum", "badge": 12, "content": "法律交流社区"},
+    {"id": "news", "label": "法律资讯", "icon": "newspaper", "type": "content", "link": "/news", "badge": None, "content": "法律热点解读"},
+]
 
-router = APIRouter(prefix="/home", tags=["首页"])
+_RECOMMENDATIONS = [
+    {"id": "1", "type": "lawyer", "title": "张律师 - 婚姻家庭法专家", "content": "15年执业经验，擅长离婚财产分割、子女抚养权等领域", "tags": ["婚姻家庭", "财产分割", "抚养权"], "image_url": "/assets/lawyers/zhang.png", "score": 95, "link": "/lawyers/1"},
+    {"id": "2", "type": "lawyer", "title": "李律师 - 劳动纠纷专家", "content": "10年劳动仲裁经验，代理劳动争议案件300+", "tags": ["劳动法", "劳动合同", "工伤赔偿"], "image_url": "/assets/lawyers/li.png", "score": 92, "link": "/lawyers/2"},
+    {"id": "3", "type": "service", "title": "合同审查服务", "content": "专业律师审阅合同条款，帮您规避法律风险", "tags": ["合同", "审查", "风险控制"], "image_url": "/assets/services/contract-review.png", "score": 88, "link": "/services/contract-review"},
+    {"id": "4", "type": "article", "title": "民法典：你应该知道的十大变化", "content": "深度解读民法典对日常生活的影响", "tags": ["民法典", "法律解读", "普法"], "image_url": "/assets/articles/civil-code.png", "score": 90, "link": "/knowledge/1"},
+    {"id": "5", "type": "document", "title": "房屋租赁合同模板", "content": "标准房屋租赁合同模板，免费下载使用", "tags": ["租赁合同", "模板", "房产"], "image_url": "/assets/documents/rental.png", "score": 85, "link": "/documents/rental"},
+    {"id": "6", "type": "service", "title": "法律咨询服务", "content": "30分钟在线法律咨询，专业律师为您解答", "tags": ["咨询", "在线服务", "法律建议"], "image_url": "/assets/services/consultation.png", "score": 94, "link": "/consultations/new"},
+]
 
+_ACTIVITIES = [
+    {"id": "1", "type": "consultation", "title": "您收到了张律师的咨询回复", "description": "关于\"劳动合同解除\"的咨询已获专业解答", "timestamp": (datetime.now() - timedelta(hours=2)).isoformat(), "link": "/consultations/1"},
+    {"id": "2", "type": "post", "title": "您的帖子获得10个点赞", "description": "「租房押金不退怎么办」获得社区关注", "timestamp": (datetime.now() - timedelta(hours=5)).isoformat(), "link": "/forum/post/123"},
+    {"id": "3", "type": "points", "title": "每日签到获得10积分", "description": "连续签到第7天，获得额外奖励", "timestamp": (datetime.now() - timedelta(hours=8)).isoformat(), "link": "/points"},
+    {"id": "4", "type": "news", "title": "新法规解读已更新", "description": "《消费者权益保护法》最新修订解读", "timestamp": (datetime.now() - timedelta(days=1)).isoformat(), "link": "/news/1"},
+]
 
-class HomeBanner(BaseModel):
-    """首页横幅"""
-    id: str
-    title: str
-    subtitle: str | None = None
-    description: str | None = None
-    image_url: str | None = None
-    button_text: str | None = None
-    button_link: str | None = None
-    is_active: bool = True
-    order: int = 0
+_STATS = {
+    "total_users": 125680,
+    "total_lawyers": 3820,
+    "total_consultations": 526941,
+    "total_documents": 89120,
+    "today_active_users": 3580,
+    "monthly_resolved_cases": 12560,
+}
 
-
-class QuickAction(BaseModel):
-    """快捷入口"""
-    id: str
-    title: str
-    description: str | None = None
-    icon: str
-    link: str
-    badge: str | None = None
-    is_new: bool = False
-    order: int = 0
-
-
-class Recommendation(BaseModel):
-    """推荐内容"""
-    id: str
-    type: str  # lawyer, article, consultation, knowledge
-    title: str
-    description: str | None = None
-    image_url: str | None = None
-    link: str
-    tags: list[str] | None = None
-    rating: float | None = None
-    view_count: int | None = None
-    author_name: str | None = None
-    author_avatar: str | None = None
-    created_at: str | None = None
-    relevance_score: float | None = None
-
-
-class FeatureCard(BaseModel):
-    """功能卡片"""
-    id: str
-    title: str
-    description: str
-    icon: str
-    link: str
-    color: str  # blue, green, purple, orange, red, teal
-    stats_label: str | None = None
-    stats_value: str | None = None
+_PERSONALIZED_CONTENT = {
+    "title": "为您推荐",
+    "description": "基于您的浏览历史和兴趣偏好",
+    "items": [
+        {"id": "1", "type": "article", "title": "劳动争议处理流程全解", "summary": "从仲裁到诉讼，一文读懂劳动争议解决路径", "tags": ["劳动法", "仲裁", "诉讼"], "image_url": "/assets/articles/labor.png", "score": 88},
+        {"id": "2", "type": "article", "title": "民间借贷利息的法律保护上限", "summary": "最高人民法院关于审理民间借贷案件适用法律若干问题的规定解读", "tags": ["借贷", "利息", "民间借贷"], "image_url": "/assets/articles/loan.png", "score": 85},
+        {"id": "3", "type": "service", "title": "AI 智能文书生成", "summary": "输入基本信息，AI 自动生成法律文书初稿", "tags": ["AI", "文书", "智能"], "image_url": "/assets/services/ai-document.png", "score": 92},
+    ],
+    "category": "法律知识",
+}
 
 
-class HomeStats(BaseModel):
-    """首页统计数据"""
-    total_consultations: int
-    total_lawyers: int
-    total_users: int
-    total_articles: int
-    solved_cases: int
-    satisfaction_rate: int  # 百分比
+@router.get("/data")
+def get_home_data():
+    return {
+        "user": {
+            "id": 1,
+            "username": "demo_user",
+            "nickname": "法律小助手",
+            "avatar_url": "/assets/avatars/default.png",
+            "member_level": "VIP1",
+            "points_balance": 1250,
+        },
+        "banners": _BANNERS,
+        "quick_actions": _QUICK_ACTIONS,
+        "recommendations": _RECOMMENDATIONS,
+        "stats": _STATS,
+        "recent_activity": _ACTIVITIES,
+        "personalized_content": _PERSONALIZED_CONTENT,
+    }
 
 
-class HomeData(BaseModel):
-    """首页数据聚合"""
-    banners: list[HomeBanner]
-    quick_actions: list[QuickAction]
-    recommendations: list[Recommendation]
-    feature_cards: list[FeatureCard]
-    stats: HomeStats
-    last_updated: str
+@router.get("/recommendations")
+def get_recommendations(page: int = 1, page_size: int = 10, recommendation_type: Optional[str] = None):
+    items = _RECOMMENDATIONS
+    if recommendation_type:
+        items = [r for r in items if r["type"] == recommendation_type]
+    total = len(items)
+    start = (page - 1) * page_size
+    return {"recommendations": items[start:start + page_size], "total": total, "page": page, "page_size": page_size}
 
 
-async def _get_home_banners() -> list[HomeBanner]:
-    """获取首页横幅数据"""
-    return [
-        HomeBanner(
-            id="1",
-            title="欢迎来到百姓助手",
-            subtitle="您的AI法律助手",
-            description="提供专业的法律咨询服务，让法律问题变得简单易懂",
-            image_url=None,
-            button_text="立即咨询",
-            button_link="/consultation",
-            is_active=True,
-            order=1,
-        ),
-        HomeBanner(
-            id="2",
-            title="AI智能法律咨询",
-            subtitle="24小时在线服务",
-            description="基于大语言模型的智能法律助手，随时随地解答您的法律问题",
-            image_url=None,
-            button_text="开始对话",
-            button_link="/chat",
-            is_active=True,
-            order=2,
-        ),
-    ]
+@router.get("/quick-actions")
+def get_quick_actions():
+    return _QUICK_ACTIONS
 
 
-async def _get_quick_actions() -> list[QuickAction]:
-    """获取快捷入口数据"""
-    return [
-        QuickAction(id="1", title="AI咨询", description="智能法律助手", icon="ai", link="/chat", is_new=True, order=1),
-        QuickAction(id="2", title="找律师", description="专业律师服务", icon="lawyer", link="/lawyer", order=2),
-        QuickAction(id="3", title="法律咨询", description="一对一咨询", icon="consultation", link="/consultation", order=3),
-        QuickAction(id="4", title="法律知识", description="海量法律知识", icon="knowledge", link="/knowledge", order=4),
-        QuickAction(id="5", title="合同审查", description="AI智能审查", icon="contract", link="/contracts", is_new=True, order=5),
-        QuickAction(id="6", title="文书生成", description="快速生成文书", icon="document", link="/document", order=6),
-        QuickAction(id="7", title="法律论坛", description="交流讨论", icon="forum", link="/forum", order=7),
-        QuickAction(id="8", title="会员中心", description="尊享特权", icon="vip", link="/vip", order=8),
-    ]
+@router.get("/stats")
+def get_stats():
+    return _STATS
 
 
-async def _get_feature_cards() -> list[FeatureCard]:
-    """获取功能卡片数据"""
-    return [
-        FeatureCard(
-            id="1",
-            title="AI智能咨询",
-            description="基于大模型的智能法律助手，24小时在线解答您的法律问题",
-            icon="ai",
-            link="/chat",
-            color="blue",
-            stats_label="已解答",
-            stats_value="100万+",
-        ),
-        FeatureCard(
-            id="2",
-            title="合同智能审查",
-            description="上传合同文件，AI自动识别风险条款，提供专业修改建议",
-            icon="document",
-            link="/contracts",
-            color="purple",
-            stats_label="审查合同",
-            stats_value="50万+",
-        ),
-        FeatureCard(
-            id="3",
-            title="律师精准匹配",
-            description="根据您的需求和案件类型，智能推荐最合适的专业律师",
-            icon="search",
-            link="/lawyer-matching",
-            color="green",
-            stats_label="入驻律师",
-            stats_value="10万+",
-        ),
-        FeatureCard(
-            id="4",
-            title="法律文书生成",
-            description="输入关键信息，一键生成专业的法律文书，省时省力",
-            icon="calculator",
-            link="/document",
-            color="orange",
-            stats_label="生成文书",
-            stats_value="200万+",
-        ),
-    ]
+@router.get("/banners")
+def get_banners():
+    return _BANNERS
 
 
-async def _get_stats_from_db(db: AsyncSession) -> HomeStats:
-    """从数据库获取首页统计数据"""
-    try:
-        # 总用户数
-        user_result = await db.execute(select(func.count(User.id)).where(User.is_active == True))
-        total_users = user_result.scalar() or 0
-
-        # 活跃律师数 (已认证且活跃的律师)
-        lawyer_result = await db.execute(
-            select(func.count(Lawyer.id)).where(
-                and_(Lawyer.is_verified == True, Lawyer.is_active == True)
-            )
-        )
-        total_lawyers = lawyer_result.scalar() or 0
-
-        # 总咨询数
-        consultation_result = await db.execute(select(func.count(Consultation.id)))
-        total_consultations = consultation_result.scalar() or 0
-
-        # 合同审查数
-        contract_result = await db.execute(select(func.count(ContractReviewHistory.id)))
-        total_contracts = contract_result.scalar() or 0
-
-        # 法律知识文章数 (静态统计)
-        total_articles = 50000  # 知识库文章数，已迁移到微服务
-
-        # 计算满意度 (基于律师评价的平均分)
-        rating_result = await db.execute(select(func.avg(LawyerReview.rating)))
-        avg_rating = rating_result.scalar()
-        satisfaction_rate = int((avg_rating or 4.5) / 5 * 100)  # 默认4.5分，转换为百分比
-
-        # 已解决案件数 (使用咨询数作为近似值)
-        solved_cases = int(total_consultations * 0.8)  # 假设80%的咨询得到解决
-
-        return HomeStats(
-            total_consultations=total_consultations,
-            total_lawyers=total_lawyers,
-            total_users=total_users,
-            total_articles=total_articles,
-            solved_cases=solved_cases,
-            satisfaction_rate=satisfaction_rate,
-        )
-    except Exception as e:
-        # 如果数据库查询失败，返回默认数据
-        return HomeStats(
-            total_consultations=1_000_000,
-            total_lawyers=10_000,
-            total_users=500_000,
-            total_articles=50_000,
-            solved_cases=800_000,
-            satisfaction_rate=98,
-        )
-
-
-async def _get_recommendations_from_db(
-    db: AsyncSession,
-    type: str | None = None,
-    limit: int = 10,
-    offset: int = 0,
-) -> tuple[list[Recommendation], int]:
-    """从数据库获取推荐内容"""
-    recommendations: list[Recommendation] = []
-    
-    try:
-        # 1. 获取推荐律师 (按评分排序)
-        if type is None or type == "all" or type == "lawyer":
-            lawyer_query = (
-                select(Lawyer)
-                .where(and_(Lawyer.is_verified == True, Lawyer.is_active == True))
-                .order_by(Lawyer.rating.desc())
-                .limit(limit)
-            )
-            lawyer_result = await db.execute(lawyer_query)
-            lawyers = lawyer_result.scalars().all()
-            
-            for lawyer in lawyers:
-                specialties = lawyer.specialties.split(",") if lawyer.specialties else []
-                recommendations.append(
-                    Recommendation(
-                        id=f"lawyer_{lawyer.id}",
-                        type="lawyer",
-                        title=f"{lawyer.name} - {lawyer.title or '专业律师'}",
-                        description=lawyer.introduction or "资深律师，为您提供专业法律服务",
-                        link=f"/lawyer/{lawyer.id}",
-                        tags=specialties[:3] if specialties else ["法律咨询"],
-                        rating=lawyer.rating or 4.5,
-                        view_count=lawyer.case_count or 0,
-                        author_name=lawyer.name,
-                        author_avatar=lawyer.avatar,
-                        created_at=lawyer.created_at.isoformat() if lawyer.created_at else None,
-                    )
-                )
-
-        # 2. 获取热门法律知识文章 (已迁移到news-service)
-        # 文章推荐由news-service提供
-
-        # 3. 获取最新咨询 (热门咨询)
-        if type is None or type == "all" or type == "consultation":
-            consultation_query = (
-                select(Consultation)
-                .order_by(Consultation.created_at.desc())
-                .limit(limit)
-            )
-            consultation_result = await db.execute(consultation_query)
-            consultations = consultation_result.scalars().all()
-            
-            for consultation in consultations:
-                recommendations.append(
-                    Recommendation(
-                        id=f"consultation_{consultation.id}",
-                        type="consultation",
-                        title=consultation.title or "法律咨询",
-                        description="点击查看咨询详情",
-                        link=f"/consultation/{consultation.id}",
-                        tags=["法律咨询"],
-                        view_count=0,
-                        created_at=consultation.created_at.isoformat() if consultation.created_at else None,
-                    )
-                )
-
-        total = len(recommendations)
-        
-        # 根据类型过滤
-        if type and type != "all":
-            recommendations = [r for r in recommendations if r.type == type]
-        
-        # 分页
-        recommendations = recommendations[offset:offset + limit]
-        
-        return recommendations, total
-        
-    except Exception as e:
-        # 如果数据库查询失败，返回默认数据
-        default_recommendations = [
-            Recommendation(
-                id="1",
-                type="lawyer",
-                title="张律师 - 专注民商事纠纷",
-                description="10年执业经验，擅长合同纠纷、债务追讨",
-                link="/lawyer/1",
-                tags=["合同纠纷", "债务追讨", "民事诉讼"],
-                rating=4.9,
-                view_count=1250,
-                author_name="张律师",
-            ),
-            Recommendation(
-                id="2",
-                type="article",
-                title="劳动合同解除的法定情形",
-                description="详解劳动合同法中关于合同解除的各项规定",
-                link="/knowledge/article/1",
-                tags=["劳动法", "合同纠纷", "员工权益"],
-                view_count=3500,
-                author_name="李律师",
-            ),
-        ]
-        return default_recommendations, len(default_recommendations)
-
-
-@router.get("/data", response_model=dict[str, Any], summary="获取首页完整数据")
-async def get_home_data(
-    request: Request,
-    include_stats: bool = True,
-    recommendation_limit: int = 8,
-    current_user: Any = Depends(get_current_user_optional),
-    db: AsyncSession = Depends(get_db),
-):
-    """获取首页完整数据聚合
-    
-    - 横幅数据
-    - 快捷入口
-    - 推荐内容
-    - 功能卡片
-    - 统计数据
-    """
-    try:
-        # 获取横幅
-        banners = await _get_home_banners()
-        
-        # 获取快捷入口
-        quick_actions = await _get_quick_actions()
-        
-        # 获取推荐内容
-        recommendations, _ = await _get_recommendations_from_db(
-            db, type="all", limit=recommendation_limit
-        )
-        
-        # 获取功能卡片
-        feature_cards = await _get_feature_cards()
-        
-        # 获取统计数据
-        stats = await _get_stats_from_db(db) if include_stats else None
-        
-        return {
-            "data": {
-                "banners": [b.model_dump() for b in banners],
-                "quick_actions": [a.model_dump() for a in quick_actions],
-                "recommendations": [r.model_dump() for r in recommendations],
-                "feature_cards": [c.model_dump() for c in feature_cards],
-                "stats": stats.model_dump() if stats else None,
-                "last_updated": datetime.now(timezone.utc).isoformat(),
-            }
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取首页数据失败: {str(e)}")
-
-
-@router.get("/banners", response_model=dict[str, list[HomeBanner]], summary="获取首页横幅")
-async def get_banners(
-    current_user: Any = Depends(get_current_user_optional),
-):
-    """获取首页横幅列表"""
-    banners = await _get_home_banners()
-    return {"banners": banners}
-
-
-@router.get("/quick-actions", response_model=dict[str, list[QuickAction]], summary="获取快捷入口")
-async def get_quick_actions(
-    current_user: Any = Depends(get_current_user_optional),
-):
-    """获取快捷入口列表"""
-    actions = await _get_quick_actions()
-    return {"actions": actions}
-
-
-@router.get("/recommendations", response_model=dict[str, Any], summary="获取推荐内容")
-async def get_recommendations(
-    type: str | None = None,
-    limit: int = 10,
-    offset: int = 0,
-    current_user: Any = Depends(get_current_user_optional),
-    db: AsyncSession = Depends(get_db),
-):
-    """获取推荐内容列表"""
-    try:
-        recommendations, total = await _get_recommendations_from_db(
-            db, type=type, limit=limit, offset=offset
-        )
-        
-        return {
-            "recommendations": [r.model_dump() for r in recommendations],
-            "total": total,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取推荐内容失败: {str(e)}")
-
-
-@router.get("/stats", response_model=dict[str, HomeStats], summary="获取首页统计数据")
-async def get_stats(
-    current_user: Any = Depends(get_current_user_optional),
-    db: AsyncSession = Depends(get_db),
-):
-    """获取首页统计数据"""
-    try:
-        stats = await _get_stats_from_db(db)
-        return {"stats": stats}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取统计数据失败: {str(e)}")
-
-
-@router.post("/track-click", summary="追踪点击行为")
-async def track_click(
-    request: Request,
-    data: dict[str, Any],
-    current_user: Any = Depends(get_current_user_optional),
-) -> dict[str, bool]:
-    """追踪用户点击行为，用于优化推荐"""
-    if not isinstance(data, dict) or "item_id" not in data:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="缺少必要参数: item_id",
-        )
+@router.post("/track-click")
+async def track_click(body: dict, request: Request):
     return {"success": True}
 
 
-@router.put("/interests", summary="更新用户兴趣")
-async def update_interests(
-    request: Request,
-    data: dict[str, list[str]],
-    current_user: Any = Depends(get_current_user_optional),
-) -> dict[str, Any]:
-    """更新用户兴趣标签"""
-    interests = data.get("interests", [])
-    if not isinstance(interests, list):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="interests 必须是字符串数组",
-        )
-    return {"success": True, "interests": interests}
+@router.post("/interests")
+async def set_interests(body: dict):
+    return {"success": True, "interests": body.get("interests", [])}

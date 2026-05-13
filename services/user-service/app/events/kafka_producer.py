@@ -3,16 +3,26 @@
 import logging
 from typing import Optional
 
-from services.common.events import (
-    EventBus,
-    UserEvent,
-    UserEventTypes,
-    PaymentEvent,
-    PaymentEventTypes,
-    get_event_bus,
-    init_event_bus,
-    close_event_bus,
-)
+try:
+    from services.common.events import (
+        EventBus,
+        UserEvent,
+        UserEventTypes,
+        PaymentEvent,
+        PaymentEventTypes,
+        get_event_bus,
+        init_event_bus,
+        close_event_bus,
+    )
+except ImportError:
+    EventBus = None
+    UserEvent = None
+    UserEventTypes = None
+    PaymentEvent = None
+    PaymentEventTypes = None
+    get_event_bus = None
+    init_event_bus = None
+    close_event_bus = None
 
 logger = logging.getLogger(__name__)
 
@@ -20,18 +30,20 @@ _event_bus: Optional[EventBus] = None
 
 
 async def init_kafka_producer(bootstrap_servers: str = "kafka:9092"):
-    """初始化 Kafka 生产者"""
     global _event_bus
+    if init_event_bus is None:
+        logger.warning("services.common.events not available, Kafka producer disabled")
+        return None
     _event_bus = await init_event_bus(bootstrap_servers)
     logger.info(f"Kafka producer initialized: {bootstrap_servers}")
     return _event_bus
 
 
 async def close_kafka_producer():
-    """关闭 Kafka 生产者"""
     global _event_bus
     if _event_bus:
-        await close_event_bus()
+        if close_event_bus is not None:
+            await close_event_bus()
         _event_bus = None
         logger.info("Kafka producer closed")
 
@@ -142,6 +154,39 @@ async def publish_membership_activated(
         return True
     except Exception as e:
         logger.error(f"Failed to publish membership_activated event: {e}")
+        return False
+
+
+async def publish_quota_changed(
+    user_id: str,
+    quota_type: str,
+    old_value: int,
+    new_value: int,
+    reason: Optional[str] = None,
+) -> bool:
+    """发布配额变更事件"""
+    if not _event_bus:
+        logger.warning("Kafka producer not initialized")
+        return False
+
+    event = PaymentEvent(
+        event_type=PaymentEventTypes.QUOTA_CHANGED,
+        user_id=user_id,
+        payload={
+            "quota_type": quota_type,
+            "old_value": old_value,
+            "new_value": new_value,
+            "reason": reason,
+        },
+        source="user-service",
+    )
+
+    try:
+        await _event_bus.publish_payment_event(event, user_id=user_id)
+        logger.info(f"Published payment.quota_changed event for user {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to publish quota_changed event: {e}")
         return False
 
 

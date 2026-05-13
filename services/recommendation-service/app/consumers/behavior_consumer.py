@@ -1,7 +1,10 @@
 import logging
 from typing import Dict, Any
 
-from services.common.events.consumer import KafkaConsumerManager
+try:
+    from services.common.events.consumer import KafkaConsumerManager
+except ImportError:
+    KafkaConsumerManager = None
 from app.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -10,7 +13,7 @@ logger = logging.getLogger(__name__)
 class BehaviorConsumer:
     def __init__(self):
         settings = get_settings()
-        self._manager = KafkaConsumerManager()
+        self._manager = KafkaConsumerManager() if KafkaConsumerManager else None
         self._group_id = settings.kafka_consumer_group
         self._db_session_factory = None
 
@@ -19,8 +22,8 @@ class BehaviorConsumer:
 
     async def start(self):
         settings = get_settings()
-        if not settings.kafka_enabled:
-            logger.warning("Kafka not enabled, behavior consumer not started")
+        if not settings.kafka_enabled or self._manager is None:
+            logger.warning("Kafka not enabled or KafkaConsumerManager unavailable, behavior consumer not started")
             return
 
         self._manager.register_handler(

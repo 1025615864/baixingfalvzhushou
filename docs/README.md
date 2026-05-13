@@ -4,8 +4,8 @@
 
 ## 项目状态
 
-- **当前版本**: v2.1
-- **最后更新**: 2026-05-09
+- **当前版本**: v3.0
+- **最后更新**: 2026-05-11
 - **项目状态**: 生产就绪
 - **架构模式**: 微服务 + BFF (Backend for Frontend)
 
@@ -32,20 +32,24 @@
 
 ### 微服务集群
 
-| 服务 | 端口 | 说明 |
-|------|------|------|
-| **backend (BFF)** | 8000 | BFF 聚合层 |
-| **user-service** | 8001 | 用户管理 |
-| **legal-service** | 8004 | 法律咨询服务 |
-| **ai-service** | 8005 | AI 对话服务 |
-| **news-service** | 8006 | 新闻服务 |
-| **community-service** | 8007 | 社区/论坛服务 |
-| **points-service** | 8008 | 积分服务 |
-| **search-service** | 8009 | 跨服务聚合搜索 |
-| **order-service** | 8010 | 订单/支付服务 |
-| **knowledge-service** | 8081 | 知识库服务 |
-| **archive-service** | 8013 | 档案服务 |
-| **embedding-service** | 8082 | 向量嵌入服务 |
+| 服务 | 端口 | 说明 | 详细文档 |
+|------|------|------|----------|
+| **backend (BFF)** | 8000 | BFF 聚合层 | [backend-bff.md](services/backend-bff.md) |
+| **user-service** | 8001 | 用户管理 | [user-service.md](services/user-service.md) |
+| **payment-channel-service** | 8002 | 支付通道 | [payment-channel-service.md](services/payment-channel-service.md) |
+| **embedding-service** | 8003 | 向量嵌入 | [embedding-service.md](services/embedding-service.md) |
+| **order-service** | 8004 | 订单服务 | [order-service.md](services/order-service.md) |
+| **ai-service** | 8005 | AI 对话 | [ai-service.md](services/ai-service.md) |
+| **news-service** | 8006 | 新闻服务 | [news-service.md](services/news-service.md) |
+| **community-service** | 8007 | 社区论坛 | [community-service.md](services/community-service.md) |
+| **legal-service** | 8008 | 法律咨询 | [legal-service.md](services/legal-service.md) |
+| **search-service** | 8009 | 搜索服务 | [search-service.md](services/search-service.md) |
+| **recommendation-service** | 8010 | 推荐服务 | [recommendation-service.md](services/recommendation-service.md) |
+| **notification-service** | 8011 | 通知服务 | [notification-service.md](services/notification-service.md) |
+| **points-service** | 8012 | 积分服务 | [points-service.md](services/points-service.md) |
+| **archive-service** | 8013 | 档案服务 | [archive-service.md](services/archive-service.md) |
+| **knowledge-service** | 8081 | 知识库 | [knowledge-service.md](services/knowledge-service.md) |
+| **frontend-v2** | 3000 | 前端应用 | [frontend.md](services/frontend.md) |
 
 ### 后端技术栈
 
@@ -111,7 +115,10 @@
 │   ├── points-service/   # 积分服务
 │   ├── knowledge-service/# 知识库服务
 │   ├── archive-service/  # 档案服务
-│   └── embedding-service/# 向量嵌入服务
+│   ├── embedding-service/# 向量嵌入服务
+│   ├── notification-service/# 通知服务
+│   ├── payment-channel-service/# 支付通道服务
+│   └── recommendation-service/# 推荐服务
 ├── deploy/               # 部署配置 (APISIX/systemd)
 ├── docs/                 # 项目文档
 ├── scripts/              # 运维脚本
@@ -163,6 +170,21 @@ npm run dev
 | [服务通信规范](./service-communication-spec.md) | 微服务间通信标准 |
 | [特性清单](./FEATURES.md) | 功能特性列表 |
 
+### 微服务文档
+
+每个微服务的详细文档包含：服务概览、API 端点、数据模型、关联服务、配置项、部署信息。
+
+| 服务 | 文档 | 服务 | 文档 |
+|------|------|------|------|
+| Backend BFF | [backend-bff.md](services/backend-bff.md) | User | [user-service.md](services/user-service.md) |
+| Payment Channel | [payment-channel-service.md](services/payment-channel-service.md) | Embedding | [embedding-service.md](services/embedding-service.md) |
+| Order | [order-service.md](services/order-service.md) | AI | [ai-service.md](services/ai-service.md) |
+| News | [news-service.md](services/news-service.md) | Community | [community-service.md](services/community-service.md) |
+| Legal | [legal-service.md](services/legal-service.md) | Search | [search-service.md](services/search-service.md) |
+| Recommendation | [recommendation-service.md](services/recommendation-service.md) | Notification | [notification-service.md](services/notification-service.md) |
+| Points | [points-service.md](services/points-service.md) | Archive | [archive-service.md](services/archive-service.md) |
+| Knowledge | [knowledge-service.md](services/knowledge-service.md) | Frontend | [frontend.md](services/frontend.md) |
+
 ### 设计文档
 
 | 文档 | 说明 |
@@ -183,7 +205,19 @@ npm run dev
 
 | 文档 | 说明 |
 |------|------|
-| [v2.1 迭代计划](./V2.1_ITERATION_PLAN.md) | 当前迭代进度与验收 |
+| [v2.1 迭代计划](./V2.1_ITERATION_PLAN.md) | v2.1迭代进度与验收 |
+| [v3.0 迭代计划](./V3_ITERATION_PLAN.md) | v3.0迭代（已完成） |
+| [v2.1 验收报告](./V2_ACCEPTANCE_REPORT.md) | v2.1验收结果 |
+| [v3.0 验收报告](./V3_ACCEPTANCE_REPORT.md) | v3.0验收结果（已通过） |
+
+### 运维脚本
+
+| 脚本 | 说明 |
+|------|------|
+| `scripts/health-check.sh` | 14服务健康检查 |
+| `scripts/verify-docker-builds.sh` | Docker构建验证 |
+| `scripts/production-readiness.sh` | 生产就绪8项检查 |
+| `scripts/perf/run-perf-tests.sh` | 性能压测运行器 |
 
 ## CI/CD
 

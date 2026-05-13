@@ -26,6 +26,23 @@ class Base(DeclarativeBase):
 
 
 def import_audit_log_model():
-    """延迟导入审计日志模型以避免循环依赖"""
-    from services.common.models.audit_log import AuditLog
-    return AuditLog
+    try:
+        from services.common.models.audit_log import AuditLog
+        return AuditLog
+    except ImportError:
+        from sqlalchemy import Column, String, Text, DateTime, Integer
+        from sqlalchemy.sql import func
+
+        class AuditLog(Base):
+            __tablename__ = "audit_logs"
+
+            id = Column(Integer, primary_key=True, autoincrement=True)
+            user_id = Column(String(255), index=True)
+            action = Column(String(100))
+            resource_type = Column(String(100))
+            resource_id = Column(String(255))
+            details = Column(Text)
+            ip_address = Column(String(45))
+            created_at = Column(DateTime, server_default=func.now())
+
+        return AuditLog

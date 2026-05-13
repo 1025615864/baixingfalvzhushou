@@ -1,6 +1,7 @@
 import pytest
 from pydantic import ValidationError
 from app.schemas.user import UserCreate, UserUpdate, PasswordChange, PasswordResetConfirm
+from tests.conftest import TEST_PASSWORD
 
 class TestUserValidationEnhancement:
     
@@ -11,7 +12,7 @@ class TestUserValidationEnhancement:
         model = UserCreate(
             username=valid_username, 
             email="test@example.com", 
-            password="Password123",
+            password=TEST_PASSWORD,
             agree_terms=True,
             agree_privacy=True,
             agree_ai_disclaimer=True
@@ -19,12 +20,11 @@ class TestUserValidationEnhancement:
         assert model.username == valid_username
 
     def test_username_invalid_chars(self):
-        """Test username with invalid characters"""
         with pytest.raises(ValidationError) as exc:
             UserCreate(
-                username="invalid@user",  # invalid char @
-                email="test@example.com", 
-                password="Password123",
+                username="invalid@user",
+                email="test@example.com",
+                password=TEST_PASSWORD,
                 agree_terms=True,
                 agree_privacy=True,
                 agree_ai_disclaimer=True
@@ -38,14 +38,11 @@ class TestUserValidationEnhancement:
             UserCreate(
                 username="u", 
                 email="test@example.com", 
-                password="Password123",
+                password=TEST_PASSWORD,
                 agree_terms=True,
                 agree_privacy=True,
                 agree_ai_disclaimer=True
             )
-        # Note: Pydantic min_length=2 checks first, or validator checks len < 2
-        # Our Schema sets min_length=2 and validator also checks it.
-        # Check specific error message if possible or just existence of error.
         errors = exc.value.errors()
         # Message might be standard pydantic min_length or custom validator
         assert any("String should have at least 2 characters" in e['msg'] or "用户名至少2个字符" in e['msg'] for e in errors)
@@ -55,12 +52,12 @@ class TestUserValidationEnhancement:
         model = UserCreate(
             username="validUser", 
             email="test@example.com", 
-            password="StrongPassword1", # Contains Upper, Lower, Digit
+            password=TEST_PASSWORD,
             agree_terms=True,
             agree_privacy=True,
             agree_ai_disclaimer=True
         )
-        assert model.password == "StrongPassword1"
+        assert model.password == TEST_PASSWORD
 
     def test_password_complexity_weak(self):
         """Test weak passwords"""

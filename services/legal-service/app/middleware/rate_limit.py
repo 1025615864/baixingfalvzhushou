@@ -1,9 +1,12 @@
 """限流中间件 - 分级限流"""
 import os
 import time
+import logging
 from typing import Optional, Tuple
 from fastapi import Request, HTTPException, status
 import redis.asyncio as redis
+
+logger = logging.getLogger(__name__)
 
 
 RATE_LIMIT_RULES = {
@@ -35,6 +38,7 @@ class RateLimiter:
                 self._client = redis.from_url(self.redis_url, decode_responses=True)
                 await self._client.ping()
             except Exception:
+                logger.error("Redis限流客户端初始化失败")
                 self._client = None
         return self._client
 
@@ -76,6 +80,7 @@ class RateLimiter:
             return True, limit - count - 1, limit
 
         except Exception:
+            logger.error("限流检查失败，默认放行")
             return True, None, limit
 
     async def get_remaining(
@@ -96,6 +101,7 @@ class RateLimiter:
                 return limit
             return max(0, limit - int(current))
         except Exception:
+            logger.error("获取限流剩余次数失败")
             return None
 
 

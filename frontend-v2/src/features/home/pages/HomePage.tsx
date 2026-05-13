@@ -27,6 +27,7 @@ import { Recommendations } from '../components/Recommendations';
 import { FeatureCards } from '../components/FeatureCards';
 import { StatsSection } from '../components/StatsSection';
 import { useHomePageData } from '../hooks/useHome';
+import { useLawyers } from '@/features/lawyer/hooks/useLawyers';
 
 /**
  * 首页功能卡片数据 - 展示平台核心功能入口
@@ -96,6 +97,9 @@ export function HomePage(): JSX.Element {
     stats,
     isLoading,
   } = useHomePageData();
+
+  const { data: lawyersData, isLoading: lawyersLoading } = useLawyers({ page_size: 4 } as Parameters<typeof useLawyers>[0]);
+  const featuredLawyers = lawyersData?.lawyers ?? [];
 
   return (
     <div className="min-h-screen">
@@ -270,32 +274,42 @@ export function HomePage(): JSX.Element {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { name: '张律师', specialty: '民商事诉讼', experience: '15年', rating: 4.9 },
-              { name: '李律师', specialty: '刑事辩护', experience: '12年', rating: 4.8 },
-              { name: '王律师', specialty: '知识产权', experience: '10年', rating: 4.9 },
-              { name: '陈律师', specialty: '婚姻家庭', experience: '8年', rating: 4.7 },
-            ].map((lawyer, index) => (
+            {lawyersLoading && Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="bg-slate-50 rounded-2xl p-6 animate-pulse">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-14 h-14 bg-slate-200 rounded-xl" />
+                  <div className="flex-1">
+                    <div className="h-5 bg-slate-200 rounded w-16 mb-2" />
+                    <div className="h-4 bg-slate-200 rounded w-24" />
+                  </div>
+                </div>
+                <div className="h-4 bg-slate-200 rounded w-20" />
+              </div>
+            ))}
+            {!lawyersLoading && featuredLawyers.length === 0 && (
+              <div className="col-span-full text-center py-8 text-slate-400">暂无推荐律师</div>
+            )}
+            {!lawyersLoading && featuredLawyers.map((lawyer) => (
               <div
-                key={index}
+                key={lawyer.id}
                 className="bg-slate-50 rounded-2xl p-6 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer group"
               >
                 <div className="flex items-center gap-4 mb-4">
                   <div className="w-14 h-14 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md group-hover:shadow-lg transition-shadow">
-                    {lawyer.name.charAt(0)}
+                    {(lawyer.name || '?').charAt(0)}
                   </div>
                   <div>
                     <h3 className="font-semibold text-slate-900">{lawyer.name}</h3>
-                    <p className="text-sm text-slate-500">{lawyer.specialty}</p>
+                    <p className="text-sm text-slate-500">{String(lawyer.specialties ?? '').split(',').filter(Boolean).slice(0, 2).join(' · ') || '执业律师'}</p>
                   </div>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-600">执业{lawyer.experience}</span>
+                  <span className="text-slate-600">执业{lawyer.experienceYears ?? 0}年</span>
                   <span className="flex items-center gap-1 text-gold-600">
                     <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
                       <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
                     </svg>
-                    {lawyer.rating}
+                    {lawyer.rating?.toFixed(1) ?? '-'}
                   </span>
                 </div>
               </div>

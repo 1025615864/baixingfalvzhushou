@@ -12,6 +12,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
     ENVIRONMENT: str = Field(default="development", description="运行环境: development/production")
@@ -47,8 +48,8 @@ class Settings(BaseSettings):
     use_remote_session: bool = Field(default=True)
 
     knowledge_service_url: str = Field(default="http://localhost:8081")
-    archive_service_url: str = Field(default="http://localhost:8082")
-    embedding_service_url: str = Field(default="http://localhost:8006")
+    archive_service_url: str = Field(default="http://localhost:8013")
+    embedding_service_url: str = Field(default="http://localhost:8003")
 
     internal_api_key: str = Field(default="internal-api-key-change-in-production")
 

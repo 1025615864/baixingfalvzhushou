@@ -6,7 +6,7 @@ from functools import lru_cache
 
 class PointsSettings(BaseSettings):
     service_name: str = "points-service"
-    service_port: int = 8008
+    service_port: int = 8012
     database_url: str = os.getenv("POINTS_DATABASE_URL", "postgresql+asyncpg://user:pass@localhost:5432/points")
     db_pool_size: int = 20
     db_max_overflow: int = 30

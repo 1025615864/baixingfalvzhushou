@@ -181,9 +181,26 @@ class ResultDeduplicator:
 class BatchRetrievalOptimizer:
     def __init__(self, batch_window_ms: int = 50):
         self._batch_window_ms = batch_window_ms
+        self._pending: dict[str, list] = {}
 
     async def execute_with_batching(self, query: str, k: int, search_func) -> list:
-        return await search_func(query, k)
+        key = f"{query}::{k}"
+        future = asyncio.get_event_loop().create_future()
+        if key not in self._pending:
+            self._pending[key] = []
+            self._pending[key].append(future)
+            try:
+                result = await search_func(query, k)
+                for f in self._pending.pop(key, []):
+                    if not f.done():
+                        f.set_result(result)
+            except Exception as e:
+                for f in self._pending.pop(key, []):
+                    if not f.done():
+                        f.set_exception(e)
+        else:
+            self._pending[key].append(future)
+        return await future
 
 
 class RequestQueueManager:

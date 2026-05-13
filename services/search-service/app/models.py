@@ -1,7 +1,8 @@
 """搜索服务模型"""
 from datetime import datetime
 from dataclasses import dataclass
-from sqlalchemy import String, DateTime, Integer, Index, Text
+from sqlalchemy import String, DateTime, Integer, Index, Text, func
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
 
@@ -28,11 +29,13 @@ class SearchIndex(Base):
     status: Mapped[str] = mapped_column(String(20), default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    search_vector = mapped_column(TSVECTOR)
 
     __table_args__ = (
         Index("idx_search_type_id", "item_type", "item_id", unique=True),
         Index("idx_search_title", "title"),
         Index("idx_search_status", "status"),
+        Index('ix_search_index_search_vector', search_vector, postgresql_using='gin'),
     )
 
 

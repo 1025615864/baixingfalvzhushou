@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import '@/i18n';
 
 const LazyAppRouter = lazy(() => import('@/app/providers/Router').then((module) => ({ default: module.AppRouter })));
 

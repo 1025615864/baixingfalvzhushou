@@ -3,6 +3,7 @@ import asyncio
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
+from tests.conftest import TEST_PASSWORD
 
 
 @pytest.mark.asyncio
@@ -24,7 +25,7 @@ async def test_alipay_notify_concurrent_idempotent(
         username="u_alipay_notify_concurrent",
         email="u_alipay_notify_concurrent@example.com",
         nickname="u_alipay_notify_concurrent",
-        hashed_password=hash_password("Test123456"),
+        hashed_password=hash_password(TEST_PASSWORD),
         role="user",
         is_active=True,
     )

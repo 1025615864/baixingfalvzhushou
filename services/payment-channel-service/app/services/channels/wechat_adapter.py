@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import base64
 import logging
+import os
 import time
 import json
 from typing import Any, Dict
@@ -34,12 +35,41 @@ class WechatAdapter(PaymentChannelAdapter):
 
     def _generate_signature(self, method: str, path: str, timestamp: str, nonce: str, body: str = "") -> str:
         message = f"{method}\n{path}\n{timestamp}\n{nonce}\n{body}\n"
-        signature = hmac.new(
-            self.api_v3_key.encode("utf-8"),
-            message.encode("utf-8"),
-            hashlib.sha256,
-        ).digest()
-        return base64.b64encode(signature).decode("utf-8")
+        try:
+            from cryptography.hazmat.primitives import hashes, serialization
+            from cryptography.hazmat.primitives.asymmetric import padding
+            from cryptography.hazmat.backends import default_backend
+
+            if self.private_key and self.private_key.startswith("-----"):
+                private_key_obj = serialization.load_pem_private_key(
+                    self.private_key.encode("utf-8"),
+                    password=None,
+                    backend=default_backend(),
+                )
+            else:
+                private_key_obj = serialization.load_pem_private_key(
+                    f"-----BEGIN PRIVATE KEY-----\n{self.private_key}\n-----END PRIVATE KEY-----".encode("utf-8"),
+                    password=None,
+                    backend=default_backend(),
+                )
+
+            signature = private_key_obj.sign(
+                message.encode("utf-8"),
+                padding.PKCS1v15(),
+                hashes.SHA256(),
+            )
+            return base64.b64encode(signature).decode("utf-8")
+        except ImportError:
+            logger.warning("cryptography package not installed, falling back to HMAC-SHA256 (not V3 compliant)")
+            signature = hmac.new(
+                self.api_v3_key.encode("utf-8"),
+                message.encode("utf-8"),
+                hashlib.sha256,
+            ).digest()
+            return base64.b64encode(signature).decode("utf-8")
+        except Exception as e:
+            logger.error(f"RSA signature generation failed: {e}")
+            raise
 
     def _build_auth_header(self, method: str, path: str, body: str = "") -> str:
         timestamp = str(int(time.time()))
@@ -99,35 +129,60 @@ class WechatAdapter(PaymentChannelAdapter):
         except Exception as e:
             if "Wechat payment creation failed" in str(e):
                 raise
-            logger.warning(f"Wechat API unavailable, using mock response: {e}")
-            return {
-                "qr_code": f"weixin://wxpay/bizpayurl?pr={order_no}",
-                "order_no": order_no,
-                "provider": "wechat",
-            }
+            logger.error(f"Wechat API unavailable: {e}")
+            raise
 
     async def verify_callback(self, payload: Dict[str, Any]) -> bool:
         try:
+            from cryptography.hazmat.primitives import hashes, serialization
+            from cryptography.hazmat.primitives.asymmetric import padding
+            from cryptography.hazmat.backends import default_backend
+
             headers = payload.get("headers", {})
             body = payload.get("body", "")
 
             timestamp = headers.get("wechatpay-timestamp", "")
             nonce = headers.get("wechatpay-nonce", "")
-            signature = headers.get("wechatpay-signature", "")
+            signature_b64 = headers.get("wechatpay-signature", "")
+            serial_no = headers.get("wechatpay-serial", "")
 
-            if not all([timestamp, nonce, signature]):
+            if not all([timestamp, nonce, signature_b64]):
+                logger.warning("Missing required WeChat callback headers")
                 return False
 
             message = f"{timestamp}\n{nonce}\n{body}\n"
-            expected_signature = base64.b64encode(
-                hmac.new(
-                    self.api_v3_key.encode("utf-8"),
-                    message.encode("utf-8"),
-                    hashlib.sha256,
-                ).digest()
-            ).decode("utf-8")
+            signature = base64.b64decode(signature_b64)
 
-            return hmac.compare_digest(signature, expected_signature)
+            wechat_public_key = os.getenv("WECHAT_PAY_PUBLIC_KEY", "")
+            if not wechat_public_key:
+                logger.error("WECHAT_PAY_PUBLIC_KEY not configured, cannot verify callback")
+                return False
+
+            if wechat_public_key.startswith("-----"):
+                public_key_obj = serialization.load_pem_public_key(
+                    wechat_public_key.encode("utf-8"),
+                    backend=default_backend(),
+                )
+            else:
+                public_key_obj = serialization.load_pem_public_key(
+                    f"-----BEGIN PUBLIC KEY-----\n{wechat_public_key}\n-----END PUBLIC KEY-----".encode("utf-8"),
+                    backend=default_backend(),
+                )
+
+            try:
+                public_key_obj.verify(
+                    signature,
+                    message.encode("utf-8"),
+                    padding.PKCS1v15(),
+                    hashes.SHA256(),
+                )
+                return True
+            except Exception:
+                logger.exception("WeChat callback signature verification failed")
+                return False
+        except ImportError:
+            logger.error("cryptography package not installed, cannot verify WeChat callback")
+            return False
         except Exception as e:
             logger.error(f"Wechat verify_callback failed: {e}")
             return False
@@ -206,11 +261,5 @@ class WechatAdapter(PaymentChannelAdapter):
         except Exception as e:
             if "Wechat refund failed" in str(e):
                 raise
-            logger.warning(f"Wechat API unavailable, using mock refund: {e}")
-            return {
-                "refund_no": refund_no,
-                "order_no": order_no,
-                "success": True,
-                "provider_refund_no": "",
-                "raw_response": {},
-            }
+            logger.error(f"Wechat API unavailable for refund: {e}")
+            raise

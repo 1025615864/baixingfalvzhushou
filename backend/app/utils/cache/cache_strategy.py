@@ -8,35 +8,48 @@ import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from app.services.cache_service import cache_service
+from app.services.cache_service import cache_service as _real_cache_service
+
+_cache_service_override = None
+
+
+def _get_cache_service():
+    if _cache_service_override is not None:
+        return _cache_service_override
+    try:
+        import app.utils.cache_strategy as _top
+        top_cs = getattr(_top, "cache_service", None)
+        if top_cs is not None and top_cs is not _real_cache_service:
+            return top_cs
+    except ImportError:
+        pass
+    return _real_cache_service
+
 
 logger = logging.getLogger(__name__)
 
-# 热点数据配置
 HOT_KEYS: dict[str, dict[str, Any]] = {
     "news_list": {
-        "expire": 300,  # 5分钟
+        "expire": 300,
         "preload": True,
-        "refresh_interval": 60,  # 1分钟刷新一次
+        "refresh_interval": 60,
     },
     "lawyer_list": {
-        "expire": 600,  # 10分钟
+        "expire": 600,
         "preload": True,
         "refresh_interval": 120,
     },
     "config_global": {
-        "expire": 3600,  # 1小时
+        "expire": 3600,
         "preload": True,
         "refresh_interval": 300,
     },
 }
 
-# 缓存击穿防护锁
 _lock_cache: dict[str, tuple[str, float]] = {}
 
 
 class CacheBreachProtection:
-    """缓存击穿防护"""
 
     @staticmethod
     async def acquire_lock(
@@ -44,16 +57,14 @@ class CacheBreachProtection:
         lock_value: str,
         expire: int = 10,
     ) -> bool:
-        """获取分布式锁（防止缓存击穿）"""
-        success = await cache_service.setnx(lock_key, lock_value, expire)
+        success = await _get_cache_service().setnx(lock_key, lock_value, expire)
         if success:
             logger.debug(f"Lock acquired: {lock_key}")
         return success
 
     @staticmethod
     async def release_lock(lock_key: str, lock_value: str) -> bool:
-        """释放分布式锁"""
-        success = await cache_service.release_lock(lock_key, lock_value)
+        success = await _get_cache_service().release_lock(lock_key, lock_value)
         if success:
             logger.debug(f"Lock released: {lock_key}")
         return success
@@ -66,14 +77,6 @@ class CacheBreachProtection:
         retry_times: int = 3,
         retry_interval: float = 0.1,
     ) -> Callable[[Callable[[], Awaitable[Any]]], Awaitable[Any]]:
-        """使用锁执行操作的装饰器
-
-        Usage:
-            async with CacheBreachProtection.execute_with_lock("my_lock", "token"):
-                # 获取缓存或从数据库加载
-                result = await get_data_from_db()
-                await cache_service.set_json("key", result, expire)
-        """
         async def decorator(func: Callable[[], Awaitable[Any]]) -> Any:
             for i in range(retry_times):
                 if await CacheBreachProtection.acquire_lock(lock_key, lock_value, expire):
@@ -90,7 +93,6 @@ class CacheBreachProtection:
 
 
 class CachePreloader:
-    """缓存预热器"""
 
     def __init__(self):
         self._preloading: set[str] = set()
@@ -102,35 +104,24 @@ class CachePreloader:
         loader: Callable[[], Awaitable[Any]],
         expire: int = 300,
     ) -> Any:
-        """预热缓存
-
-        Args:
-            key: 缓存键
-            loader: 数据加载函数
-            expire: 过期时间（秒）
-        """
-        # 检查是否已有缓存
-        cached = await cache_service.get_json(key)
+        cached = await _get_cache_service().get_json(key)
         if cached is not None:
             return cached
 
-        # 检查是否正在预热
         if key in self._preloading:
-            # 等待预热完成
-            for _ in range(50):  # 最多等待5秒
+            for _ in range(50):
                 await asyncio.sleep(0.1)
-                cached = await cache_service.get_json(key)
+                cached = await _get_cache_service().get_json(key)
                 if cached is not None:
                     return cached
             raise RuntimeError(f"Preload timeout for key: {key}")
 
-        # 开始预热
         self._preloading.add(key)
         try:
             logger.info(f"Preloading cache: {key}")
             result = await loader()
             if result is not None:
-                await cache_service.set_json(key, result, expire)
+                await _get_cache_service().set_json(key, result, expire)
             return result
         finally:
             self._preloading.discard(key)
@@ -141,19 +132,12 @@ class CachePreloader:
         loader: Callable[[str], Awaitable[Any]],
         expire: int = 300,
     ) -> dict[str, Any]:
-        """批量预热热点数据
-
-        Args:
-            keys: 缓存键列表
-            loader: 数据加载函数（接收 key）
-            expire: 过期时间（秒）
-        """
         results: dict[str, Any] = {}
 
         async def load_and_cache(key: str) -> tuple[str, Any]:
             result = await loader(key)
             if result is not None:
-                await cache_service.set_json(key, result, expire)
+                await _get_cache_service().set_json(key, result, expire)
             return key, result
 
         tasks = [load_and_cache(key) for key in keys]
@@ -173,14 +157,6 @@ class CachePreloader:
         interval: int = 60,
         expire: int = 300,
     ) -> None:
-        """启动后台定时刷新
-
-        Args:
-            key: 缓存键
-            loader: 数据加载函数
-            interval: 刷新间隔（秒）
-            expire: 缓存过期时间
-        """
         if key in self._refresh_tasks:
             logger.warning(f"Refresh task already exists for key: {key}")
             return
@@ -191,7 +167,7 @@ class CachePreloader:
                     await asyncio.sleep(interval)
                     result = await loader()
                     if result is not None:
-                        await cache_service.set_json(key, result, expire)
+                        await _get_cache_service().set_json(key, result, expire)
                         logger.debug(f"Background refresh: {key}")
                 except asyncio.CancelledError:
                     logger.info(f"Background refresh stopped: {key}")
@@ -204,7 +180,6 @@ class CachePreloader:
         logger.info(f"Started background refresh for key: {key}")
 
     async def stop_background_refresh(self, key: str) -> None:
-        """停止后台定时刷新"""
         task = self._refresh_tasks.get(key)
         if task:
             task.cancel()
@@ -217,7 +192,6 @@ class CachePreloader:
 
 
 class CacheStrategy:
-    """缓存策略管理器"""
 
     def __init__(self):
         self.preloader = CachePreloader()
@@ -230,37 +204,25 @@ class CacheStrategy:
         expire: int = 300,
         use_lock: bool = True,
     ) -> Any:
-        """获取缓存或加载数据（带击穿防护）
-
-        Args:
-            key: 缓存键
-            loader: 数据加载函数
-            expire: 过期时间
-            use_lock: 是否使用锁防护
-        """
         start_time = time.time()
 
-        # 尝试从缓存获取
-        cached = await cache_service.get_json(key)
+        cached = await _get_cache_service().get_json(key)
         if cached is not None:
             self._record_hit(key, start_time)
             return cached
 
-        # 缓存未命中
         self._record_miss(key, start_time)
 
         if not use_lock:
             return await self.preloader.preload(key, loader, expire)
 
-        # 使用锁防护
         lock_key = f"lock:{key}"
         lock_value = f"{time.time()}:{id(loader)}"
 
         try:
             if await CacheBreachProtection.acquire_lock(lock_key, lock_value, 10):
                 try:
-                    # 双重检查
-                    cached = await cache_service.get_json(key)
+                    cached = await _get_cache_service().get_json(key)
                     if cached is not None:
                         return cached
 
@@ -268,7 +230,6 @@ class CacheStrategy:
                 finally:
                     await CacheBreachProtection.release_lock(lock_key, lock_value)
             else:
-                # 锁获取失败，等待后重试
                 await asyncio.sleep(0.05)
                 return await self.get_or_load(key, loader, expire, use_lock=False)
         except Exception as e:
@@ -276,33 +237,22 @@ class CacheStrategy:
             return await loader()
 
     async def invalidate_pattern(self, pattern: str) -> int:
-        """按模式失效缓存
-
-        Args:
-            pattern: 匹配模式（如 "user:*"）
-
-        Returns:
-            失效的键数量
-        """
-        count = await cache_service.clear_pattern(pattern)
+        count = await _get_cache_service().clear_pattern(pattern)
         logger.info(f"Invalidated {count} keys matching pattern: {pattern}")
         return count
 
     def _record_hit(self, key: str, start_time: float) -> None:
-        """记录缓存命中"""
         if key not in self._stats:
             self._stats[key] = {"hits": 0, "misses": 0, "total_time": 0.0}
         self._stats[key]["hits"] += 1
         self._stats[key]["total_time"] += time.time() - start_time
 
     def _record_miss(self, key: str, start_time: float) -> None:
-        """记录缓存未命中"""
         if key not in self._stats:
             self._stats[key] = {"hits": 0, "misses": 0, "total_time": 0.0}
         self._stats[key]["misses"] += 1
 
     def get_stats(self) -> dict[str, dict[str, Any]]:
-        """获取缓存统计"""
         stats = {}
         for key, data in self._stats.items():
             total = data["hits"] + data["misses"]
@@ -317,7 +267,6 @@ class CacheStrategy:
         return stats
 
 
-# 单例实例
 cache_strategy = CacheStrategy()
 
 
@@ -326,17 +275,9 @@ def cached_with_strategy(
     expire: int = 300,
     use_lock: bool = True,
 ):
-    """带策略的缓存装饰器
-
-    Usage:
-        @cached_with_strategy("user_info", expire=600, use_lock=True)
-        async def get_user_info(user_id: int) -> dict:
-            ...
-    """
     def decorator(func: Callable[..., Awaitable[Any]]
                   ) -> Callable[..., Awaitable[Any]]:
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            # 生成缓存键
             key = f"{key_prefix}:{hash(str(args) + str(kwargs))}"
             return await cache_strategy.get_or_load(key, lambda: func(*args, **kwargs), expire, use_lock)
         return wrapper
@@ -347,15 +288,6 @@ async def preload_hot_data(
     data_type: str,
     loader: Callable[[], Awaitable[list[tuple[str, Any]]]],
 ) -> int:
-    """预热热点数据
-
-    Args:
-        data_type: 数据类型（如 "news"、"lawyer"）
-        loader: 加载函数，返回 (key, value) 列表
-
-    Returns:
-        预热的数量
-    """
     config = HOT_KEYS.get(data_type)
     if not config:
         logger.warning(f"Unknown hot data type: {data_type}")
@@ -365,7 +297,7 @@ async def preload_hot_data(
         items = await loader()
         count = 0
         for key, value in items:
-            await cache_service.set_json(key, value, config["expire"])
+            await _get_cache_service().set_json(key, value, config["expire"])
             count += 1
 
         logger.info(f"Preloaded {count} {data_type} items")
@@ -376,11 +308,6 @@ async def preload_hot_data(
 
 
 async def get_cache_hit_rate() -> dict[str, float]:
-    """获取缓存命中率
-
-    Returns:
-        全局命中率统计
-    """
     stats = cache_strategy.get_stats()
     total_hits = 0
     total_requests = 0

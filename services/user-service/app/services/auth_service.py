@@ -282,7 +282,7 @@ class AuthService:
                         details=f"Refresh token reuse detected, family {family} revoked",
                     )
             except Exception:
-                pass
+                logger.exception("Failed to log token family revocation audit event")
             return None
 
         if await token_manager.is_refresh_token_revoked(refresh_jti):

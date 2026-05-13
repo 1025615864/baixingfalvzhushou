@@ -1,0 +1,104 @@
+{
+  "app": {
+    "name": "Baixing Legal Assistant",
+    "slogan": "Making Law Accessible"
+  },
+  "nav": {
+    "home": "Home",
+    "legal": "Legal Consultation",
+    "ai": "AI Assistant",
+    "knowledge": "Knowledge Base",
+    "community": "Community",
+    "news": "News",
+    "profile": "Profile",
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error occurred",
+    "retry": "Retry",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search",
+    "noData": "No data",
+    "more": "View more",
+    "back": "Back"
+  },
+  "auth": {
+    "loginTitle": "Login",
+    "registerTitle": "Register",
+    "phone": "Phone",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "username": "Username",
+    "verificationCode": "Verification Code",
+    "getCode": "Get Code",
+    "loginSuccess": "Login successful",
+    "registerSuccess": "Registration successful",
+    "logoutSuccess": "Logged out",
+    "phoneRequired": "Phone number is required",
+    "passwordRequired": "Password is required"
+  },
+  "legal": {
+    "title": "Legal Consultation",
+    "askQuestion": "Ask a Question",
+    "myQuestions": "My Questions",
+    "lawyers": "Lawyers",
+    "onlineConsultation": "Online Consultation"
+  },
+  "ai": {
+    "title": "AI Legal Assistant",
+    "placeholder": "Describe your legal question...",
+    "send": "Send",
+    "newChat": "New Chat",
+    "history": "History"
+  },
+  "points": {
+    "title": "My Points",
+    "balance": "Points Balance",
+    "history": "Points History",
+    "redeem": "Redeem",
+    "checkIn": "Daily Check-in",
+    "checkedIn": "Checked In"
+  },
+  "notification": {
+    "title": "Notifications",
+    "markAllRead": "Mark All Read",
+    "noUnread": "No unread notifications",
+    "order": "Order",
+    "system": "System",
+    "payment": "Payment"
+  },
+  "order": {
+    "title": "My Orders",
+    "status": {
+      "pending": "Pending",
+      "paid": "Paid",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    }
+  },
+  "community": {
+    "title": "Legal Community",
+    "post": "Post",
+    "reply": "Reply",
+    "like": "Like",
+    "hotTopics": "Hot Topics"
+  },
+  "knowledge": {
+    "title": "Legal Knowledge Base",
+    "searchPlaceholder": "Search legal knowledge...",
+    "categories": "Categories",
+    "popular": "Popular"
+  },
+  "news": {
+    "title": "Legal News",
+    "latest": "Latest",
+    "hot": "Trending"
+  }
+}

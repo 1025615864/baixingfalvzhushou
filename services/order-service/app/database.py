@@ -1,7 +1,10 @@
 """数据库配置"""
+import logging
 import os
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
+
+logger = logging.getLogger(__name__)
 
 database_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/order.db")
 
@@ -24,6 +27,7 @@ async def get_db():
             yield session
             await session.commit()
         except Exception:
+            logger.exception("Database session error, rolling back")
             await session.rollback()
             raise
         finally:

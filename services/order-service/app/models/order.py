@@ -18,7 +18,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
-from services.common.models.base import Base
+from app.database import Base
 
 
 class OrderStatus(str, enum.Enum):
@@ -60,6 +60,7 @@ class Order(Base):
         Index("idx_order_created", "created_at"),
         Index("idx_order_no", "order_no", unique=True),
         Index("idx_order_saga_id", "saga_id"),
+        Index("idx_order_status", "status"),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)

@@ -4,8 +4,8 @@
 
 ## 项目状态
 
-- **当前版本**: v2.1
-- **最后更新**: 2026-05-09
+- **当前版本**: v3.0
+- **最后更新**: 2026-05-11
 - **项目状态**: 生产就绪
 
 ## 技术栈
@@ -37,7 +37,11 @@
 │   ├── search-service/   # 搜索服务
 │   ├── points-service/   # 积分服务
 │   ├── knowledge-service/# 知识库服务
-│   └── archive-service/  # 档案服务
+│   ├── archive-service/  # 档案服务
+│   ├── embedding-service/# 向量嵌入服务
+│   ├── notification-service/# 通知服务
+│   ├── payment-channel-service/# 支付通道服务
+│   └── recommendation-service/# 推荐服务
 ├── deploy/               # 部署配置 (APISIX / systemd)
 ├── docs/                 # 项目文档
 ├── scripts/              # 运维脚本
@@ -74,6 +78,8 @@ npm run dev
 
 详细文档请参阅 [docs/](docs/) 目录：
 
+### 核心文档
+
 | 文档 | 说明 |
 |------|------|
 | [项目概览](docs/README.md) | 完整项目介绍与文档导航 |
@@ -81,7 +87,29 @@ npm run dev
 | [API 参考](docs/API.md) | API 接口文档 |
 | [开发指南](docs/DEVELOPMENT.md) | 本地开发流程与规范 |
 | [功能清单](docs/FEATURES.md) | 功能特性列表 |
-| [v2.1 迭代计划](docs/V2.1_ITERATION_PLAN.md) | 当前迭代进度 |
+| [v3.0 迭代计划](docs/V3_ITERATION_PLAN.md) | v3.0迭代（已完成） |
+| [v3.0 验收报告](docs/V3_ACCEPTANCE_REPORT.md) | v3.0验收结果（已通过） |
+
+### 微服务文档
+
+| 服务 | 端口 | 说明 | 文档 |
+|------|------|------|------|
+| Backend BFF | 8000 | API 聚合层 | [backend-bff.md](docs/services/backend-bff.md) |
+| User Service | 8001 | 用户认证与会员 | [user-service.md](docs/services/user-service.md) |
+| Payment Channel | 8002 | 支付渠道 | [payment-channel-service.md](docs/services/payment-channel-service.md) |
+| Embedding | 8003 | 向量嵌入 | [embedding-service.md](docs/services/embedding-service.md) |
+| Order | 8004 | 订单管理 | [order-service.md](docs/services/order-service.md) |
+| AI | 8005 | AI 对话 | [ai-service.md](docs/services/ai-service.md) |
+| News | 8006 | 新闻资讯 | [news-service.md](docs/services/news-service.md) |
+| Community | 8007 | 社区论坛 | [community-service.md](docs/services/community-service.md) |
+| Legal | 8008 | 法律咨询 | [legal-service.md](docs/services/legal-service.md) |
+| Search | 8009 | 搜索服务 | [search-service.md](docs/services/search-service.md) |
+| Recommendation | 8010 | 推荐服务 | [recommendation-service.md](docs/services/recommendation-service.md) |
+| Notification | 8011 | 通知服务 | [notification-service.md](docs/services/notification-service.md) |
+| Points | 8012 | 积分系统 | [points-service.md](docs/services/points-service.md) |
+| Archive | 8013 | 档案服务 | [archive-service.md](docs/services/archive-service.md) |
+| Knowledge | 8081 | 知识库 | [knowledge-service.md](docs/services/knowledge-service.md) |
+| Frontend | 3000 | 前端应用 | [frontend.md](docs/services/frontend.md) |
 
 ## 许可证
 

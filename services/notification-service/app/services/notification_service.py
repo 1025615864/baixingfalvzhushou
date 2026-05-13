@@ -1,4 +1,5 @@
 """通知服务 - 服务层"""
+import logging
 from typing import List, Tuple, Optional, Dict
 from datetime import datetime
 
@@ -6,6 +7,10 @@ from sqlalchemy import select, func, desc, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Notification, NotificationSettings
+from .email_service import email_service
+from .sms_service import sms_service
+
+logger = logging.getLogger(__name__)
 
 
 class NotificationService:
@@ -63,6 +68,7 @@ class NotificationService:
         )
         session.add(notification)
         await session.flush()
+        await self._deliver_notification(session, notification)
         return notification
 
     async def create_batch_notifications(
@@ -188,6 +194,38 @@ class NotificationService:
 
         await session.flush()
         return settings
+
+    async def _deliver_notification(
+        self,
+        session: AsyncSession,
+        notification: Notification,
+    ) -> None:
+        """实际投递通知（邮件/短信）"""
+        try:
+            settings = await self.get_settings(session, notification.user_id)
+
+            if notification.type in ("system", "order", "payment"):
+                if await self.should_send_notification(session, notification.user_id, "email"):
+                    if settings.email_enabled and email_service.is_enabled:
+                        email_address = getattr(settings, "email_address", "")
+                        if email_address:
+                            await email_service.send_email(
+                                to=email_address,
+                                subject=notification.title,
+                                body=notification.content or "",
+                            )
+
+            if notification.type in ("verification", "security"):
+                if await self.should_send_notification(session, notification.user_id, "sms"):
+                    if settings.sms_enabled and sms_service.is_enabled:
+                        phone = getattr(settings, "phone_number", "")
+                        if phone:
+                            await sms_service.send_sms(
+                                phone=phone,
+                                template_params={"title": notification.title, "content": notification.content or ""},
+                            )
+        except Exception as e:
+            logger.error(f"Failed to deliver notification {notification.id}: {e}")
 
     async def should_send_notification(
         self,

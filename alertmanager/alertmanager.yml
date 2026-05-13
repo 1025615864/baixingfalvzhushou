@@ -1,32 +1,6 @@
-# Alertmanager 配置
-# 用于百姓法律助手生产环境告警通知
-#
-# 配置说明：
-# 1. 复制此文件为 alertmanager.local.yml
-# 2. 填充实际的 webhook URL 和认证信息
-# 3. 在 docker-compose 中挂载本地配置文件
-
 global:
-  # 全局配置
   resolve_timeout: 5m
 
-  # 邮件服务器配置（需要配置 SMTP）
-  # 取消注释并填充实际配置
-  # smtp_smarthost: 'smtp.example.com:587'
-  # smtp_from: 'alertmanager@example.com'
-  # smtp_auth_username: 'alertmanager@example.com'
-  # smtp_auth_password: '${SMTP_PASSWORD}'
-  # smtp_require_tls: true
-
-  # Slack 配置
-  # 从环境变量 SLACK_API_URL 读取
-  slack_api_url: '${SLACK_WEBHOOK_URL}'
-
-# 模板配置
-templates:
-  - '/etc/alertmanager/templates/*.tmpl'
-
-# 路由配置
 route:
   group_by: ['alertname', 'cluster', 'service']
   group_wait: 30s
@@ -34,42 +8,7 @@ route:
   repeat_interval: 4h
   receiver: 'default-receiver'
 
-  # 子路由配置
-  routes:
-    # 严重告警 - 立即通知
-    - match:
-        severity: critical
-      receiver: 'critical-receiver'
-      group_wait: 10s
-      repeat_interval: 1h
-
-    # 警告告警 - 批量通知
-    - match:
-        severity: warning
-      receiver: 'warning-receiver'
-      group_wait: 5m
-      repeat_interval: 6h
-
-    # 后端服务告警
-    - match:
-        service: backend
-      receiver: 'backend-receiver'
-      continue: true
-
-    # 数据库告警
-    - match:
-        service: database
-      receiver: 'database-receiver'
-      continue: true
-
-    # 安全告警
-    - match:
-        category: security
-      receiver: 'security-receiver'
-
-# 抑制规则
 inhibit_rules:
-  # 如果服务整体不可用，抑制该服务的其他告警
   - source_match:
       severity: 'critical'
       alertname: 'ServiceDown'
@@ -77,90 +16,5 @@ inhibit_rules:
       severity: 'warning'
     equal: ['service']
 
-  # 如果数据库不可用，抑制应用层告警
-  - source_match:
-      alertname: 'DatabaseDown'
-    target_match_re:
-      service: '^(backend|api)$'
-    equal: ['instance']
-
-# 接收器配置
 receivers:
-  # 默认接收器
   - name: 'default-receiver'
-    slack_configs:
-      - channel: '#alerts'
-        send_resolved: true
-        title: '{{ .Status | toUpper }}: {{ .GroupLabels.alertname }}'
-        text: |-
-          {{ range .Alerts }}
-          *告警*: {{ .Annotations.summary }}
-          *描述*: {{ .Annotations.description }}
-          *开始时间*: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
-          {{ end }}
-
-  # 严重告警接收器
-  - name: 'critical-receiver'
-    slack_configs:
-      - channel: '#alerts-critical'
-        send_resolved: true
-        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
-        title: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
-        text: |-
-          *严重级别*: CRITICAL
-          *服务*: {{ .GroupLabels.service }}
-          {{ range .Alerts }}
-          *描述*: {{ .Annotations.description }}
-          *详情*: {{ .Annotations.details }}
-          {{ end }}
-    email_configs:
-      - to: '${ALERT_EMAIL_TO}'
-        headers:
-          Subject: '🚨 [CRITICAL] {{ .GroupLabels.alertname }}'
-        send_resolved: true
-
-  # 警告告警接收器
-  - name: 'warning-receiver'
-    slack_configs:
-      - channel: '#alerts-warning'
-        send_resolved: true
-        color: 'warning'
-        title: '⚠️ WARNING: {{ .GroupLabels.alertname }}'
-        text: |-
-          *服务*: {{ .GroupLabels.service }}
-          {{ range .Alerts }}
-          *描述*: {{ .Annotations.summary }}
-          {{ end }}
-
-  # 后端服务接收器
-  - name: 'backend-receiver'
-    slack_configs:
-      - channel: '#backend-alerts'
-        send_resolved: true
-        title: '🔧 Backend: {{ .GroupLabels.alertname }}'
-
-  # 数据库服务接收器
-  - name: 'database-receiver'
-    slack_configs:
-      - channel: '#database-alerts'
-        send_resolved: true
-        title: '🗄️ Database: {{ .GroupLabels.alertname }}'
-
-  # 安全告警接收器
-  - name: 'security-receiver'
-    slack_configs:
-      - channel: '#security-alerts'
-        send_resolved: true
-        color: 'danger'
-        title: '🔒 SECURITY: {{ .GroupLabels.alertname }}'
-        text: |-
-          *严重级别*: {{ .Status | toUpper }}
-          *告警*: {{ .GroupLabels.alertname }}
-          {{ range .Alerts }}
-          *详情*: {{ .Annotations.description }}
-          {{ end }}
-    email_configs:
-      - to: '${SECURITY_EMAIL_TO}'
-        headers:
-          Subject: '🔒 [SECURITY] {{ .GroupLabels.alertname }}'
-        send_resolved: true

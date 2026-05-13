@@ -382,7 +382,7 @@ export function ChatPage(): JSX.Element {
     try {
       const controller = apiSendMessageStream(
         {
-          sessionId,
+          sessionId: sessionId ?? undefined,
           content,
           stream: true,
         },

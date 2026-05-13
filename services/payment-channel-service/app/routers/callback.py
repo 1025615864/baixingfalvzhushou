@@ -7,8 +7,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import AsyncSessionLocal
 from ..models import PaymentOrder, PaymentCallback
 from ..services.idempotency_service import IdempotencyService
-from ..events.kafka_client import get_publisher
-from ..events.kafka_events import PaymentCompletedEvent
+
+try:
+    from ..events.kafka_client import get_publisher
+    from ..events.kafka_events import PaymentCompletedEvent
+    HAS_KAFKA = True
+except ImportError:
+    HAS_KAFKA = False
+    get_publisher = None
+    PaymentCompletedEvent = None
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -55,16 +62,17 @@ async def alipay_callback(
 
             # 发布支付完成事件
             try:
-                publisher = await get_publisher()
-                if publisher:
-                    event = PaymentCompletedEvent(
-                        order_id=order.order_no,
-                        user_id=order.user_id,
-                        amount=float(order.amount),
-                        payment_method="alipay",
-                        trade_no=trade_no,
-                    )
-                    await publisher.publish(event, key=str(order.user_id))
+                if HAS_KAFKA and get_publisher:
+                    publisher = await get_publisher()
+                    if publisher:
+                        event = PaymentCompletedEvent(
+                            order_id=order.order_no,
+                            user_id=order.user_id,
+                            amount=float(order.amount),
+                            payment_method="alipay",
+                            trade_no=trade_no,
+                        )
+                        await publisher.publish(event, key=str(order.user_id))
             except Exception as e:
                 logger.error(f"Failed to publish event: {e}")
 
@@ -116,16 +124,17 @@ async def wechatpay_callback(
 
             # 发布支付完成事件
             try:
-                publisher = await get_publisher()
-                if publisher:
-                    event = PaymentCompletedEvent(
-                        order_id=order.order_no,
-                        user_id=order.user_id,
-                        amount=float(order.amount),
-                        payment_method="wechatpay",
-                        trade_no=transaction_id,
-                    )
-                    await publisher.publish(event, key=str(order.user_id))
+                if HAS_KAFKA and get_publisher:
+                    publisher = await get_publisher()
+                    if publisher:
+                        event = PaymentCompletedEvent(
+                            order_id=order.order_no,
+                            user_id=order.user_id,
+                            amount=float(order.amount),
+                            payment_method="wechatpay",
+                            trade_no=transaction_id,
+                        )
+                        await publisher.publish(event, key=str(order.user_id))
             except Exception as e:
                 logger.error(f"Failed to publish event: {e}")
 

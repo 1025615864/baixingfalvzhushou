@@ -30,6 +30,7 @@ class Consultation(Base):
         Index("idx_consult_lawyer", "lawyer_id", "status"),
         Index("idx_consult_category_status", "category", "status"),
         Index("idx_consult_lawfirm", "lawfirm_id", "status"),
+        Index("idx_consult_user_status", "user_id", "status"),
     )
 
     def __repr__(self) -> str:

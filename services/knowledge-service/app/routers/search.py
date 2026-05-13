@@ -7,7 +7,11 @@ from sqlalchemy import or_, func
 
 from app.database import get_db
 from app.models.knowledge import LegalKnowledge
-from services.common.middleware.rate_limit import check_search_rate_limit
+try:
+    from services.common.middleware.rate_limit import check_search_rate_limit
+except ImportError:
+    def check_search_rate_limit(*args, **kwargs):
+        return True, 999
 
 router = APIRouter(prefix="/api/v1/knowledge", tags=["知识搜索"])
 

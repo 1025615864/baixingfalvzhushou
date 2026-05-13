@@ -6,10 +6,23 @@ from pydantic import BaseModel, Field
 
 
 class PostCreate(BaseModel):
-    title: str
+    title: str = Field(max_length=200)
     content: str
     category: str = "general"
     cover_image: str | None = None
+
+
+class PostUpdate(BaseModel):
+    title: str | None = None
+    content: str | None = None
+    category: str | None = None
+    cover_image: str | None = None
+
+
+class CommentCreate(BaseModel):
+    content: str
+    parent_id: int | None = None
+    images: list[str] | None = None
 
 
 class NewsToForumPostRequest(BaseModel):

@@ -3,6 +3,7 @@
 提供统一的限流中间件，所有服务可复用。
 Redis 故障时自动降级为内存限流。
 """
+import logging
 import os
 import time
 import asyncio
@@ -10,6 +11,8 @@ from collections import defaultdict
 from typing import Optional, Tuple
 from fastapi import Request, HTTPException, status
 import redis.asyncio as redis
+
+logger = logging.getLogger(__name__)
 
 
 DEFAULT_RATE_LIMIT_RULES = {
@@ -76,6 +79,7 @@ class RateLimiter:
                 self._client = redis.from_url(self.redis_url, decode_responses=True)
                 await self._client.ping()
             except Exception:
+                logger.error("Redis限流客户端初始化失败")
                 self._client = None
         return self._client
 
@@ -117,7 +121,7 @@ class RateLimiter:
                 await client.incr(key)
                 return True, limit - count - 1, limit
             except Exception:
-                pass
+                logger.error("Redis限流检查失败，降级到内存限流")
 
         # Redis 不可用时降级为内存限流
         return await self._memory_limiter.check(key, limit, window)
@@ -148,7 +152,7 @@ class RateLimiter:
                 await client.incr(key)
                 return True, limit - count - 1, limit
             except Exception:
-                pass
+                logger.error("Redis IP限流检查失败，降级到内存限流")
 
         # Redis 不可用时降级为内存限流
         return await self._memory_limiter.check(key, limit, window)
@@ -179,7 +183,7 @@ class RateLimiter:
                 await client.incr(key)
                 return True, limit - count - 1, limit
             except Exception:
-                pass
+                logger.error("Redis资源限流检查失败，降级到内存限流")
 
         # Redis 不可用时降级为内存限流
         return await self._memory_limiter.check(key, limit, window)
@@ -201,7 +205,7 @@ class RateLimiter:
                     return limit
                 return max(0, limit - int(current))
             except Exception:
-                pass
+                logger.error("Redis获取限流剩余次数失败")
 
         # Redis 不可用时使用内存限流器估算
         return limit

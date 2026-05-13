@@ -2,24 +2,44 @@
 // 管理后台 - 内容管理页面
 // ============================================
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-// Mock 内容数据
-const MOCK_CONTENTS = [
-  { id: 1, title: '如何在劳动争议中维护自己的权益？', type: 'forum_post', author: '张三', status: 'published', created_at: '2026-02-01', views: 1256, likes: 89 },
-  { id: 2, title: '房屋租赁合同注意事项', type: 'knowledge', author: '李律师', status: 'published', created_at: '2026-01-30', views: 2341, likes: 156 },
-  { id: 3, title: '最新婚姻法司法解释解读', type: 'news', author: '系统管理员', status: 'published', created_at: '2026-01-28', views: 3422, likes: 234 },
-  { id: 4, title: '我有一个法律问题想咨询', type: 'forum_post', author: '用户123', status: 'pending', created_at: '2026-02-02', views: 0, likes: 0 },
-  { id: 5, title: '知识产权侵权案例分析', type: 'knowledge', author: '王律师', status: 'reviewing', created_at: '2026-01-25', views: 892, likes: 45 },
-  { id: 6, title: '广告测试帖子', type: 'forum_post', author: '可疑用户', status: 'flagged', created_at: '2026-02-02', views: 12, likes: 0 },
-];
+import { api } from '@/shared/lib/api/client';
+
+interface ContentItem {
+  id: number;
+  title: string;
+  type: string;
+  author: string;
+  status: string;
+  created_at: string;
+  views: number;
+  likes: number;
+}
+
+const DEFAULT_CONTENTS: ContentItem[] = [];
 
 export function AdminContentPage() {
+  const [contents, setContents] = useState<ContentItem[]>(DEFAULT_CONTENTS);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  const filteredContents = MOCK_CONTENTS.filter((content) => {
+  useEffect(() => {
+    const fetchContents = async () => {
+      try {
+        const data = await api.get<ContentItem[]>('/admin/content');
+        if (data && data.length > 0) {
+          setContents(data);
+        }
+      } catch {
+        // TODO: Backend /api/admin/content not yet available, using defaults
+      }
+    };
+    void fetchContents();
+  }, []);
+
+  const filteredContents = contents.filter((content) => {
     const matchesSearch = content.title.includes(searchTerm) || content.author.includes(searchTerm);
     const matchesType = typeFilter === 'all' || content.type === typeFilter;
     const matchesStatus = statusFilter === 'all' || content.status === statusFilter;

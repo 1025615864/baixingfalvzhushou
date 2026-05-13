@@ -106,6 +106,383 @@ redis:
 postgresql:
   enabled: false
 
+kafka:
+  enabled: true
+  bootstrapServers: "kafka:29092"
+
+minio:
+  enabled: false
+  endpoint: "http://minio:9000"
+  bucket: "baixing-uploads"
+
+global:
+  imageTag: latest
+
+microservices:
+  user-service:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: baixing-user-service
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 8001
+    kafka:
+      enabled: true
+    config:
+      DEBUG: "false"
+      CORS_ORIGINS: "https://yourdomain.com"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    secret:
+      DATABASE_URL: ""
+      REDIS_URL: ""
+
+  order-service:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: baixing-order-service
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 8004
+    kafka:
+      enabled: true
+    config:
+      DEBUG: "false"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    secret:
+      DATABASE_URL: ""
+      REDIS_URL: ""
+
+  payment-channel-service:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: baixing-payment-channel-service
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 8002
+    kafka:
+      enabled: true
+    config:
+      DEBUG: "false"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    secret:
+      DATABASE_URL: ""
+      REDIS_URL: ""
+
+  ai-service:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: baixing-ai-service
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 8005
+    kafka:
+      enabled: true
+    config:
+      DEBUG: "false"
+      AI_MODEL: "deepseek-chat"
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+    secret:
+      DATABASE_URL: ""
+      REDIS_URL: ""
+      EXTRA:
+        OPENAI_API_KEY: ""
+
+  embedding-service:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: baixing-embedding-service
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 8003
+    kafka:
+      enabled: true
+    config:
+      DEBUG: "false"
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+    secret:
+      DATABASE_URL: ""
+      REDIS_URL: ""
+
+  news-service:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: baixing-news-service
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 8006
+    kafka:
+      enabled: true
+    config:
+      DEBUG: "false"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    secret:
+      DATABASE_URL: ""
+      REDIS_URL: ""
+
+  community-service:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: baixing-community-service
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 8007
+    kafka:
+      enabled: true
+    config:
+      DEBUG: "false"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    secret:
+      DATABASE_URL: ""
+      REDIS_URL: ""
+
+  legal-service:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: baixing-legal-service
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 8008
+    kafka:
+      enabled: true
+    config:
+      DEBUG: "false"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    secret:
+      DATABASE_URL: ""
+      REDIS_URL: ""
+
+  search-service:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: baixing-search-service
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 8009
+    kafka:
+      enabled: true
+    config:
+      DEBUG: "false"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    secret:
+      DATABASE_URL: ""
+      REDIS_URL: ""
+
+  recommendation-service:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: baixing-recommendation-service
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 8010
+    kafka:
+      enabled: true
+    config:
+      DEBUG: "false"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    secret:
+      DATABASE_URL: ""
+      REDIS_URL: ""
+
+  notification-service:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: baixing-notification-service
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 8011
+    kafka:
+      enabled: true
+    config:
+      DEBUG: "false"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    secret:
+      DATABASE_URL: ""
+      REDIS_URL: ""
+
+  points-service:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: baixing-points-service
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 8012
+    kafka:
+      enabled: true
+    config:
+      DEBUG: "false"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    secret:
+      DATABASE_URL: ""
+      REDIS_URL: ""
+
+  archive-service:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: baixing-archive-service
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 8013
+    kafka:
+      enabled: true
+    config:
+      DEBUG: "false"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    secret:
+      DATABASE_URL: ""
+      REDIS_URL: ""
+
+  knowledge-service:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: baixing-knowledge-service
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 8081
+    kafka:
+      enabled: true
+    config:
+      DEBUG: "false"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    secret:
+      DATABASE_URL: ""
+      REDIS_URL: ""
+
+  payment-accounting-service:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: baixing-payment-accounting-service
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 8014
+    kafka:
+      enabled: true
+    config:
+      DEBUG: "false"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    secret:
+      DATABASE_URL: ""
+      REDIS_URL: ""
+
 monitoring:
   enabled: false
   prometheusRule:

@@ -120,26 +120,8 @@ def _env_enabled(name: str, default: bool = False) -> bool:
 
 async def _moderate_image_via_webhook(
         *, content: bytes, content_type: str | None) -> tuple[bool, str | None]:
-    """图片内容审核（模拟实现）
-    
-    生产环境应集成真实的审核服务（如阿里云内容安全、腾讯云天御等）
-    """
-    _ = content
-    _ = content_type
-    
-    if (not settings.debug) and not _env_enabled(
-            "UPLOAD_IMAGE_MODERATION_ALLOW_MOCK", default=False):
-        raise RuntimeError("Image moderation mock disabled")
-
-    # 记录警告：当前使用模拟实现
-    logger.warning(
-        "[SECURITY] Image moderation is using MOCK implementation. "
-        "Integrate real content moderation service for production!"
-    )
-    
-    # 模拟：所有图片都通过审核
-    # 生产环境：调用真实API检查色情、暴恐、政治敏感内容
-    return True, None
+    from ..services.image_moderation import moderate_image
+    return await moderate_image(content, content_type)
 
 
 async def _scan_bytes_with_clamd(content: bytes) -> tuple[str, str]:
@@ -563,7 +545,7 @@ async def upload_image(
 @router.get("/images/{filename}", summary="获取图片", response_model=None)
 async def get_image(
     filename: str,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User | None, Depends(get_current_user_optional)],
 ) -> FileResponse | RedirectResponse:
     """获取图片文件（需要登录）"""
     _ = current_user

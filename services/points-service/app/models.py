@@ -18,6 +18,11 @@ class PointsUser(Base):
 
 class PointsHistory(Base):
     __tablename__ = "points_history"
+    __table_args__ = (
+        Index("idx_points_history_user_created", "user_id", "created_at"),
+        Index("idx_points_history_source", "source"),
+    )
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, index=True)
     change: Mapped[int] = mapped_column()
@@ -30,6 +35,10 @@ class PointsHistory(Base):
 
 class PointsMallItem(Base):
     __tablename__ = "points_mall_items"
+    __table_args__ = (
+        Index("idx_points_mall_status", "status"),
+    )
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
     description: Mapped[str] = mapped_column(String(500), nullable=True)

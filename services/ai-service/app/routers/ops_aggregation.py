@@ -1,4 +1,5 @@
 """运营API聚合 - 代理知识库和案例库运营操作"""
+import logging
 from typing import Optional, List
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, Query, HTTPException
@@ -7,6 +8,7 @@ import httpx
 from app.dependencies.auth import require_admin, UserContext
 
 router = APIRouter(prefix="/api/v1/ai-ops", tags=["运营API聚合"])
+logger = logging.getLogger(__name__)
 
 
 class KnowledgeStats(BaseModel):
@@ -93,7 +95,7 @@ async def get_knowledge_stats():
             if response.status_code == 200:
                 return response.json()
     except Exception:
-        pass
+        logger.exception("Failed to fetch knowledge stats from service")
 
     return KnowledgeStats(total=0, published=0, draft=0, archived=0, categories=0)
 
@@ -144,7 +146,7 @@ async def get_archive_stats():
             if response.status_code == 200:
                 return response.json()
     except Exception:
-        pass
+        logger.exception("Failed to fetch archive stats from service")
 
     return ArchiveStats(total=0, published=0, draft=0, archived=0, guiding_cases=0, categories=0)
 
@@ -156,7 +158,7 @@ async def get_services_health(user: UserContext = Depends(require_admin)):
     import time
 
     knowledge_url = os.getenv("KNOWLEDGE_SERVICE_URL", "http://localhost:8081")
-    archive_url = os.getenv("ARCHIVE_SERVICE_URL", "http://localhost:8082")
+    archive_url = os.getenv("ARCHIVE_SERVICE_URL", "http://localhost:8013")
     ai_url = os.getenv("AI_SERVICE_URL", "http://localhost:8005")
 
     services = [

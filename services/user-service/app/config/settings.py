@@ -2,23 +2,27 @@
 import os
 import secrets
 from typing import Optional
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
 
 class UserServiceSettings(BaseSettings):
-    """用户服务配置"""
 
     service_name: str = "user-service"
     service_host: str = "0.0.0.0"
     service_port: int = 8001
 
-    database_url: str = os.getenv(
-        "USER_DATABASE_URL",
-        "postgresql+asyncpg://postgres:postgres@localhost:5433/user_service"
-    )
+    database_url: str = os.getenv("USER_DATABASE_URL", "")
     db_pool_size: int = 20
     db_max_overflow: int = 30
+
+    @field_validator("database_url")
+    @classmethod
+    def validate_database_url(cls, v):
+        if not v:
+            raise ValueError("USER_DATABASE_URL environment variable must be set")
+        return v
 
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:16379/0")
     redis_password: Optional[str] = os.getenv("REDIS_PASSWORD")

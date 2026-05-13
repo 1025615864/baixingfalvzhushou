@@ -185,24 +185,41 @@ jobs:
         continue-on-error: true
 
   microservice-tests:
-    name: Microservice Tests
+    name: Microservice Tests (${{ matrix.service.name }})
     runs-on: ubuntu-latest
     needs: [backend-lint]
     strategy:
+      fail-fast: false
       matrix:
         service:
+          - name: user
+            dir: ./services/user-service
+          - name: order
+            dir: ./services/order-service
+          - name: payment-channel
+            dir: ./services/payment-channel-service
+          - name: ai
+            dir: ./services/ai-service
           - name: news
             dir: ./services/news-service
-            db_port: 5433
-          - name: search
-            dir: ./services/search-service
-            db_port: 0
-          - name: legal
-            dir: ./services/legal-service
-            db_port: 5435
           - name: community
             dir: ./services/community-service
-            db_port: 5436
+          - name: legal
+            dir: ./services/legal-service
+          - name: search
+            dir: ./services/search-service
+          - name: recommendation
+            dir: ./services/recommendation-service
+          - name: notification
+            dir: ./services/notification-service
+          - name: points
+            dir: ./services/points-service
+          - name: archive
+            dir: ./services/archive-service
+          - name: knowledge
+            dir: ./services/knowledge-service
+          - name: embedding
+            dir: ./services/embedding-service
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -217,17 +234,46 @@ jobs:
         continue-on-error: true
 
   docker-build:
-    name: Docker Build
+    name: Docker Build (${{ matrix.service.tag }})
     runs-on: ubuntu-latest
     needs: [frontend-build, backend-test]
     if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
     strategy:
+      fail-fast: false
       matrix:
         service:
           - context: ./frontend-v2
             tag: baixing-frontend
           - context: ./backend
             tag: baixing-backend
+          - context: ./services/user-service
+            tag: baixing-user-service
+          - context: ./services/order-service
+            tag: baixing-order-service
+          - context: ./services/payment-channel-service
+            tag: baixing-payment-channel-service
+          - context: ./services/ai-service
+            tag: baixing-ai-service
+          - context: ./services/news-service
+            tag: baixing-news-service
+          - context: ./services/community-service
+            tag: baixing-community-service
+          - context: ./services/legal-service
+            tag: baixing-legal-service
+          - context: ./services/search-service
+            tag: baixing-search-service
+          - context: ./services/recommendation-service
+            tag: baixing-recommendation-service
+          - context: ./services/notification-service
+            tag: baixing-notification-service
+          - context: ./services/points-service
+            tag: baixing-points-service
+          - context: ./services/archive-service
+            tag: baixing-archive-service
+          - context: ./services/knowledge-service
+            tag: baixing-knowledge-service
+          - context: ./services/embedding-service
+            tag: baixing-embedding-service
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3

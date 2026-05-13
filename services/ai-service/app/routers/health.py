@@ -188,12 +188,12 @@ async def check_vector_stores() -> VectorStoreHealth:
         try:
             knowledge_count = get_knowledge_count()
         except Exception:
-            pass
+            logger.exception("Failed to get knowledge collection count")
 
         try:
             archive_count = get_archive_count()
         except Exception:
-            pass
+            logger.exception("Failed to get archive collection count")
 
         return VectorStoreHealth(
             knowledge_collection="knowledge_laws",
@@ -264,12 +264,14 @@ async def readiness_check():
         from app.services.knowledge_vector_store import knowledge_vector_store
         checks["knowledge_vector"] = "ok" if knowledge_vector_store else "fail"
     except Exception:
+        logger.error("Failed to check knowledge vector store availability")
         checks["knowledge_vector"] = "skipped"
 
     try:
         from app.services.archive_vector_store import archive_vector_store
         checks["archive_vector"] = "ok" if archive_vector_store else "fail"
     except Exception:
+        logger.error("Failed to check archive vector store availability")
         checks["archive_vector"] = "skipped"
 
     checks["llm_provider"] = "ok" if (await check_llm_provider()).healthy else "fail"

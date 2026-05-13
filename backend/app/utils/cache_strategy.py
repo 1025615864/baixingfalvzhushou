@@ -8,3 +8,4 @@ from app.utils.cache.cache_strategy import (  # noqa: F401
     get_cache_hit_rate,
     preload_hot_data,
 )
+from app.services.cache_service import cache_service  # noqa: F401

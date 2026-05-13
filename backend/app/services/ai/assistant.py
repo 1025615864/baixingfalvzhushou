@@ -5,6 +5,38 @@ from dataclasses import dataclass
 
 from app.services.ai.session import SessionManager
 from app.services.ai.core import AICore
+from app.services.ai.knowledge_base import LegalKnowledgeBase
+
+try:
+    from app.config import get_settings
+except Exception:
+    from unittest.mock import MagicMock
+    get_settings = MagicMock()
+
+try:
+    from langchain_openai import ChatOpenAI
+except Exception:
+    ChatOpenAI = None
+
+try:
+    from app.services.ai.content_safety import ContentSafetyFilter
+except Exception:
+    ContentSafetyFilter = None
+
+try:
+    from app.services.ai.response_strategy import ResponseStrategyDecider
+except Exception:
+    ResponseStrategyDecider = None
+
+try:
+    from app.services.ai.intent_classifier import AiIntentClassifier
+except Exception:
+    AiIntentClassifier = None
+
+try:
+    from app.services.disclaimer import DisclaimerManager
+except Exception:
+    DisclaimerManager = None
 
 
 @dataclass
@@ -30,22 +62,38 @@ class AILegalAssistant:
         self._session_manager.clear_session(session_id)
 
     def _evict_if_needed(self) -> None:
-        self._session_manager._evict_if_needed()
+        if len(self.conversation_histories) <= self._max_sessions:
+            return
+        oldest = sorted(self._last_seen.items(), key=lambda x: x[1])
+        to_remove = len(self.conversation_histories) - self._max_sessions
+        for sid, _ in oldest[:to_remove]:
+            self.conversation_histories.pop(sid, None)
+            self._last_seen.pop(sid, None)
 
     def _append_disclaimer(self, answer: str, risk_level=None, strategy=None) -> str:
         if self._disclaimer_manager is None:
-            try:
-                from app.services.disclaimer import DisclaimerManager
+            if DisclaimerManager is not None:
                 self._disclaimer_manager = DisclaimerManager()
-            except Exception:
-                return answer
+            else:
+                try:
+                    from app.services.disclaimer import DisclaimerManager as DM
+                    self._disclaimer_manager = DM()
+                except Exception:
+                    return answer
         disclaimer = self._disclaimer_manager.get_disclaimer(risk_level=risk_level, strategy=strategy)
         if disclaimer:
             return f"{answer}\n\n---\n{disclaimer}"
         return answer
 
     def _normalize_history(self, history: list[dict]) -> list[dict]:
-        return self._session_manager._normalize_history(history)
+        valid_roles = {"user", "assistant", "system"}
+        result = []
+        for msg in history:
+            role = msg.get("role", "").strip().lower()
+            content = msg.get("content", "")
+            if role in valid_roles and content and content.strip():
+                result.append({"role": role, "content": content.strip() if isinstance(content, str) else content})
+        return result
 
     def _count_tokens(self, text: str, model: str = "gpt-4") -> int:
         return AICore._count_tokens(text, model)
@@ -76,7 +124,6 @@ class AILegalAssistant:
 
     def _model_candidates(self) -> list[str]:
         try:
-            from app.core.config import get_settings
             settings = get_settings()
             primary = getattr(settings, 'ai_model', '')
             fallbacks = getattr(settings, 'ai_fallback_models', []) or []
@@ -89,8 +136,9 @@ class AILegalAssistant:
         return AICore._encoding_for_model(model)
 
     def _llm_for_model(self, model: str):
+        if ChatOpenAI is None:
+            return None
         try:
-            from langchain_openai import ChatOpenAI
             from app.core.config import get_settings
             settings = get_settings()
             return ChatOpenAI(

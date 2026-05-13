@@ -5,7 +5,7 @@ from typing import Optional, Any
 from dataclasses import dataclass, field
 
 
-class PointsAction(enum.Enum):
+class PointsAction(str, enum.Enum):
     DAILY_SIGNIN = "daily_signin"
     AI_CONSULTATION = "ai_consultation"
     POST_CREATED = "post_created"
@@ -36,26 +36,42 @@ class PointsRule:
 
 
 POINTS_RULES: dict[PointsAction, PointsRule] = {
-    PointsAction.DAILY_SIGNIN: PointsRule(action=PointsAction.DAILY_SIGNIN, points=5, max_daily=1, description="每日签到"),
-    PointsAction.AI_CONSULTATION: PointsRule(action=PointsAction.AI_CONSULTATION, points=3, max_daily=10, description="AI咨询"),
-    PointsAction.POST_CREATED: PointsRule(action=PointsAction.POST_CREATED, points=10, max_daily=5, description="发布帖子"),
-    PointsAction.COMMENT_CREATED: PointsRule(action=PointsAction.COMMENT_CREATED, points=5, max_daily=20, description="发表评论"),
+    PointsAction.DAILY_SIGNIN: PointsRule(
+        action=PointsAction.DAILY_SIGNIN, points=5, max_daily=1, description="每日签到",
+        continuous_bonus={"7_days": {"bonus": 10, "description": "连续7天签到奖励"}, "30_days": {"bonus": 50, "description": "连续30天签到奖励"}},
+    ),
+    PointsAction.AI_CONSULTATION: PointsRule(action=PointsAction.AI_CONSULTATION, points=2, max_daily=10, description="AI咨询", requires_auth=True, vip_multiplier=1.5),
+    PointsAction.POST_CREATED: PointsRule(action=PointsAction.POST_CREATED, points=10, max_daily=5, description="发布帖子", requires_auth=True),
+    PointsAction.COMMENT_CREATED: PointsRule(action=PointsAction.COMMENT_CREATED, points=5, max_daily=20, description="发表评论", requires_auth=True),
     PointsAction.SHARE_CONTENT: PointsRule(action=PointsAction.SHARE_CONTENT, points=3, max_daily=10, description="分享内容"),
     PointsAction.DOCUMENT_GENERATED: PointsRule(action=PointsAction.DOCUMENT_GENERATED, points=2, max_daily=10, description="生成文档"),
     PointsAction.LAWYER_BOOKING: PointsRule(action=PointsAction.LAWYER_BOOKING, points=15, max_daily=3, description="预约律师"),
-    PointsAction.INVITE_FRIEND: PointsRule(action=PointsAction.INVITE_FRIEND, points=50, max_daily=5, description="邀请好友"),
+    PointsAction.INVITE_FRIEND: PointsRule(action=PointsAction.INVITE_FRIEND, points=100, max_daily=10, description="邀请好友"),
     PointsAction.FAVORITE_POST: PointsRule(action=PointsAction.FAVORITE_POST, points=2, max_daily=10, description="收藏帖子"),
     PointsAction.COMPLETE_PROFILE: PointsRule(action=PointsAction.COMPLETE_PROFILE, points=20, max_daily=1, description="完善资料"),
     PointsAction.FIRST_QUESTION: PointsRule(action=PointsAction.FIRST_QUESTION, points=10, max_daily=1, description="首次提问"),
 }
 
 
-def get_vip_multiplier(level: int) -> float:
+async def get_vip_multiplier(user_id: int, db: Any = None) -> float:
     multipliers = {1: 1.0, 2: 1.2, 3: 1.5, 4: 2.0, 5: 3.0}
+    level = 1
+    if db is not None:
+        try:
+            from app.services.points.points_service_base import PointsServiceBase
+            svc = PointsServiceBase()
+            level = svc.get_level(user_id)
+        except Exception:
+            level = 1
     return multipliers.get(level, 1.0)
 
 
-def get_points_rule(action: PointsAction) -> Optional[PointsRule]:
+def get_points_rule(action: PointsAction | str) -> Optional[PointsRule]:
+    if isinstance(action, str):
+        try:
+            action = PointsAction(action)
+        except ValueError:
+            return None
     return POINTS_RULES.get(action)
 
 

@@ -44,6 +44,8 @@ class BalanceTransaction(Base):
     __table_args__ = (
         Index("idx_tx_user_type", "user_id", "type"),
         Index("idx_tx_created", "created_at"),
+        Index("idx_tx_user_created", "user_id", "created_at"),
+        Index("idx_tx_order", "order_id"),
     )
 
     def __repr__(self) -> str:
@@ -74,6 +76,10 @@ class LawyerWallet(Base):
 class Settlement(Base):
     """结算记录表"""
     __tablename__ = "settlements"
+    __table_args__ = (
+        Index("idx_settlement_lawyer_status", "lawyer_id", "status"),
+        Index("idx_settlement_created", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     lawyer_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)

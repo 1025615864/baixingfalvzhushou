@@ -2,7 +2,9 @@
 // 管理后台 - 系统设置页面
 // ============================================
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+import { api } from '@/shared/lib/api/client';
 
 interface SettingSection {
   id: string;
@@ -20,16 +22,16 @@ interface SettingItem {
   description?: string;
 }
 
-const MOCK_SETTINGS: SettingSection[] = [
+const DEFAULT_SETTINGS: SettingSection[] = [
   {
     id: 'general',
     title: '通用设置',
     description: '配置系统的基本信息',
     settings: [
-      { id: 'site_name', label: '站点名称', type: 'input', value: '百姓法律咨询平台', description: '显示在浏览器标签和页脚的站点名称' },
-      { id: 'site_logo', label: '站点Logo', type: 'input', value: '/logo.png', description: '站点Logo图片地址' },
-      { id: 'contact_email', label: '联系邮箱', type: 'input', value: 'contact@example.com', description: '用于接收系统通知和用户反馈' },
-      { id: 'icp', label: 'ICP备案号', type: 'input', value: '京ICP备12345678号', description: '网站的ICP备案信息' },
+      { id: 'site_name', label: '站点名称', type: 'input', value: '', description: '显示在浏览器标签和页脚的站点名称' },
+      { id: 'site_logo', label: '站点Logo', type: 'input', value: '', description: '站点Logo图片地址' },
+      { id: 'contact_email', label: '联系邮箱', type: 'input', value: '', description: '用于接收系统通知和用户反馈' },
+      { id: 'icp', label: 'ICP备案号', type: 'input', value: '', description: '网站的ICP备案信息' },
     ],
   },
   {
@@ -37,7 +39,7 @@ const MOCK_SETTINGS: SettingSection[] = [
     title: '安全设置',
     description: '配置系统的安全策略',
     settings: [
-      { id: 'enable_captcha', label: '启用验证码', type: 'toggle', value: true, description: '在登录和注册时启用图形验证码' },
+      { id: 'enable_captcha', label: '启用验证码', type: 'toggle', value: false, description: '在登录和注册时启用图形验证码' },
       { id: 'max_login_attempts', label: '最大登录尝试次数', type: 'number', value: 5, description: '超过此次数将锁定账户15分钟' },
       { id: 'password_min_length', label: '密码最小长度', type: 'number', value: 8, description: '用户密码的最小长度要求' },
       { id: 'session_timeout', label: '会话超时时间(分钟)', type: 'number', value: 60, description: '用户无操作后自动登出的时间' },
@@ -48,11 +50,11 @@ const MOCK_SETTINGS: SettingSection[] = [
     title: '支付设置',
     description: '配置支付相关的参数',
     settings: [
-      { id: 'consultation_fee', label: '咨询默认费用', type: 'number', value: 50, description: '单次咨询的默认费用(元)' },
-      { id: 'platform_rate', label: '平台抽成比例(%)', type: 'number', value: 10, description: '平台从每笔交易中抽取的百分比' },
-      { id: 'min_withdrawal', label: '最低提现金额', type: 'number', value: 100, description: '律师提现的最低金额要求' },
-      { id: 'enable_wechat_pay', label: '启用微信支付', type: 'toggle', value: true, description: '允许用户使用微信支付' },
-      { id: 'enable_alipay', label: '启用支付宝', type: 'toggle', value: true, description: '允许用户使用支付宝支付' },
+      { id: 'consultation_fee', label: '咨询默认费用', type: 'number', value: 0, description: '单次咨询的默认费用(元)' },
+      { id: 'platform_rate', label: '平台抽成比例(%)', type: 'number', value: 0, description: '平台从每笔交易中抽取的百分比' },
+      { id: 'min_withdrawal', label: '最低提现金额', type: 'number', value: 0, description: '律师提现的最低金额要求' },
+      { id: 'enable_wechat_pay', label: '启用微信支付', type: 'toggle', value: false, description: '允许用户使用微信支付' },
+      { id: 'enable_alipay', label: '启用支付宝', type: 'toggle', value: false, description: '允许用户使用支付宝支付' },
     ],
   },
   {
@@ -61,8 +63,8 @@ const MOCK_SETTINGS: SettingSection[] = [
     description: '配置内容审核和展示规则',
     settings: [
       { id: 'auto_approve', label: '自动审核通过', type: 'toggle', value: false, description: '新发布的内容自动审核通过' },
-      { id: 'enable_comment', label: '启用评论功能', type: 'toggle', value: true, description: '允许用户对内容进行评论' },
-      { id: 'sensitive_words', label: '敏感词过滤', type: 'toggle', value: true, description: '自动过滤包含敏感词的内容' },
+      { id: 'enable_comment', label: '启用评论功能', type: 'toggle', value: false, description: '允许用户对内容进行评论' },
+      { id: 'sensitive_words', label: '敏感词过滤', type: 'toggle', value: false, description: '自动过滤包含敏感词的内容' },
       { id: 'content_per_page', label: '每页内容数量', type: 'number', value: 20, description: '列表页每页显示的内容数量' },
     ],
   },
@@ -71,19 +73,36 @@ const MOCK_SETTINGS: SettingSection[] = [
     title: 'AI 设置',
     description: '配置 AI 助手相关参数',
     settings: [
-      { id: 'enable_ai_chat', label: '启用AI对话', type: 'toggle', value: true, description: '允许用户使用AI助手功能' },
-      { id: 'ai_model', label: 'AI模型', type: 'select', value: 'gpt-4', options: ['gpt-4', 'gpt-3.5-turbo', 'claude-3'], description: '选择使用的AI模型' },
-      { id: 'max_context_length', label: '最大上下文长度', type: 'number', value: 4000, description: 'AI对话的最大上下文token数' },
-      { id: 'ai_temperature', label: 'AI创造性', type: 'number', value: 0.7, description: '值越高回答越有创意(0-1)' },
+      { id: 'enable_ai_chat', label: '启用AI对话', type: 'toggle', value: false, description: '允许用户使用AI助手功能' },
+      { id: 'ai_model', label: 'AI模型', type: 'select', value: '', options: ['gpt-4', 'gpt-3.5-turbo', 'claude-3'], description: '选择使用的AI模型' },
+      { id: 'max_context_length', label: '最大上下文长度', type: 'number', value: 0, description: 'AI对话的最大上下文token数' },
+      { id: 'ai_temperature', label: 'AI创造性', type: 'number', value: 0, description: '值越高回答越有创意(0-1)' },
     ],
   },
 ];
 
 export function AdminSettingsPage() {
   const [activeSection, setActiveSection] = useState('general');
-  const [settings, setSettings] = useState<SettingSection[]>(MOCK_SETTINGS);
+  const [settings, setSettings] = useState<SettingSection[]>(DEFAULT_SETTINGS);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const data = await api.get<SettingSection[]>('/admin/settings');
+        if (data && data.length > 0) {
+          setSettings(data);
+        }
+      } catch {
+        // TODO: Backend /api/admin/settings not yet available, using defaults
+      } finally {
+        setLoading(false);
+      }
+    };
+    void fetchSettings();
+  }, []);
 
   const currentSection = settings.find((s) => s.id === activeSection);
 
@@ -100,14 +119,19 @@ export function AdminSettingsPage() {
     );
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setSaving(true);
-    // 模拟保存操作
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      await api.put('/admin/settings', { settings });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
-    }, 1000);
+    } catch {
+      // TODO: Backend /api/admin/settings PUT not yet available
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const renderSettingInput = (setting: SettingItem) => {

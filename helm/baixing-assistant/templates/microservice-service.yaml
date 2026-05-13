@@ -1,0 +1,23 @@
+{{- range $name, $svc := .Values.microservices }}
+{{- if $svc.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "baixing-assistant.fullname" $ }}-{{ $name }}
+  labels:
+{{ include "baixing-assistant.labels" $ | indent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+spec:
+  type: {{ $svc.service.type | default "ClusterIP" }}
+  ports:
+    - port: {{ $svc.service.port }}
+      targetPort: {{ $svc.service.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: {{ include "baixing-assistant.name" $ }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: {{ $name }}
+{{- end }}
+{{- end }}

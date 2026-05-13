@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import cast
 
 from app.config import get_settings
+from tests.conftest import TEST_PASSWORD
 
 
 def _json_dict(res: Response) -> dict[str, object]:
@@ -33,7 +34,7 @@ async def test_payment_webhook_marks_order_paid_and_records_event(
         username="u_pay_smoke",
         email="u_pay_smoke@example.com",
         nickname="u_pay_smoke",
-        hashed_password=hash_password("Test123456"),
+        hashed_password=hash_password(TEST_PASSWORD),
         role="user",
         is_active=True,
     )
@@ -65,7 +66,7 @@ async def test_payment_webhook_marks_order_paid_and_records_event(
         username="u_pay_admin",
         email="u_pay_admin@example.com",
         nickname="u_pay_admin",
-        hashed_password=hash_password("Test123456"),
+        hashed_password=hash_password(TEST_PASSWORD),
         role="admin",
         is_active=True,
     )
@@ -128,7 +129,7 @@ async def test_payment_webhook_missing_secret_returns_error(
         username="u_pay_missing_secret",
         email="u_pay_missing_secret@example.com",
         nickname="u_pay_missing_secret",
-        hashed_password=hash_password("Test123456"),
+        hashed_password=hash_password(TEST_PASSWORD),
         role="user",
         is_active=True,
     )
@@ -172,7 +173,7 @@ async def test_payment_webhook_missing_secret_records_event(
         username="u_pay_admin_webhook",
         email="u_pay_admin_webhook@example.com",
         nickname="u_pay_admin_webhook",
-        hashed_password=hash_password("Test123456"),
+        hashed_password=hash_password(TEST_PASSWORD),
         role="admin",
         is_active=True,
     )
@@ -210,7 +211,7 @@ async def test_ikunpay_pay_url_return_url_contains_order_no(
         username="u_pay_ikun",
         email="u_pay_ikun@example.com",
         nickname="u_pay_ikun",
-        hashed_password=hash_password("Test123456"),
+        hashed_password=hash_password(TEST_PASSWORD),
         role="user",
         is_active=True,
     )

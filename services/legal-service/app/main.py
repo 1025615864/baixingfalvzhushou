@@ -28,6 +28,34 @@ settings = get_settings()
 setup_logging(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
 
+try:
+    from services.common.security import get_cors_config
+except ImportError:
+    def get_cors_config():
+        return {
+            "allow_origins": os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(","),
+            "allow_credentials": True,
+            "allow_methods": ["*"],
+            "allow_headers": ["*"],
+        }
+
+try:
+    from services.common.tracing import init_telemetry
+except ImportError:
+    def init_telemetry(*args, **kwargs):
+        pass
+
+try:
+    from services.common.discovery import get_consul_registry
+except ImportError:
+    def get_consul_registry(*args, **kwargs):
+        return None
+
+try:
+    from services.common.proto import legal_pb2_grpc
+except ImportError:
+    legal_pb2_grpc = None
+
 _redis_client: redis.Redis = None
 _redis_for_rate_limit: redis.Redis = None
 _start_time = time.time()
@@ -39,7 +67,6 @@ async def lifespan(app: FastAPI):
     global _redis_client, _redis_for_rate_limit, _grpc_server
     logger.info("Legal service starting...")
 
-    from services.common.tracing import init_telemetry
     init_telemetry(
         service_name="legal-service",
         service_version="1.0.0",
@@ -66,12 +93,12 @@ async def lifespan(app: FastAPI):
                 decode_responses=True
             )
         except Exception:
+            logger.error("限流Redis连接初始化失败")
             _redis_for_rate_limit = None
 
     from .middleware.rate_limit import rate_limiter
     rate_limiter._client = _redis_for_rate_limit
 
-    from services.common.discovery import get_consul_registry
     consul = get_consul_registry()
     if consul and os.getenv("CONSUL_ENABLED", "").lower() in {"1", "true", "yes"}:
         host = os.getenv("SERVICE_HOST", "localhost")
@@ -106,12 +133,14 @@ async def lifespan(app: FastAPI):
     _grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     from .database import AsyncSessionLocal
     from .grpc_server import SyncLegalServiceServicer
-    from services.common.proto import legal_pb2_grpc
-    servicer = SyncLegalServiceServicer(AsyncSessionLocal, _redis_client)
-    legal_pb2_grpc.add_LegalServiceServicer_to_server(servicer, _grpc_server)
-    _grpc_server.add_insecure_port(f"[::]:{grpc_port}")
-    _grpc_server.start()
-    logger.info(f"gRPC server started on port {grpc_port}")
+    if legal_pb2_grpc:
+        servicer = SyncLegalServiceServicer(AsyncSessionLocal, _redis_client)
+        legal_pb2_grpc.add_LegalServiceServicer_to_server(servicer, _grpc_server)
+        _grpc_server.add_insecure_port(f"[::]:{grpc_port}")
+        _grpc_server.start()
+        logger.info(f"gRPC server started on port {grpc_port}")
+    else:
+        logger.warning("legal_pb2_grpc not available, gRPC server not started")
 
     from .services.appointment_scheduler import get_scheduler
     scheduler = get_scheduler(AsyncSessionLocal)
@@ -161,7 +190,6 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    from services.common.security import get_cors_config
 
     app = FastAPI(
         title="Legal Service",

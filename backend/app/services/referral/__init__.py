@@ -136,10 +136,10 @@ class ReferralService:
         ref = self._referrals.get(code)
         if not ref:
             return {"success": False, "error": "邀请码不存在"}
-        if ref["status"] != ReferralStatus.ACCEPTED:
-            return {"success": False, "error": "邀请码未被接受"}
         if ref["reward_claimed"]:
             return {"success": False, "error": "奖励已领取"}
+        if ref["status"] != ReferralStatus.ACCEPTED:
+            return {"success": False, "error": "邀请码未被接受"}
         ref["reward_claimed"] = True
         ref["status"] = ReferralStatus.REWARDED
         reward = self._reward_config.get_reward("referrer")

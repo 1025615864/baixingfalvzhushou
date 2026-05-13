@@ -1,0 +1,354 @@
+x-common-backend: &common-backend
+  environment:
+    POSTGRES_USER: ${POSTGRES_USER:-postgres}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD?POSTGRES_PASSWORD is required}
+    POSTGRES_DB: ${POSTGRES_DB:-baixing_law}
+    POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+    POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+    REDIS_URL: ${REDIS_URL:-redis://:${REDIS_PASSWORD?REDIS_PASSWORD is required}@redis:6379/0}
+    OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.deepseek.com/v1}
+    AI_MODEL: ${AI_MODEL:-deepseek-chat}
+    ENVIRONMENT: ${ENVIRONMENT:-development}
+
+services:
+  # ==============================================
+  # 基础设施
+  # ==============================================
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-baixing_law}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend-network
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD?REDIS_PASSWORD is required} --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD?REDIS_PASSWORD is required}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - backend-network
+
+  # ==============================================
+  # Nginx 反向代理
+  # ==============================================
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - frontend-network
+      - backend-network
+
+  # ==============================================
+  # 核心应用
+  # ==============================================
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      <<: *common-backend
+      AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai-service:8005}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev_jwt_secret}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      CSRF_SECRET_KEY: ${CSRF_SECRET_KEY:-dev_csrf_secret}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/alembic:/app/alembic
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - backend-network
+      - frontend-network
+
+  frontend:
+    build:
+      context: ./frontend-v2
+      dockerfile: Dockerfile.dev
+    environment:
+      VITE_API_BASE_URL: /api
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend-v2/src:/app/src
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3000"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - frontend-network
+
+  # ==============================================
+  # 微服务
+  # ==============================================
+
+  ai-service:
+    build:
+      context: ./services/ai-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *common-backend
+      USER_SERVICE_URL: ${USER_SERVICE_URL:-http://user-service:8001}
+      KNOWLEDGE_SERVICE_URL: ${KNOWLEDGE_SERVICE_URL:-http://knowledge-service:8081}
+      ARCHIVE_SERVICE_URL: ${ARCHIVE_SERVICE_URL:-http://archive-service:8013}
+    ports:
+      - "8005:8005"
+    depends_on:
+      - user-service
+      - knowledge-service
+    networks:
+      - backend-network
+
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *common-backend
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend-network
+
+  legal-service:
+    build:
+      context: ./services/legal-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *common-backend
+    ports:
+      - "8008:8008"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend-network
+
+  community-service:
+    build:
+      context: ./services/community-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *common-backend
+    ports:
+      - "8007:8007"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend-network
+
+  knowledge-service:
+    build:
+      context: ./services/knowledge-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *common-backend
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend-network
+
+  archive-service:
+    build:
+      context: ./services/archive-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *common-backend
+    ports:
+      - "8013:8013"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend-network
+
+  payment-channel-service:
+    build:
+      context: ./services/payment-channel-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *common-backend
+      WECHAT_APP_ID: ${WECHAT_APP_ID:-}
+      WECHAT_APP_SECRET: ${WECHAT_APP_SECRET:-}
+    ports:
+      - "8014:8014"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend-network
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *common-backend
+    ports:
+      - "8011:8011"
+    networks:
+      - backend-network
+
+  recommendation-service:
+    build:
+      context: ./services/recommendation-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *common-backend
+    ports:
+      - "8010:8010"
+    networks:
+      - backend-network
+
+  points-service:
+    build:
+      context: ./services/points-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *common-backend
+    ports:
+      - "8012:8012"
+    networks:
+      - backend-network
+
+  order-service:
+    build:
+      context: ./services/order-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *common-backend
+    ports:
+      - "8004:8004"
+    networks:
+      - backend-network
+
+  search-service:
+    build:
+      context: ./services/search-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *common-backend
+    ports:
+      - "8009:8009"
+    networks:
+      - backend-network
+
+  news-service:
+    build:
+      context: ./services/news-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *common-backend
+    ports:
+      - "8006:8006"
+    networks:
+      - backend-network
+
+  embedding-service:
+    build:
+      context: ./services/embedding-service
+      dockerfile: Dockerfile
+    environment:
+      <<: *common-backend
+    ports:
+      - "8003:8003"
+    networks:
+      - backend-network
+
+  # ==============================================
+  # 监控栈
+  # ==============================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks:
+      - backend-network
+      - monitoring-network
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
+    volumes:
+      - ./backend/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring-network
+
+networks:
+  backend-network:
+    driver: bridge
+  frontend-network:
+    driver: bridge
+  monitoring-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:

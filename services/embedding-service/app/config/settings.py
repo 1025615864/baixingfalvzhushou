@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     )
 
     SERVICE_NAME: str = "embedding-service"
-    SERVICE_PORT: int = 8006
+    SERVICE_PORT: int = 8003
     ENVIRONMENT: str = "development"
 
     EMBEDDING_MODEL: str = "shibing624/text2vec-base-chinese"

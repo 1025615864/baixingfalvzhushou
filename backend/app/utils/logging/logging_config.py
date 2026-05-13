@@ -1,46 +1,33 @@
 """日志配置"""
 import logging
 import sys
+from datetime import datetime as _stdlib_datetime
 from pathlib import Path
-from datetime import datetime
 
 
-def setup_logging(
+def _setup_logging_impl(
     log_level: str = "INFO",
     log_dir: str = "logs",
-    app_name: str = "baixing_law"
+    app_name: str = "baixing_law",
+    _datetime=_stdlib_datetime,
 ) -> None:
-    """
-    配置日志系统
-
-    Args:
-        log_level: 日志级别
-        log_dir: 日志目录
-        app_name: 应用名称
-    """
-    # 创建日志目录
     log_path = Path(log_dir)
     log_path.mkdir(parents=True, exist_ok=True)
 
-    # 日志格式
     log_format = "%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d | %(message)s"
     date_format = "%Y-%m-%d %H:%M:%S"
 
-    # 获取根日志器
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
 
-    # 清除现有处理器
     root_logger.handlers.clear()
 
-    # 控制台处理器
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.DEBUG)
     console_handler.setFormatter(logging.Formatter(log_format, date_format))
     root_logger.addHandler(console_handler)
 
-    # 文件处理器 - 普通日志
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = _datetime.now().strftime("%Y-%m-%d")
     file_handler = logging.FileHandler(
         log_path / f"{app_name}_{today}.log",
         encoding="utf-8"
@@ -49,7 +36,6 @@ def setup_logging(
     file_handler.setFormatter(logging.Formatter(log_format, date_format))
     root_logger.addHandler(file_handler)
 
-    # 文件处理器 - 错误日志
     error_handler = logging.FileHandler(
         log_path / f"{app_name}_error_{today}.log",
         encoding="utf-8"
@@ -58,7 +44,6 @@ def setup_logging(
     error_handler.setFormatter(logging.Formatter(log_format, date_format))
     root_logger.addHandler(error_handler)
 
-    # 降低第三方库日志级别
     logging.getLogger("uvicorn").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
@@ -66,6 +51,14 @@ def setup_logging(
     logging.getLogger("httpcore").setLevel(logging.WARNING)
 
     logging.info("Logging configured: level=%s, dir=%s", log_level, log_dir)
+
+
+def setup_logging(
+    log_level: str = "INFO",
+    log_dir: str = "logs",
+    app_name: str = "baixing_law"
+) -> None:
+    _setup_logging_impl(log_level=log_level, log_dir=log_dir, app_name=app_name)
 
 
 class RequestLogger:
@@ -129,5 +122,4 @@ class RequestLogger:
         self.logger.error(msg)
 
 
-# 单例实例
 request_logger = RequestLogger()

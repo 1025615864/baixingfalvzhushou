@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     service_name: str = "archive-service"
     service_host: str = Field(default="0.0.0.0")
-    service_port: int = Field(default=8082)
+    service_port: int = Field(default=8013)
 
     database_url: str = Field(
         default="postgresql://user:pass@localhost:5432/archive_service",

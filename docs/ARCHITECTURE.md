@@ -523,8 +523,8 @@ backend/
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         前端 (5173)                              │
-│  vite.config.ts 配置了 11 个服务的代理                          │
+│                         前端 (3000)                              │
+│  vite.config.ts 配置了 15 个服务的代理                          │
 └─────────────────────────────────────────────────────────────────┘
                                 │
                                 ▼
@@ -535,50 +535,53 @@ backend/
     │           │           │           │           │
     ▼           ▼           ▼           ▼           ▼
 ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐
-│ Backend│ │ User   │ │Payment │ │Legal   │ │  AI    │
-│ 8080   │ │Service │ │Channel │ │Service │ │Service │
-│        │ │ 8001   │ │ 8002   │ │ 8004   │ │ 8005   │
+│ Backend│ │ User   │ │Payment │ │Embed-  │ │ Order  │
+│  BFF   │ │Service │ │Channel │ │ding    │ │Service │
+│ 8000   │ │ 8001   │ │ 8002   │ │ 8003   │ │ 8004   │
 └────────┘ └────────┘ └────────┘ └────────┘ └────────┘
-                                │
-              ┌─────────────────┼─────────────────┐
-              ▼                 ▼                 ▼
-        ┌────────┐       ┌────────┐         ┌────────┐
-        │Accounting│       │ News   │         │Community│
-        │ 8003   │       │Service │         │Service │
-        └────────┘       │ 8006   │         │ 8007   │
-                          └────────┘         └────────┘
-        ┌───────────────────────┼───────────────────────┐
-        ▼                       ▼                       ▼
-    ┌────────┐           ┌────────┐              ┌────────┐
-    │ Points │           │Notifi- │              │Search  │
-    │Service │           │ cation │              │Service │
-    │ 8008   │           │ 8009   │              │ 8011   │
-    └────────┘           └────────┘              └────────┘
+    │           │           │           │
+    ▼           ▼           ▼           ▼
+┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐
+│  AI    │ │ News   │ │Community│ │ Legal  │ │Search  │
+│Service │ │Service │ │Service │ │Service │ │Service │
+│ 8005   │ │ 8006   │ │ 8007   │ │ 8008   │ │ 8009   │
+└────────┘ └────────┘ └────────┘ └────────┘ └────────┘
+    │           │           │           │
+    ▼           ▼           ▼           ▼
+┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐
+│Recommen-   │ │Notification│ │  Points    │ │  Archive   │
+│dation Svc  │ │  Service   │ │  Service   │ │  Service   │
+│   8010     │ │   8011     │ │   8012     │ │   8013     │
+└────────────┘ └────────────┘ └────────────┘ └────────────┘
                                 │
                                 ▼
-                          ┌────────┐
-                          │Recom- │
-                          │dation │
-                          │ 8010  │
-                          └────────┘
+                          ┌────────────┐
+                          │ Knowledge  │
+                          │  Service   │
+                          │   8081     │
+                          └────────────┘
 ```
 
 ### 12.2 服务列表
 
-| 服务 | 端口 | 前缀 | 说明 |
-|------|------|------|------|
-| Backend (BFF) | 8000 | /api | BFF 聚合层 |
-| User Service | 8001 | /api/v1 | 用户、认证、会员 |
-| Legal Service | 8004 | /api/v1 | 律师、法律知识 |
-| AI Service | 8005 | /api/v1 | AI 对话 |
-| News Service | 8006 | /api/v1 | 新闻资讯 |
-| Community Service | 8007 | /api/v1 | 社区论坛 |
-| Points Service | 8008 | /api/v1 | 积分系统 |
-| Search Service | 8009 | /api/v1 | 搜索服务 |
-| Order Service | 8010 | /api/v1 | 订单/支付 |
-| Knowledge Service | 8081 | /api/v1 | 知识库 |
-| Archive Service | 8013 | /api/v1 | 档案服务 |
-| Embedding Service | 8082 | /api/v1 | 向量嵌入 |
+| 服务 | 端口 | 前缀 | 说明 | 详细文档 |
+|------|------|------|------|----------|
+| Backend (BFF) | 8000 | /api/v1 | BFF 聚合层 | [backend-bff.md](services/backend-bff.md) |
+| User Service | 8001 | /api/v1/users | 用户、认证、会员 | [user-service.md](services/user-service.md) |
+| Payment Channel | 8002 | /api/v1/payment | 支付渠道 | [payment-channel-service.md](services/payment-channel-service.md) |
+| Embedding Service | 8003 | /api/v1/embeddings | 向量嵌入 | [embedding-service.md](services/embedding-service.md) |
+| Order Service | 8004 | /api/v1/orders | 订单管理 | [order-service.md](services/order-service.md) |
+| AI Service | 8005 | /api/v1/ai | AI 对话 | [ai-service.md](services/ai-service.md) |
+| News Service | 8006 | /api/v1/news | 新闻资讯 | [news-service.md](services/news-service.md) |
+| Community Service | 8007 | /api/v1/community | 社区论坛 | [community-service.md](services/community-service.md) |
+| Legal Service | 8008 | /api/v1/legal | 律师、法律知识 | [legal-service.md](services/legal-service.md) |
+| Search Service | 8009 | /api/v1/search | 搜索服务 | [search-service.md](services/search-service.md) |
+| Recommendation Service | 8010 | /api/v1/recommendations | 推荐服务 | [recommendation-service.md](services/recommendation-service.md) |
+| Notification Service | 8011 | /api/v1/notifications | 通知服务 | [notification-service.md](services/notification-service.md) |
+| Points Service | 8012 | /api/v1/points | 积分系统 | [points-service.md](services/points-service.md) |
+| Archive Service | 8013 | /api/v1/archives | 档案服务 | [archive-service.md](services/archive-service.md) |
+| Knowledge Service | 8081 | /api/v1/knowledge | 知识库 | [knowledge-service.md](services/knowledge-service.md) |
+| Frontend | 3000 | / | 前端应用 | [frontend.md](services/frontend.md) |
 
 ### 12.3 前端代理配置
 
@@ -589,36 +592,48 @@ proxy: {
   '/api/v1/auth': { target: 'http://127.0.0.1:8001' },
   '/api/v1/users': { target: 'http://127.0.0.1:8001' },
   '/api/v1/payment': { target: 'http://127.0.0.1:8002' },
-  '/api/v1/balance': { target: 'http://127.0.0.1:8003' },
-  '/api/v1/legal': { target: 'http://127.0.0.1:8004' },
+  '/api/v1/embeddings': { target: 'http://127.0.0.1:8003' },
+  '/api/v1/orders': { target: 'http://127.0.0.1:8004' },
   '/api/v1/ai': { target: 'http://127.0.0.1:8005' },
   '/api/v1/news': { target: 'http://127.0.0.1:8006' },
   '/api/v1/community': { target: 'http://127.0.0.1:8007' },
-  '/api/v1/points': { target: 'http://127.0.0.1:8008' },
-  '/api/v1/notifications': { target: 'http://127.0.0.1:8009' },
+  '/api/v1/legal': { target: 'http://127.0.0.1:8008' },
+  '/api/v1/search': { target: 'http://127.0.0.1:8009' },
   '/api/v1/recommendations': { target: 'http://127.0.0.1:8010' },
-  '/api/v1/search': { target: 'http://127.0.0.1:8011' },
+  '/api/v1/notifications': { target: 'http://127.0.0.1:8011' },
+  '/api/v1/points': { target: 'http://127.0.0.1:8012' },
+  '/api/v1/archives': { target: 'http://127.0.0.1:8013' },
+  '/api/v1/knowledge': { target: 'http://127.0.0.1:8081' },
 }
 ```
 
 ### 12.4 启动服务
 
 ```bash
+# Docker Compose 启动所有服务
+docker compose up -d
+
+# 单独启动某个服务
+docker compose up -d --build user-service
+
 # 启动后端
-cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8080
+cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 # 启动所有微服务 (每个终端一个)
 cd services/user-service && uvicorn app.main:app --port 8001
 cd services/payment-channel-service && uvicorn app.main:app --port 8002
-cd services/payment-accounting-service && uvicorn app.main:app --port 8003
-cd services/legal-service && uvicorn app.main:app --port 8004
+cd services/embedding-service && uvicorn app.main:app --port 8003
+cd services/order-service && uvicorn app.main:app --port 8004
 cd services/ai-service && uvicorn app.main:app --port 8005
 cd services/news-service && uvicorn app.main:app --port 8006
 cd services/community-service && uvicorn app.main:app --port 8007
-cd services/points-service && uvicorn app.main:app --port 8008
-cd services/notification-service && uvicorn app.main:app --port 8009
+cd services/legal-service && uvicorn app.main:app --port 8008
+cd services/search-service && uvicorn app.main:app --port 8009
 cd services/recommendation-service && uvicorn app.main:app --port 8010
-cd services/search-service && uvicorn app.main:app --port 8011
+cd services/notification-service && uvicorn app.main:app --port 8011
+cd services/points-service && uvicorn app.main:app --port 8012
+cd services/archive-service && uvicorn app.main:app --port 8013
+cd services/knowledge-service && uvicorn app.main:app --port 8081
 
 # 运行联调测试
 bash scripts/test-microservices.sh
@@ -727,4 +742,4 @@ UserService (Consumer) → Pact Broker ← LegalService (Provider)
 
 ---
 
-*文档最后更新：2026-05-09*
+*文档最后更新：2026-05-11*

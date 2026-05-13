@@ -20,6 +20,9 @@ class Post(Base):
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     is_essence: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_hot: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_locked: Mapped[bool] = mapped_column(Boolean, default=False)
     favorite_count: Mapped[int] = mapped_column(Integer, default=0)
     like_count: Mapped[int] = mapped_column(Integer, default=0)
     comment_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -42,4 +45,41 @@ class Comment(Base):
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     like_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+
+
+class CommentLike(Base):
+    __tablename__ = "forum_comment_likes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    comment_id: Mapped[int] = mapped_column(Integer, ForeignKey("forum_comments.id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+
+
+class PostLike(Base):
+    __tablename__ = "forum_post_likes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    post_id: Mapped[int] = mapped_column(Integer, ForeignKey("forum_posts.id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+
+
+class PostFavorite(Base):
+    __tablename__ = "forum_post_favorites"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    post_id: Mapped[int] = mapped_column(Integer, ForeignKey("forum_posts.id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+
+
+class PostReaction(Base):
+    __tablename__ = "forum_post_reactions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    post_id: Mapped[int] = mapped_column(Integer, ForeignKey("forum_posts.id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    emoji: Mapped[str] = mapped_column(String(20), nullable=False)
     created_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)

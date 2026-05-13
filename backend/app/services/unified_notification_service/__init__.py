@@ -6,7 +6,7 @@ from typing import Optional, Any
 from dataclasses import dataclass, field
 
 
-class NotificationChannel(enum.Enum):
+class NotificationChannel(str, enum.Enum):
     IN_APP = "in_app"
     EMAIL = "email"
     SMS = "sms"

@@ -19,7 +19,7 @@ try:
 except ImportError:
     def get_cors_config():
         return {
-            "allow_origins": ["*"],
+            "allow_origins": os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(","),
             "allow_credentials": True,
             "allow_methods": ["*"],
             "allow_headers": ["*"],

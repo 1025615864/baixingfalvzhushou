@@ -1,3 +1,4 @@
+import logging
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional
@@ -9,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import AsyncSessionLocal
 from ..models import PaymentOrder
 from ..services.channels import get_adapter
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -199,6 +202,7 @@ async def query_payment_status(
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Unsupported payment provider: {provider}")
     except Exception:
+        logger.error("Failed to query payment from provider %s for order %s", provider, order_no)
         provider_result = {}
 
     if provider == "alipay":

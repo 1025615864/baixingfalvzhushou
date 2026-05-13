@@ -6,7 +6,7 @@ from functools import lru_cache
 
 class SearchSettings(BaseSettings):
     service_name: str = "search-service"
-    service_port: int = 8011
+    service_port: int = 8009
     database_url: str = os.getenv("SEARCH_DATABASE_URL", "postgresql+asyncpg://user:pass@localhost:5432/search")
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 

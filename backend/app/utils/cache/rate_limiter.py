@@ -113,6 +113,22 @@ class RateLimiter:
 rate_limiter = RateLimiter()
 
 
+def _get_rate_limiter() -> RateLimiter:
+    import sys
+    reexport = sys.modules.get("app.utils.rate_limiter")
+    if reexport is not None and hasattr(reexport, "rate_limiter"):
+        return reexport.rate_limiter
+    return sys.modules[__name__].rate_limiter
+
+
+def _get_prometheus_metrics():
+    import sys
+    reexport = sys.modules.get("app.utils.rate_limiter")
+    if reexport is not None and hasattr(reexport, "prometheus_metrics"):
+        return reexport.prometheus_metrics
+    return sys.modules[__name__].prometheus_metrics
+
+
 # 预定义限流配置
 class RateLimitConfig:
     """限流配置"""
@@ -232,10 +248,9 @@ def rate_limit(
             # 提取端点路径用于 metrics（不包含 IP/用户信息）
             endpoint = str(request.url.path or "unknown").strip() or "unknown"
 
-            allowed, _, wait_time = await rate_limiter.check(key, max_requests, window_seconds)
+            allowed, _, wait_time = await _get_rate_limiter().check(key, max_requests, window_seconds)
 
-            # 记录限流 metrics
-            prometheus_metrics.record_rate_limit(
+            _get_prometheus_metrics().record_rate_limit(
                 endpoint=endpoint, allowed=allowed)
 
             if not allowed:
@@ -256,32 +271,40 @@ def rate_limit(
     return decorator
 
 
+def _get_rate_limit():
+    import sys
+    reexport = sys.modules.get("app.utils.rate_limiter")
+    if reexport is not None and hasattr(reexport, "rate_limit"):
+        return reexport.rate_limit
+    return sys.modules[__name__].rate_limit
+
+
 # 便捷装饰器
 def rate_limit_ai() -> Callable[[Callable[..., Coroutine[Any, Any, R]]], Callable[..., Coroutine[Any, Any, R]]]:
     """AI接口限流"""
-    return rate_limit(*RateLimitConfig.AI_CHAT, by_user=True)
+    return _get_rate_limit()(*RateLimitConfig.AI_CHAT, by_user=True)
 
 
 def rate_limit_auth() -> Callable[[Callable[..., Coroutine[Any, Any, R]]], Callable[..., Coroutine[Any, Any, R]]]:
     """认证接口限流"""
-    return rate_limit(*RateLimitConfig.AUTH_LOGIN, by_ip=True)
+    return _get_rate_limit()(*RateLimitConfig.AUTH_LOGIN, by_ip=True)
 
 
 def rate_limit_post() -> Callable[[Callable[..., Coroutine[Any, Any, R]]], Callable[..., Coroutine[Any, Any, R]]]:
     """发帖限流"""
-    return rate_limit(*RateLimitConfig.POST_CREATE, by_user=True)
+    return _get_rate_limit()(*RateLimitConfig.POST_CREATE, by_user=True)
 
 
 def rate_limit_comment() -> Callable[[Callable[..., Coroutine[Any, Any, R]]], Callable[..., Coroutine[Any, Any, R]]]:
     """评论限流"""
-    return rate_limit(*RateLimitConfig.COMMENT_CREATE, by_user=True)
+    return _get_rate_limit()(*RateLimitConfig.COMMENT_CREATE, by_user=True)
 
 
 def rate_limit_search() -> Callable[[Callable[..., Coroutine[Any, Any, R]]], Callable[..., Coroutine[Any, Any, R]]]:
     """搜索限流"""
-    return rate_limit(*RateLimitConfig.SEARCH, by_ip=True)
+    return _get_rate_limit()(*RateLimitConfig.SEARCH, by_ip=True)
 
 
 def rate_limit_upload() -> Callable[[Callable[..., Coroutine[Any, Any, R]]], Callable[..., Coroutine[Any, Any, R]]]:
     """上传限流"""
-    return rate_limit(*RateLimitConfig.UPLOAD, by_user=True)
+    return _get_rate_limit()(*RateLimitConfig.UPLOAD, by_user=True)

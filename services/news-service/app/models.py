@@ -54,7 +54,11 @@ class News(Base):
     category = relationship("NewsCategory", back_populates="news")
     tags = relationship("NewsTag", secondary="news_tag_association", back_populates="news")
 
-    __table_args__ = (Index("idx_news_category_status", "category_id", "status"), Index("idx_news_published", "published_at"))
+    __table_args__ = (
+        Index("idx_news_category_status", "category_id", "status"),
+        Index("idx_news_published", "published_at"),
+        Index("idx_news_status_published", "status", "published_at"),
+    )
 
 
 class NewsTagAssociation(Base):
@@ -71,8 +75,12 @@ class NewsComment(Base):
     news_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending, approved, rejected
+    status: Mapped[str] = mapped_column(String(20), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("idx_news_comment_created", "news_id", "created_at"),
+    )
 
 
 class UserNewsInteraction(Base):

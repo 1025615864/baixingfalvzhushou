@@ -142,7 +142,7 @@ def apply_content_filter_config(
     check_url: bool | None = None,
     check_phone: bool | None = None,
 ) -> None:
-    _default_filter.apply_config(
+    content_filter.apply_config(
         sensitive_words=sensitive_words,
         ad_words=ad_words,
         ad_threshold=ad_words_threshold,
@@ -152,13 +152,13 @@ def apply_content_filter_config(
 
 
 def check_post_content(title: str, content: str) -> tuple[bool, str]:
-    passed, reason, _ = _default_filter.check_content(title)
+    passed, reason, _ = content_filter.check_content(title)
     if not passed:
         if reason == "内容疑似广告":
             return True, ""
         return False, f"标题{reason}"
 
-    passed, reason, _ = _default_filter.check_content(content)
+    passed, reason, _ = content_filter.check_content(content)
     if not passed:
         if reason == "内容疑似广告":
             return True, ""
@@ -168,7 +168,7 @@ def check_post_content(title: str, content: str) -> tuple[bool, str]:
 
 
 def check_comment_content(content: str) -> tuple[bool, str]:
-    passed, reason, _ = _default_filter.check_content(content)
+    passed, reason, _ = content_filter.check_content(content)
     if not passed:
         if reason == "内容包含敏感词汇":
             return False, reason
@@ -178,21 +178,21 @@ def check_comment_content(content: str) -> tuple[bool, str]:
 
 
 def needs_review(content: str) -> tuple[bool, str]:
-    passed, reason, _ = _default_filter.check_content(content)
+    passed, reason, _ = content_filter.check_content(content)
     if not passed:
         return True, reason
 
-    risk_level = _default_filter.get_risk_level(content)
+    risk_level = content_filter.get_risk_level(content)
 
     if risk_level == 'danger':
         return True, "内容风险较高，需要人工审核"
 
-    if _default_filter.check_url:
+    if content_filter.check_url:
         url_pattern = r'https?://[^\s]+'
         if re.search(url_pattern, content):
             return True, "内容包含链接，需要人工审核"
 
-    if _default_filter.check_phone:
+    if content_filter.check_phone:
         phone_pattern = r'1[3-9]\d{9}'
         if re.search(phone_pattern, content):
             return True, "内容包含联系方式，需要人工审核"
@@ -201,24 +201,24 @@ def needs_review(content: str) -> tuple[bool, str]:
 
 
 def add_sensitive_word(word: str):
-    _default_filter.sensitive_words.add(word)
+    content_filter.sensitive_words.add(word)
 
 
 def remove_sensitive_word(word: str):
-    _default_filter.sensitive_words.discard(word)
+    content_filter.sensitive_words.discard(word)
 
 
 def get_all_sensitive_words() -> list[str]:
-    return list(_default_filter.sensitive_words)
+    return list(content_filter.sensitive_words)
 
 
 def add_ad_word(word: str):
-    _default_filter.ad_words.add(word)
+    content_filter.ad_words.add(word)
 
 
 def remove_ad_word(word: str):
-    _default_filter.ad_words.discard(word)
+    content_filter.ad_words.discard(word)
 
 
 def get_all_ad_words() -> list[str]:
-    return list(_default_filter.ad_words)
+    return list(content_filter.ad_words)

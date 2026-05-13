@@ -2,8 +2,15 @@
 import os
 import logging
 from typing import Optional, List, Dict
-import chromadb
-from chromadb.config import Settings as ChromaSettings
+
+try:
+    import chromadb
+    from chromadb.config import Settings as ChromaSettings
+    CHROMADB_AVAILABLE = True
+except ImportError:
+    chromadb = None
+    ChromaSettings = None
+    CHROMADB_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -158,8 +165,10 @@ def get_pgvector_store():
 
 
 def get_chroma_client():
-    """获取ChromaDB客户端"""
     global _chroma_client
+    if not CHROMADB_AVAILABLE:
+        logger.warning("chromadb is not installed, vector store features are unavailable")
+        return None
     if _chroma_client is None:
         os.makedirs(_chroma_store_path, exist_ok=True)
         _chroma_client = chromadb.PersistentClient(
@@ -170,8 +179,10 @@ def get_chroma_client():
 
 
 def get_chroma_collection():
-    """获取ChromaDB Collection"""
     global _chroma_collection
+    if not CHROMADB_AVAILABLE:
+        logger.warning("chromadb is not installed, vector store features are unavailable")
+        return None
     if _chroma_collection is None:
         client = get_chroma_client()
         _chroma_collection = client.get_or_create_collection(
@@ -271,19 +282,20 @@ def _search_pgvector_sync(query: str, top_k: int) -> list[dict]:
 
 
 async def _search_chroma_async(query: str, top_k: int) -> list[dict]:
-    """使用ChromaDB异步搜索"""
     try:
+        collection = get_chroma_collection()
+        if collection is None:
+            logger.warning("ChromaDB not available, returning empty results")
+            return []
         embed_func = _get_embedding_func()
 
         if is_remote_embedding_enabled():
             query_vector = await embed_func.embed_query(query)
-            collection = get_chroma_collection()
             results = collection.query(
                 query_embeddings=[query_vector],
                 n_results=top_k
             )
         else:
-            collection = get_chroma_collection()
             results = collection.query(
                 query_texts=[query],
                 n_results=top_k
@@ -310,9 +322,11 @@ async def _search_chroma_async(query: str, top_k: int) -> list[dict]:
 
 
 def _search_chroma_sync(query: str, top_k: int) -> list[dict]:
-    """使用ChromaDB同步搜索"""
     try:
         collection = get_chroma_collection()
+        if collection is None:
+            logger.warning("ChromaDB not available, returning empty results")
+            return []
         results = collection.query(
             query_texts=[query],
             n_results=top_k
@@ -427,9 +441,11 @@ def _add_archive_pgvector_sync(documents: list[dict], ids: list[str]):
 
 
 async def _add_archive_chroma_async(documents: list[dict], ids: list[str]):
-    """使用ChromaDB异步添加文档"""
     try:
         collection = get_chroma_collection()
+        if collection is None:
+            logger.warning("ChromaDB not available, cannot add documents")
+            return
         texts = [doc["content"] for doc in documents]
         metadatas = [doc.get("metadata", {}) for doc in documents]
 
@@ -453,9 +469,11 @@ async def _add_archive_chroma_async(documents: list[dict], ids: list[str]):
 
 
 def _add_archive_chroma_sync(documents: list[dict], ids: list[str]):
-    """使用ChromaDB同步添加文档"""
     try:
         collection = get_chroma_collection()
+        if collection is None:
+            logger.warning("ChromaDB not available, cannot add documents")
+            return
         texts = [doc["content"] for doc in documents]
         metadatas = [doc.get("metadata", {}) for doc in documents]
 
@@ -526,9 +544,11 @@ def _delete_archive_pgvector_sync(ids: list[str]):
 
 
 def _delete_archive_chroma_sync(ids: list[str]):
-    """使用ChromaDB删除"""
     try:
         collection = get_chroma_collection()
+        if collection is None:
+            logger.warning("ChromaDB not available, cannot delete documents")
+            return
         collection.delete(ids=ids)
         logger.info(f"Deleted {len(ids)} documents from ChromaDB")
     except Exception as e:
@@ -545,17 +565,27 @@ async def get_collection_count_async() -> int:
             try:
                 return await store.count()
             except Exception:
-                pass
+                logger.exception("Failed to count documents in pgvector store")
 
     try:
         collection = get_chroma_collection()
+        if collection is None:
+            return 0
         return collection.count()
     except Exception:
+        logger.error("Failed to count archive collection")
         return 0
 
 
+def get_collection():
+    return get_chroma_collection()
+
+
+async def get_archive_async(query: str, top_k: int = 5) -> list[dict]:
+    return await search_archive_async(query, top_k)
+
+
 def get_collection_count() -> int:
-    """同步获取向量库文档数量"""
     store_type = get_vector_store_type()
 
     if store_type == "pgvector":
@@ -570,10 +600,13 @@ def get_collection_count() -> int:
                 finally:
                     loop.close()
             except Exception:
-                pass
+                logger.exception("Failed to count documents in pgvector store (sync)")
 
     try:
         collection = get_chroma_collection()
+        if collection is None:
+            return 0
         return collection.count()
     except Exception:
+        logger.error("Failed to count archive collection (sync)")
         return 0

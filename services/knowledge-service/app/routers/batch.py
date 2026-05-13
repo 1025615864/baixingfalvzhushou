@@ -10,7 +10,11 @@ from app.database import get_db
 from app.models.knowledge import LegalKnowledge
 from app.services.knowledge_service import KnowledgeService
 from app.routers.knowledge import KnowledgeCreateRequest
-from services.common.middleware import check_batch_rate_limit
+try:
+    from services.common.middleware import check_batch_rate_limit
+except ImportError:
+    def check_batch_rate_limit(*args, **kwargs):
+        return True, 999
 
 router = APIRouter(prefix="/api/v1/knowledge", tags=["批量操作"])
 
@@ -34,7 +38,7 @@ class BatchImportResponse(BaseModel):
     errors: List[BatchImportError]
 
 
-class ExportQueryParams(Query):
+class ExportQueryParams(BaseModel):
     category: Optional[str] = None
     knowledge_type: Optional[str] = None
     status: Optional[str] = None
@@ -189,7 +193,7 @@ async def export_knowledge(
             "reviewed_at": item.reviewed_at.isoformat() if item.reviewed_at else None,
             "created_at": item.created_at.isoformat() if item.created_at else None,
             "updated_at": item.updated_at.isoformat() if item.updated_at else None,
-            "metadata": item.metadata,
+            "metadata": item.meta_data,
         })
 
     return ExportResponse(

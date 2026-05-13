@@ -57,6 +57,26 @@ class AppConfig(BaseSettings):
     environment: str = Field(default="development", validation_alias=AliasChoices("ENVIRONMENT", "APP_ENV"))
     frontend_base_url: str = "http://localhost:5173"
 
+    @field_validator("debug", mode="before")
+    @classmethod
+    def _parse_debug(cls, value: object) -> bool:
+        if value is None:
+            return _running_tests()
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, int):
+            return bool(value)
+        if isinstance(value, str):
+            stripped = value.strip().lower()
+            if not stripped:
+                return _running_tests()
+            if stripped in ("true", "yes", "y", "on", "1"):
+                return True
+            if stripped in ("false", "no", "n", "off", "0"):
+                return False
+            return True
+        return _running_tests()
+
 
 class DatabaseConfig(BaseSettings):
     """数据库配置"""
@@ -96,6 +116,37 @@ class SecurityConfig(BaseSettings):
     access_token_expire_minutes: int = 60
     refresh_token_expire_days: int = 7
 
+    @field_validator("secret_key", mode="before")
+    @classmethod
+    def _override_secret_key_in_tests(cls, value: object) -> str:
+        if isinstance(value, str):
+            if _running_tests():
+                insecure_defaults = {
+                    "your-super-secret-key-change-in-production",
+                    "your-secret-key-change-in-production",
+                    "your-secret-key-here",
+                    "",
+                }
+                is_insecure = (
+                    value in insecure_defaults
+                    or "change_me" in value
+                    or "change-in-production" in value
+                    or len(value) < 16
+                )
+                if is_insecure:
+                    return _generate_test_secret()
+            return value
+        return str(value) if value is not None else ""
+
+    @field_validator("algorithm", mode="before")
+    @classmethod
+    def _override_algorithm_in_tests(cls, value: object) -> str:
+        if _running_tests():
+            return "HS256"
+        if isinstance(value, str):
+            return value
+        return str(value) if value is not None else "RS256"
+
     # Rate limiting
     rate_limit_requests_per_minute: int = Field(default=60, validation_alias=AliasChoices("RATE_LIMIT_PER_MINUTE", "RATE_LIMIT_MINU"))
     rate_limit_requests_per_second: int = Field(default=10, validation_alias=AliasChoices("RATE_LIMIT_PER_SECOND", "RATE_LIMIT_SEC"))
@@ -133,6 +184,33 @@ class SecurityConfig(BaseSettings):
     def _validate_security(self):
         """验证生产环境安全配置"""
         if _running_tests():
+            return self
+
+        is_dev = (
+            os.getenv("DEBUG", "").lower() in ("true", "1", "yes")
+            or os.getenv("ENVIRONMENT", os.getenv("APP_ENV", "")).lower() == "development"
+        )
+
+        if is_dev and self.algorithm == "RS256" and not self.jwt_rsa_private_key:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                "DEV MODE: JWT_RSA_PRIVATE_KEY not set, falling back to HS256 algorithm. "
+                "This is insecure for production!"
+            )
+            object.__setattr__(self, "algorithm", "HS256")
+            if not self.secret_key:
+                object.__setattr__(self, "secret_key", "dev-" + secrets.token_urlsafe(32))
+            return self
+
+        if is_dev and self.algorithm == "HS256" and not self.secret_key:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                "DEV MODE: SECRET_KEY not set, using auto-generated key. "
+                "This is insecure for production!"
+            )
+            object.__setattr__(self, "secret_key", "dev-" + secrets.token_urlsafe(32))
             return self
 
         insecure_defaults = {
@@ -217,6 +295,21 @@ class PaymentConfig(BaseSettings):
         if _running_tests():
             return self
 
+        is_dev = (
+            os.getenv("DEBUG", "").lower() in ("true", "1", "yes")
+            or os.getenv("ENVIRONMENT", os.getenv("APP_ENV", "")).lower() == "development"
+        )
+
+        if is_dev and not self.payment_webhook_secret:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                "DEV MODE: PAYMENT_WEBHOOK_SECRET not set, using auto-generated value. "
+                "This is insecure for production!"
+            )
+            object.__setattr__(self, "payment_webhook_secret", "dev-wh-" + secrets.token_urlsafe(32))
+            return self
+
         if not getattr(self, "debug", False):
             payment_errors = []
             if not self.payment_webhook_secret or len(self.payment_webhook_secret) < 16:
@@ -282,6 +375,13 @@ class AIConfig(BaseSettings):
     # Voice transcribe
     voice_transcribe_force_enabled: bool = Field(default=False, validation_alias=AliasChoices("VOICE_TRANSCRIBE_FORCE_ENABLED"))
     voice_transcribe_provider: str = Field(default="auto", validation_alias=AliasChoices("VOICE_TRANSCRIBE_PROVIDER", "TRANSCRIBE_PROVIDER"))
+
+    @field_validator("ai_fallback_models", mode="before")
+    @classmethod
+    def _parse_ai_fallback_models(cls, value: object):
+        if isinstance(value, str):
+            return value
+        return str(value)
 
     @property
     def ai_fallback_models_list(self) -> list[str]:
@@ -426,15 +526,20 @@ class Settings:
     ai_model: str
     ai_base_url: str
 
-    def __init__(self):
-        self.app = AppConfig()
-        self.db = DatabaseConfig()
-        self.security = SecurityConfig()
-        self.payment = PaymentConfig()
-        self.ai = AIConfig()
-        self.ws = WebSocketConfig()
-        self.storage = StorageConfig()
-        self.infra = InfraConfig()
+    def __init__(self, **kwargs):
+        self.app = AppConfig(**{k: v for k, v in kwargs.items() if k in AppConfig.model_fields})
+        self.db = DatabaseConfig(**{k: v for k, v in kwargs.items() if k in DatabaseConfig.model_fields})
+        self.security = SecurityConfig(**{k: v for k, v in kwargs.items() if k in SecurityConfig.model_fields})
+        self.payment = PaymentConfig(**{k: v for k, v in kwargs.items() if k in PaymentConfig.model_fields})
+        self.ai = AIConfig(**{k: v for k, v in kwargs.items() if k in AIConfig.model_fields})
+        self.ws = WebSocketConfig(**{k: v for k, v in kwargs.items() if k in WebSocketConfig.model_fields})
+        self.storage = StorageConfig(**{k: v for k, v in kwargs.items() if k in StorageConfig.model_fields})
+        self.infra = InfraConfig(**{k: v for k, v in kwargs.items() if k in InfraConfig.model_fields})
+        for k, v in kwargs.items():
+            for cfg in (self.app, self.db, self.security, self.payment, self.ai, self.ws, self.storage, self.infra):
+                if k in cfg.model_fields:
+                    object.__setattr__(cfg, k, v)
+                    break
 
     # 向后兼容：扁平化属性代理
     def __getattr__(self, name: str):

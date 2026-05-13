@@ -17,6 +17,29 @@ settings = get_settings()
 setup_logging(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
 
+try:
+    from services.common.security import get_cors_config
+except ImportError:
+    def get_cors_config():
+        return {
+            "allow_origins": os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(","),
+            "allow_credentials": True,
+            "allow_methods": ["*"],
+            "allow_headers": ["*"],
+        }
+
+try:
+    from services.common.tracing import init_telemetry
+except ImportError:
+    def init_telemetry(*args, **kwargs):
+        pass
+
+try:
+    from services.common.discovery import get_consul_registry
+except ImportError:
+    def get_consul_registry(*args, **kwargs):
+        return None
+
 _redis_client: redis.Redis = None
 _redis_for_rate_limit: redis.Redis = None
 _start_time = time.time()
@@ -27,7 +50,6 @@ async def lifespan(app: FastAPI):
     global _redis_client, _redis_for_rate_limit
     logger.info("Community service starting...")
 
-    from services.common.tracing import init_telemetry
     init_telemetry(
         service_name="community-service",
         service_version="1.0.0",
@@ -54,12 +76,12 @@ async def lifespan(app: FastAPI):
                 decode_responses=True
             )
         except Exception:
+            logger.error("限流Redis连接失败")
             _redis_for_rate_limit = None
 
     from .middleware.rate_limit import rate_limiter
     rate_limiter._client = _redis_for_rate_limit
 
-    from services.common.discovery import get_consul_registry
     consul = get_consul_registry()
     if consul and os.getenv("CONSUL_ENABLED", "").lower() in {"1", "true", "yes"}:
         host = os.getenv("SERVICE_HOST", "localhost")
@@ -131,7 +153,6 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    from services.common.security import get_cors_config
     from fastapi.exceptions import RequestValidationError
     from starlette.exceptions import HTTPException as StarletteHTTPException
 

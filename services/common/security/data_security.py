@@ -303,6 +303,7 @@ class AuditLogger:
                 try:
                     return datetime.fromisoformat(str(value))
                 except Exception:
+                    logger.warning("时间戳解析失败")
                     return None
 
             filtered_time: list[dict[str, Any]] = []

@@ -42,6 +42,13 @@ settings = get_settings()
 
 logger = logging.getLogger(__name__)
 
+
+def _normalize_base_url(url: str) -> str:
+    url = url.strip()
+    if url.endswith("/"):
+        url = url.rstrip("/")
+    return url
+
 init_sentry(settings)
 
 try:
@@ -245,7 +252,37 @@ app.add_middleware(AuthContextMiddleware)
 
 app.add_middleware(RequestIdMiddleware)
 
+# AI Chat 直接路由 - 必须在 api_router 代理之前注册
+# 否则代理的 /api/ai/{path:path} 通配符会优先匹配
+try:
+    from app.routers.ai.chat import router as ai_chat_router
+    app.include_router(ai_chat_router, prefix="/api/ai")
+    app.include_router(ai_chat_router, prefix="/api/v1/ai")
+    logger.info("AI Chat 直接路由已注册")
+except Exception:
+    logger.exception("AI Chat 路由加载失败，使用降级路由")
+    try:
+        from fastapi import APIRouter as _APIRouter, HTTPException as _HTTPException, Query as _Query
+        _ai_chat_fallback = _APIRouter()
+
+        @_ai_chat_fallback.post("/chat")
+        async def _chat_fallback(message: str = ""):
+            raise _HTTPException(status_code=503, detail={"message": "AI服务未配置"})
+
+        @_ai_chat_fallback.post("/chat/stream")
+        async def _chat_stream_fallback(message: str = ""):
+            raise _HTTPException(status_code=503, detail={"message": "AI服务未配置"})
+
+        @_ai_chat_fallback.get("/consultations")
+        async def _list_consultations_fallback():
+            return []
+
+        app.include_router(_ai_chat_fallback, prefix="/api/ai")
+    except Exception:
+        logger.exception("AI降级路由也加载失败")
+
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(api_router, prefix="/api")
 app.include_router(websocket.router)
 
 if auth_router is not None:
@@ -253,6 +290,18 @@ if auth_router is not None:
 
 if user_router is not None:
     app.include_router(user_router.router, prefix="/api")
+
+try:
+    from app.routers.ai.transcription import router as transcription_router
+    app.include_router(transcription_router, prefix="/api/ai")
+except Exception:
+    pass
+
+try:
+    from app.routers import upload as upload_router
+    app.include_router(upload_router.router, prefix="/api")
+except Exception:
+    pass
 
 
 @app.get("/robots.txt", include_in_schema=False)

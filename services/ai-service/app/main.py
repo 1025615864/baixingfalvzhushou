@@ -8,13 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config.settings import get_settings
 from .database import engine, Base
+from sqlalchemy import text
 
 try:
     from services.common.security import get_cors_config
 except ImportError:
     def get_cors_config():
         return {
-            "allow_origins": ["*"],
+            "allow_origins": os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(","),
             "allow_credentials": True,
             "allow_methods": ["*"],
             "allow_headers": ["*"],
@@ -83,7 +84,6 @@ async def lifespan(app: FastAPI):
 
     from .database import import_audit_log_model
     AuditLog = import_audit_log_model()
-    Base.metadata.add_table(AuditLog.__table__)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -152,7 +152,13 @@ def create_app() -> FastAPI:
 
     @app.get("/health/ready")
     async def readiness_check():
-        return {"status": "ready"}
+        try:
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            return {"status": "ready"}
+        except Exception as e:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(status_code=503, content={"status": "not_ready", "error": str(e)})
 
     @app.get("/health/live")
     async def liveness_check():

@@ -7,8 +7,20 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config.settings import get_settings
 from app.routers import stats_router, archive_router, case_categories_router, search_router, vector_ops_router, vector_search_router, batch_router, recommendations_router
-from shared.discovery import get_registration
-from shared.tracing import setup_tracing, instrument_fastapi
+
+try:
+    from shared.discovery import get_registration
+except ImportError:
+    def get_registration(*args, **kwargs):
+        return None
+
+try:
+    from shared.tracing import setup_tracing, instrument_fastapi
+except ImportError:
+    def setup_tracing(*args, **kwargs):
+        pass
+    def instrument_fastapi(*args, **kwargs):
+        pass
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -22,6 +34,10 @@ consul_registration = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global tracer, consul_registration
+
+    from app.database import engine, Base
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
     try:
         tracer = setup_tracing(service_name=settings.service_name)
@@ -76,7 +92,15 @@ async def health_check():
 
 @app.get("/health/ready")
 async def readiness_check():
-    return {"status": "ready", "service": settings.service_name}
+    try:
+        from app.database import engine
+        from sqlalchemy import text
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        return {"status": "ready", "service": settings.service_name}
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=503, content={"status": "not_ready", "error": str(e)})
 
 
 @app.get("/")

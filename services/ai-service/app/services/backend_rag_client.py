@@ -63,6 +63,7 @@ class BackendRAGClient:
                 )
                 return response.status_code == 200
         except Exception:
+            logger.error("Failed to check backend RAG health")
             return False
 
 

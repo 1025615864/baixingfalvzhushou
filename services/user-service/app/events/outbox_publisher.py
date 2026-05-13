@@ -17,9 +17,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import AsyncSessionLocal
-from ..models.outbox import OutboxEvent, OutboxStatus
+from ..models import OutboxEvent, OutboxStatus
 from .kafka_producer import _event_bus
-from services.common.events.kafka_events import UserEvent
+
+try:
+    from services.common.events.kafka_events import UserEvent
+except ImportError:
+    UserEvent = None
 
 logger = logging.getLogger(__name__)
 

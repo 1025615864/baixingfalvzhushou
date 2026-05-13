@@ -6,8 +6,15 @@ import logging
 from typing import Annotated, Literal, TypedDict, AsyncIterator, Optional, Any
 from collections import deque
 
-from langgraph.graph import StateGraph, END
-from langgraph.types import StreamWriter
+try:
+    from langgraph.graph import StateGraph, END
+    from langgraph.types import StreamWriter
+    HAS_LANGGRAPH = True
+except ImportError:
+    HAS_LANGGRAPH = False
+    StateGraph = None
+    END = None
+    StreamWriter = None
 
 from app.config.settings import get_settings
 from app.services.llm_client import call_llm_with_fallback, LLMResponse, DegradedResponse, get_resilient_llm_client
@@ -142,7 +149,7 @@ def Intent_Analyzer(state: AgentState) -> AgentState:
         metrics = get_metrics_collector()
         asyncio.create_task(metrics.record_node_latency("Intent_Analyzer", latency_ms))
     except Exception:
-        pass
+        logger.exception("Failed to record Intent_Analyzer latency metric")
 
     return state
 
@@ -182,7 +189,7 @@ def Query_Rewriter(state: AgentState) -> AgentState:
         metrics = get_metrics_collector()
         asyncio.create_task(metrics.record_node_latency("Query_Rewriter", latency_ms))
     except Exception:
-        pass
+        logger.exception("Failed to record Query_Rewriter latency metric")
 
     return state
 
@@ -210,7 +217,7 @@ async def Legal_Retriever(state: AgentState) -> AgentState:
             )
             await metrics.record_node_latency("Legal_Retriever", latency_ms)
         except Exception:
-            pass
+            logger.exception("Failed to record Legal_Retriever pre-retrieved latency metric")
         return {"retrieved_docs": existing_docs}
 
     try:
@@ -239,7 +246,7 @@ async def Legal_Retriever(state: AgentState) -> AgentState:
             )
             await metrics.record_node_latency("Legal_Retriever", latency_ms)
         except Exception:
-            pass
+            logger.exception("Failed to record Legal_Retriever latency metric")
 
         await send_stage_event(writer, Stage.STAGE_RETRIEVAL, {
             "status": "completed",
@@ -336,7 +343,7 @@ async def Draft_Generator(state: AgentState) -> AgentState:
             )
             await metrics.record_node_latency("Draft_Generator", latency_ms)
         except Exception:
-            pass
+            logger.exception("Failed to record Draft_Generator latency metric")
 
         await send_stage_event(writer, Stage.STAGE_GENERATION, {
             "status": "completed",
@@ -351,7 +358,7 @@ async def Draft_Generator(state: AgentState) -> AgentState:
             await metrics.record_llm_call(success=False, latency_ms=int((time.time() - start_time) * 1000))
             await metrics.record_node_latency("Draft_Generator", int((time.time() - start_time) * 1000))
         except Exception:
-            pass
+            logger.exception("Failed to record Draft_Generator error metric")
         await send_stage_event(writer, Stage.STAGE_GENERATION, {"status": "error", "error": str(e)})
 
     return state
@@ -433,7 +440,7 @@ async def Hallucination_Checker(state: AgentState) -> AgentState:
             )
             await metrics.record_node_latency("Hallucination_Checker", latency_ms)
         except Exception:
-            pass
+            logger.exception("Failed to record Hallucination_Checker latency metric")
 
     except Exception as e:
         has_hallucination = False
@@ -443,7 +450,7 @@ async def Hallucination_Checker(state: AgentState) -> AgentState:
             metrics = get_metrics_collector()
             await metrics.record_llm_call(success=False, latency_ms=int((time.time() - start_time) * 1000))
         except Exception:
-            pass
+            logger.exception("Failed to record Hallucination_Checker error metric")
 
     current_iteration = state.get("iteration_count", 0) + 1
 
@@ -538,7 +545,7 @@ async def Lawyer_Recommender(state: AgentState) -> AgentState:
         metrics = get_metrics_collector()
         asyncio.create_task(metrics.record_node_latency("Lawyer_Recommender", latency_ms))
     except Exception:
-        pass
+        logger.exception("Failed to record Lawyer_Recommender latency metric")
 
     return state
 
@@ -555,7 +562,7 @@ def chitchat_response(state: AgentState) -> AgentState:
         metrics = get_metrics_collector()
         asyncio.create_task(metrics.record_node_latency("chitchat_response", latency_ms))
     except Exception:
-        pass
+        logger.exception("Failed to record chitchat_response latency metric")
 
     return state
 
@@ -603,7 +610,11 @@ def build_legal_agent_graph() -> StateGraph:
     return graph.compile()
 
 
-legal_agent_graph = build_legal_agent_graph()
+if HAS_LANGGRAPH:
+    legal_agent_graph = build_legal_agent_graph()
+else:
+    legal_agent_graph = None
+    logger.warning("langgraph not installed, legal agent graph is unavailable")
 
 
 async def stream_legal_agent(
@@ -617,6 +628,10 @@ async def stream_legal_agent(
     注意: 由于LangGraph的on_llm_stream事件限制，token级流式暂不可用。
     当前通过stage事件提供粗粒度流式反馈。
     """
+
+    if not HAS_LANGGRAPH or legal_agent_graph is None:
+        yield {"stage": Stage.STAGE_DONE, "response": "法律助手功能暂不可用（langgraph 未安装），请稍后再试。"}
+        return
 
     initial_state: AgentState = {
         "user_query": user_query,

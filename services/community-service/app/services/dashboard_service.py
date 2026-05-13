@@ -6,7 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.post import Post
 from ..models.comment import Comment
-from ..models.topic import Topic, ModerationQueue
+from ..models.topic import Topic
+
+try:
+    from ..models.topic import ModerationQueue
+except ImportError:
+    ModerationQueue = None
 
 
 class DashboardService:
@@ -53,12 +58,15 @@ class DashboardService:
         )
         total_comments = total_comments.scalar() or 0
 
-        pending_moderation = await self.db.execute(
-            select(func.count()).select_from(ModerationQueue).where(
-                ModerationQueue.status == "pending"
+        if ModerationQueue is not None:
+            pending_moderation = await self.db.execute(
+                select(func.count()).select_from(ModerationQueue).where(
+                    ModerationQueue.status == "pending"
+                )
             )
-        )
-        pending_moderation = pending_moderation.scalar() or 0
+            pending_moderation = pending_moderation.scalar() or 0
+        else:
+            pending_moderation = 0
 
         return {
             "posts": {

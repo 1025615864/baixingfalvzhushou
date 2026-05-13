@@ -15,7 +15,7 @@ try:
 except ImportError:
     def get_cors_config():
         return {
-            "allow_origins": ["*"],
+            "allow_origins": os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(","),
             "allow_credentials": True,
             "allow_methods": ["*"],
             "allow_headers": ["*"],
@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
     consul = get_consul_registry()
     if consul and os.getenv("CONSUL_ENABLED", "").lower() in {"1", "true", "yes"}:
         host = os.getenv("SERVICE_HOST", "localhost")
-        port = int(os.getenv("SERVICE_PORT", "8003"))
+        port = int(os.getenv("SERVICE_PORT", "8014"))
         await consul.register_service(
             service_name="payment-accounting-service",
             service_id=f"payment-accounting-service-{port}",
@@ -66,7 +66,7 @@ async def lifespan(app: FastAPI):
     yield
 
     if consul and os.getenv("CONSUL_ENABLED", "").lower() in {"1", "true", "yes"}:
-        port = int(os.getenv("SERVICE_PORT", "8003"))
+        port = int(os.getenv("SERVICE_PORT", "8014"))
         await consul.deregister_service(f"payment-accounting-service-{port}")
 
     logger.info("Accounting service shutting down...")

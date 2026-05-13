@@ -67,7 +67,7 @@ class LegalCase(Base):
     deleted_at = Column(DateTime, nullable=True)
     is_deleted = Column(Boolean, default=False, index=True)
 
-    metadata = Column(JSON, nullable=True)
+    meta_data = Column("metadata", JSON, nullable=True)
 
     __table_args__ = (
         Index("ix_cases_status_vectorized", "status", "is_vectorized"),

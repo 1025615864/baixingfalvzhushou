@@ -1,313 +1,186 @@
-"""订单服务 - API 路由"""
-import logging
-from datetime import datetime
+from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Optional
-
-from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.order import Order, OrderStatus, OrderType, PaymentMethod
-from app.services.order_service import order_service
-from app.events.order_events import order_event_publisher
 from app.database import get_db
+from app.services.order_service import order_service
+from app.models.order import OrderStatus, OrderType, PaymentMethod
 
-logger = logging.getLogger(__name__)
-
-router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
-admin_router = APIRouter(prefix="/api/v1/orders/admin", tags=["admin"])
+router = APIRouter()
+admin_router = APIRouter()
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
-async def create_order(
-    order_type: OrderType,
-    title: str,
-    amount: float,
-    description: Optional[str] = None,
-    business_id: Optional[int] = None,
-    business_type: Optional[str] = None,
-    discount_amount: float = 0,
-    current_user: dict = None,
+@router.get("")
+async def list_orders(
+    user_id: int = Query(...),
+    status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    """创建订单"""
-    user_id = current_user.get("user_id") if current_user else 1
+    order_status = None
+    if status:
+        try:
+            order_status = OrderStatus(status)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"无效的订单状态: {status}")
 
-    order = await order_service.create_order(
-        session=db,
-        user_id=user_id,
-        order_type=order_type,
-        title=title,
-        amount=amount,
-        description=description,
-        business_id=business_id,
-        business_type=business_type,
-        discount_amount=discount_amount,
+    orders, total = await order_service.list_user_orders(
+        db, user_id=user_id, status=order_status,
+        offset=(page - 1) * page_size, limit=page_size,
     )
-
-    try:
-        await order_event_publisher.publish_order_created(order)
-    except Exception as e:
-        logger.error(f"Failed to publish order_created event: {e}")
-
     return {
-        "id": order.id,
-        "order_no": order.order_no,
-        "status": order.status.value,
-        "amount": order.amount,
-        "actual_amount": order.actual_amount,
+        "items": [_order_to_dict(o) for o in orders],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
     }
 
 
 @router.get("/{order_id}")
-async def get_order(
-    order_id: int,
-    current_user: dict = None,
-    db: AsyncSession = Depends(get_db),
-):
-    """获取订单详情"""
-    user_id = current_user.get("user_id") if current_user else None
-    order = await order_service.get_order(db, order_id, user_id)
+async def get_order(order_id: str, db: AsyncSession = Depends(get_db)):
+    try:
+        order_id_int = int(order_id)
+        order = await order_service.get_order(db, order_id=order_id_int)
+    except ValueError:
+        order = await order_service.get_order_by_no(db, order_no=order_id)
 
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
+    return _order_to_dict(order)
 
+
+@router.post("")
+async def create_order(body: dict, db: AsyncSession = Depends(get_db)):
+    try:
+        order_type = OrderType(body.get("order_type", "consultation"))
+    except ValueError:
+        order_type = OrderType.CONSULTATION
+
+    order = await order_service.create_order(
+        db,
+        user_id=body.get("user_id", 1),
+        order_type=order_type,
+        title=body.get("title", ""),
+        amount=float(body.get("amount", 0)),
+        description=body.get("description"),
+        business_id=body.get("business_id"),
+        business_type=body.get("business_type"),
+        discount_amount=float(body.get("discount_amount", 0)),
+    )
+    await db.commit()
+    return _order_to_dict(order)
+
+
+@router.put("/{order_id}/status")
+async def update_status(order_id: str, body: dict, db: AsyncSession = Depends(get_db)):
+    status = body.get("status")
+    if not status:
+        raise HTTPException(status_code=400, detail="缺少 status 字段")
+
+    if status == "paid":
+        try:
+            payment_method = PaymentMethod(body.get("payment_method", "alipay"))
+        except ValueError:
+            payment_method = PaymentMethod.ALIPAY
+        try:
+            order = await order_service.get_order_by_no(db, order_no=order_id)
+            if not order:
+                try:
+                    order = await order_service.get_order(db, order_id=int(order_id))
+                except ValueError:
+                    raise HTTPException(status_code=404, detail="订单不存在")
+            order = await order_service.pay_order(db, order_no=order.order_no, payment_method=payment_method)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    elif status == "completed":
+        try:
+            order = await order_service.get_order_by_no(db, order_no=order_id)
+            if not order:
+                try:
+                    order = await order_service.get_order(db, order_id=int(order_id))
+                except ValueError:
+                    raise HTTPException(status_code=404, detail="订单不存在")
+            order = await order_service.complete_order(db, order_no=order.order_no)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    elif status == "cancelled":
+        reason = body.get("reason", "用户取消")
+        try:
+            order = await order_service.get_order_by_no(db, order_no=order_id)
+            if not order:
+                try:
+                    order = await order_service.get_order(db, order_id=int(order_id))
+                except ValueError:
+                    raise HTTPException(status_code=404, detail="订单不存在")
+            order = await order_service.cancel_order(db, order_no=order.order_no, reason=reason)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    else:
+        raise HTTPException(status_code=400, detail=f"不支持的状态变更: {status}")
+
+    await db.commit()
+    return _order_to_dict(order)
+
+
+@router.delete("/{order_id}/cancel")
+async def cancel_order(order_id: str, db: AsyncSession = Depends(get_db)):
+    try:
+        order = await order_service.get_order_by_no(db, order_no=order_id)
+        if not order:
+            try:
+                order = await order_service.get_order(db, order_id=int(order_id))
+            except ValueError:
+                raise HTTPException(status_code=404, detail="订单不存在")
+        order = await order_service.cancel_order(db, order_no=order.order_no)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    await db.commit()
+    return {"success": True}
+
+
+@admin_router.get("")
+async def admin_list_orders(
+    status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    order_status = None
+    if status:
+        try:
+            order_status = OrderStatus(status)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"无效的订单状态: {status}")
+
+    orders, total = await order_service.list_all_orders(
+        db, status=order_status,
+        offset=(page - 1) * page_size, limit=page_size,
+    )
+    return {
+        "items": [_order_to_dict(o) for o in orders],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+def _order_to_dict(order) -> dict:
     return {
         "id": order.id,
         "order_no": order.order_no,
-        "order_type": order.order_type.value,
+        "user_id": order.user_id,
+        "order_type": order.order_type.value if hasattr(order.order_type, "value") else str(order.order_type),
         "title": order.title,
         "description": order.description,
-        "amount": order.amount,
-        "discount_amount": order.discount_amount,
-        "actual_amount": order.actual_amount,
-        "status": order.status.value,
-        "payment_method": order.payment_method.value if order.payment_method else None,
-        "created_at": order.created_at.isoformat(),
+        "amount": float(order.amount) if order.amount else 0,
+        "discount_amount": float(order.discount_amount) if order.discount_amount else 0,
+        "actual_amount": float(order.actual_amount) if order.actual_amount else 0,
+        "status": order.status.value if hasattr(order.status, "value") else str(order.status),
+        "payment_method": order.payment_method.value if order.payment_method and hasattr(order.payment_method, "value") else order.payment_method,
+        "created_at": order.created_at.isoformat() if order.created_at else None,
         "paid_at": order.paid_at.isoformat() if order.paid_at else None,
+        "cancelled_at": order.cancelled_at.isoformat() if order.cancelled_at else None,
+        "completed_at": order.completed_at.isoformat() if order.completed_at else None,
     }
-
-
-@router.get("/")
-async def list_orders(
-    status_filter: Optional[OrderStatus] = Query(None, alias="status"),
-    offset: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
-    current_user: dict = None,
-    db: AsyncSession = Depends(get_db),
-):
-    """获取用户订单列表"""
-    user_id = current_user.get("user_id") if current_user else 1
-
-    orders, total = await order_service.list_user_orders(
-        db,
-        user_id=user_id,
-        status=status_filter,
-        offset=offset,
-        limit=limit,
-    )
-
-    return {
-        "total": total,
-        "offset": offset,
-        "limit": limit,
-        "items": [
-            {
-                "id": o.id,
-                "order_no": o.order_no,
-                "title": o.title,
-                "amount": o.amount,
-                "actual_amount": o.actual_amount,
-                "status": o.status.value,
-                "created_at": o.created_at.isoformat(),
-            }
-            for o in orders
-        ],
-    }
-
-
-@router.post("/{order_no}/pay")
-async def pay_order(
-    order_no: str,
-    payment_method: PaymentMethod,
-    saga_id: Optional[str] = None,
-    current_user: dict = None,
-    db: AsyncSession = Depends(get_db),
-):
-    """支付订单"""
-    try:
-        order = await order_service.pay_order(db, order_no, payment_method, saga_id)
-
-        try:
-            await order_event_publisher.publish_order_paid(order)
-        except Exception as e:
-            logger.error(f"Failed to publish order_paid event: {e}")
-
-        return {
-            "id": order.id,
-            "order_no": order.order_no,
-            "status": order.status.value,
-            "payment_method": order.payment_method.value,
-            "paid_at": order.paid_at.isoformat(),
-        }
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post("/{order_no}/cancel")
-async def cancel_order(
-    order_no: str,
-    reason: Optional[str] = None,
-    current_user: dict = None,
-    db: AsyncSession = Depends(get_db),
-):
-    """取消订单"""
-    try:
-        order = await order_service.cancel_order(db, order_no, reason)
-
-        try:
-            await order_event_publisher.publish_order_cancelled(order)
-        except Exception as e:
-            logger.error(f"Failed to publish order_cancelled event: {e}")
-
-        return {
-            "id": order.id,
-            "order_no": order.order_no,
-            "status": order.status.value,
-            "cancelled_at": order.cancelled_at.isoformat(),
-        }
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post("/{order_no}/complete")
-async def complete_order(
-    order_no: str,
-    current_user: dict = None,
-    db: AsyncSession = Depends(get_db),
-):
-    """完成订单"""
-    try:
-        order = await order_service.complete_order(db, order_no)
-
-        try:
-            await order_event_publisher.publish_order_completed(order)
-        except Exception as e:
-            logger.error(f"Failed to publish order_completed event: {e}")
-
-        return {
-            "id": order.id,
-            "order_no": order.order_no,
-            "status": order.status.value,
-            "completed_at": order.completed_at.isoformat(),
-        }
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post("/{order_no}/refund")
-async def refund_order(
-    order_no: str,
-    reason: Optional[str] = None,
-    current_user: dict = None,
-    db: AsyncSession = Depends(get_db),
-):
-    """退款订单"""
-    try:
-        order = await order_service.refund_order(db, order_no, reason)
-
-        try:
-            await order_event_publisher.publish_order_refunded(order)
-        except Exception as e:
-            logger.error(f"Failed to publish order_refunded event: {e}")
-
-        return {
-            "id": order.id,
-            "order_no": order.order_no,
-            "status": order.status.value,
-        }
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@admin_router.get("/all")
-async def admin_list_all_orders(
-    user_id: Optional[int] = Query(None),
-    order_type: Optional[OrderType] = Query(None),
-    status_filter: Optional[OrderStatus] = Query(None, alias="status"),
-    offset: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
-    db: AsyncSession = Depends(get_db),
-):
-    """管理员获取所有订单列表"""
-    orders, total = await order_service.list_all_orders(
-        db,
-        user_id=user_id,
-        order_type=order_type,
-        status=status_filter,
-        offset=offset,
-        limit=limit,
-    )
-
-    return {
-        "total": total,
-        "offset": offset,
-        "limit": limit,
-        "items": [
-            {
-                "id": o.id,
-                "order_no": o.order_no,
-                "user_id": o.user_id,
-                "order_type": o.order_type.value,
-                "title": o.title,
-                "amount": o.amount,
-                "actual_amount": o.actual_amount,
-                "status": o.status.value,
-                "payment_method": o.payment_method.value if o.payment_method else None,
-                "created_at": o.created_at.isoformat(),
-                "paid_at": o.paid_at.isoformat() if o.paid_at else None,
-                "cancelled_at": o.cancelled_at.isoformat() if o.cancelled_at else None,
-                "completed_at": o.completed_at.isoformat() if o.completed_at else None,
-            }
-            for o in orders
-        ],
-    }
-
-
-@admin_router.get("/stats")
-async def admin_order_stats(
-    start_date: datetime = Query(...),
-    end_date: datetime = Query(...),
-    db: AsyncSession = Depends(get_db),
-):
-    """管理员获取订单统计"""
-    if start_date >= end_date:
-        raise HTTPException(status_code=400, detail="start_date must be before end_date")
-
-    stats = await order_service.get_order_stats(db, start_date, end_date)
-    return stats
-
-
-@admin_router.post("/{order_no}/force-cancel")
-async def admin_force_cancel_order(
-    order_no: str,
-    reason: Optional[str] = None,
-    db: AsyncSession = Depends(get_db),
-):
-    """管理员强制取消订单"""
-    try:
-        order = await order_service.force_cancel_order(db, order_no, reason)
-
-        try:
-            await order_event_publisher.publish_order_cancelled(order)
-        except Exception as e:
-            logger.error(f"Failed to publish order_cancelled event: {e}")
-
-        return {
-            "id": order.id,
-            "order_no": order.order_no,
-            "status": order.status.value,
-            "cancel_reason": order.cancel_reason,
-            "cancelled_at": order.cancelled_at.isoformat(),
-        }
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))

@@ -66,8 +66,9 @@ async def chat_stream(request: ChatRequest, user: UserContext = Depends(get_curr
     """AI对话（流式SSE）- 支持匿名用户"""
     sanitize_result = sanitize_user_input(request.message)
     if not sanitize_result.success:
-        yield f"data: {json.dumps({'type': 'error', 'error': sanitize_result.blocked_reason})}\n\n"
-        return
+        async def error_generator():
+            yield f"data: {json.dumps({'type': 'error', 'error': sanitize_result.blocked_reason})}\n\n"
+        return StreamingResponse(error_generator(), media_type="text/event-stream")
 
     if user.user_id == 0 and not request.session_id:
         request.user_id = 0

@@ -1,0 +1,79 @@
+{{- range $name, $svc := .Values.microservices }}
+{{- if $svc.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "baixing-assistant.fullname" $ }}-{{ $name }}
+  labels:
+{{ include "baixing-assistant.labels" $ | indent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+spec:
+  replicas: {{ $svc.replicaCount | default 2 }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "baixing-assistant.name" $ }}
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ $name }}
+  template:
+    metadata:
+      labels:
+{{ include "baixing-assistant.labels" $ | indent 8 }}
+        app.kubernetes.io/component: {{ $name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: {{ $name }}
+          image: "{{ $svc.image.repository }}:{{ $svc.image.tag | default $.Values.global.imageTag | default "latest" }}"
+          imagePullPolicy: {{ $svc.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ $svc.service.port }}
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "baixing-assistant.fullname" $ }}-{{ $name }}-secret
+                  key: DATABASE_URL
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "baixing-assistant.fullname" $ }}-{{ $name }}-secret
+                  key: REDIS_URL
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ $.Values.kafka.bootstrapServers | default "kafka:29092" | quote }}
+            - name: KAFKA_ENABLED
+              value: {{ $svc.kafka.enabled | default true | quote }}
+          envFrom:
+            {{- if $svc.config }}
+            - configMapRef:
+                name: {{ include "baixing-assistant.fullname" $ }}-{{ $name }}-config
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ $svc.service.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ $svc.service.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 5
+          resources:
+{{ toYaml ( $svc.resources | default dict ) | indent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
+{{- end }}
+{{- end }}

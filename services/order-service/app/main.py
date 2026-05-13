@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import engine
+from sqlalchemy import text
 from app.models.order import Base as OrderBase
 
 try:
@@ -13,7 +14,7 @@ try:
 except ImportError:
     def get_cors_config():
         return {
-            "allow_origins": ["*"],
+            "allow_origins": os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(","),
             "allow_credentials": True,
             "allow_methods": ["*"],
             "allow_headers": ["*"],
@@ -68,7 +69,24 @@ async def lifespan(app: FastAPI):
         await init_saga_persistence()
         logger.info("Order service Saga persistence initialized")
 
+    kafka_enabled = os.getenv("KAFKA_ENABLED", "false").lower() in {"1", "true", "yes"}
+    if kafka_enabled:
+        from app.events.kafka_producer import init_kafka_producer
+        kafka_bootstrap = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
+        await init_kafka_producer(kafka_bootstrap)
+        logger.info(f"Order service Kafka producer started: {kafka_bootstrap}")
+
+    from app.services.outbox_scheduler import outbox_scheduler
+    await outbox_scheduler.start()
+
     yield
+
+    from app.services.outbox_scheduler import outbox_scheduler
+    await outbox_scheduler.stop()
+
+    if kafka_enabled:
+        from app.events.kafka_producer import close_kafka_producer
+        await close_kafka_producer()
 
     if consul and os.getenv("CONSUL_ENABLED", "").lower() in {"1", "true", "yes"}:
         port = int(os.getenv("SERVICE_PORT", "8014"))
@@ -100,7 +118,13 @@ def create_app() -> FastAPI:
 
     @app.get("/health/ready")
     async def readiness_check():
-        return {"status": "ready"}
+        try:
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            return {"status": "ready"}
+        except Exception as e:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(status_code=503, content={"status": "not_ready", "error": str(e)})
 
     @app.get("/health/live")
     async def liveness_check():
@@ -109,8 +133,8 @@ def create_app() -> FastAPI:
     # 注册路由
     from app.routers.orders import router as orders_router
     from app.routers.orders import admin_router as admin_orders_router
-    app.include_router(orders_router)
-    app.include_router(admin_orders_router)
+    app.include_router(orders_router, prefix="/api/v1/orders")
+    app.include_router(admin_orders_router, prefix="/api/v1/orders/admin")
 
     return app
 

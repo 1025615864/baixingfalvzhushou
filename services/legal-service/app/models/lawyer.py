@@ -1,6 +1,7 @@
 """Lawyer and LawyerSchedule models"""
 from datetime import datetime
-from sqlalchemy import String, DateTime, Integer, Text, Float, JSON, Index
+from sqlalchemy import String, DateTime, Integer, Text, Float, Index, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
@@ -14,7 +15,7 @@ class Lawyer(Base):
     lawfirm_id: Mapped[int] = mapped_column(Integer, nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     title: Mapped[str] = mapped_column(String(100), nullable=True)
-    specialties: Mapped[list] = mapped_column(JSON, default=list)
+    specialties: Mapped[list] = mapped_column(JSONB, default=list)
     bio: Mapped[str] = mapped_column(Text, nullable=True)
     rating: Mapped[float] = mapped_column(Float, default=5.0)
     rating_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -32,7 +33,7 @@ class Lawyer(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (
-        Index("idx_lawyers_specialty_status", "specialties", postgresql_using="gin"),
+        Index("idx_lawyers_specialty_status", text("specialties"), postgresql_using="gin"),
         Index("idx_lawyers_city_rating", "city", "rating"),
     )
 

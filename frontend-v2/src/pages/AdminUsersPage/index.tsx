@@ -2,23 +2,43 @@
 // 管理后台 - 用户管理页面
 // ============================================
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-// Mock 用户数据
-const MOCK_USERS = [
-  { id: 1, name: '张三', email: 'zhangsan@example.com', role: 'user', status: 'active', created_at: '2026-01-15', phone: '138****8888' },
-  { id: 2, name: '李四', email: 'lisi@example.com', role: 'lawyer', status: 'active', created_at: '2026-01-14', phone: '139****9999' },
-  { id: 3, name: '王五', email: 'wangwu@example.com', role: 'user', status: 'inactive', created_at: '2026-01-10', phone: '137****7777' },
-  { id: 4, name: '赵六', email: 'zhaoliu@example.com', role: 'admin', status: 'active', created_at: '2026-01-01', phone: '136****6666' },
-  { id: 5, name: '钱七', email: 'qianqi@example.com', role: 'lawyer', status: 'pending', created_at: '2026-02-01', phone: '135****5555' },
-];
+import { api } from '@/shared/lib/api/client';
+
+interface UserItem {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  created_at: string;
+  phone: string;
+}
+
+const DEFAULT_USERS: UserItem[] = [];
 
 export function AdminUsersPage() {
+  const [users, setUsers] = useState<UserItem[]>(DEFAULT_USERS);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  const filteredUsers = MOCK_USERS.filter((user) => {
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const data = await api.get<UserItem[]>('/admin/users');
+        if (data && data.length > 0) {
+          setUsers(data);
+        }
+      } catch {
+        // TODO: Backend /api/admin/users not yet available, using defaults
+      }
+    };
+    void fetchUsers();
+  }, []);
+
+  const filteredUsers = users.filter((user) => {
     const matchesSearch = user.name.includes(searchTerm) || user.email.includes(searchTerm);
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     const matchesStatus = statusFilter === 'all' || user.status === statusFilter;

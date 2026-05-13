@@ -10,10 +10,6 @@ passlib[bcrypt]>=1.7.4
 httpx>=0.26.0
 python-dotenv>=1.0.0
 
-# gRPC 依赖
-grpcio>=1.60.0
-grpcio-tools>=1.60.0
-
 # Kafka 依赖
 aiokafka>=0.10.0
 
@@ -22,6 +18,5 @@ redis>=5.0.0
 
 # 本地开发依赖 (SQLite)
 aiosqlite>=0.19.0
-
-# 契约测试
-pact-python>=2.0.0
+alembic>=1.13.0
+psycopg2-binary>=2.9.9

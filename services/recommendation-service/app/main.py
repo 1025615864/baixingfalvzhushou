@@ -4,13 +4,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config.settings import get_settings
+from .database import engine
+from sqlalchemy import text
 
 try:
     from services.common.security import get_cors_config
 except ImportError:
     def get_cors_config():
         return {
-            "allow_origins": ["*"],
+            "allow_origins": os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(","),
             "allow_credentials": True,
             "allow_methods": ["*"],
             "allow_headers": ["*"],
@@ -41,6 +43,10 @@ async def lifespan(app: FastAPI):
         service_version="1.0.0",
         otlp_endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
     )
+
+    from app.database import engine, Base
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
     from app.services.client_service import microservice_client
     from app.services.cache_service import redis_cache_service
@@ -92,7 +98,13 @@ def create_app() -> FastAPI:
 
     @app.get("/health/ready")
     async def readiness_check():
-        return {"status": "ready"}
+        try:
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            return {"status": "ready"}
+        except Exception as e:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(status_code=503, content={"status": "not_ready", "error": str(e)})
 
     @app.get("/health/live")
     async def liveness_check():

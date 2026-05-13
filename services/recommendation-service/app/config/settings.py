@@ -11,7 +11,7 @@ class Settings:
     news_service_url: str = os.getenv("NEWS_SERVICE_URL", "http://localhost:8006")
     community_service_url: str = os.getenv("COMMUNITY_SERVICE_URL", "http://localhost:8007")
     user_service_url: str = os.getenv("USER_SERVICE_URL", "http://localhost:8001")
-    legal_service_url: str = os.getenv("LEGAL_SERVICE_URL", "http://localhost:8004")
+    legal_service_url: str = os.getenv("LEGAL_SERVICE_URL", "http://localhost:8008")
 
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379")
     cache_ttl: int = int(os.getenv("RECOMMENDATION_CACHE_TTL", "300"))

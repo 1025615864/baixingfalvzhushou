@@ -6,10 +6,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 from typing import Any, Optional
 
 from app.services.cache_service import cache_service
+
+logger = logging.getLogger(__name__)
 
 
 class CacheOptimizer:
@@ -63,7 +66,7 @@ class CacheOptimizer:
         try:
             await cache_service.set(key, json.dumps(result), ttl)
         except Exception:
-            pass
+            logger.error("缓存写入失败")
 
         # 更新统计
         if key not in self.cache_stats:

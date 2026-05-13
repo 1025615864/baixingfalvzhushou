@@ -11,8 +11,8 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import AsyncSessionLocal
-from ..models.outbox import OutboxEvent, OutboxStatus
-from .outbox_publisher import outbox_publisher
+from ..models import OutboxEvent, OutboxStatus
+from ..events.outbox_publisher import outbox_publisher
 
 logger = logging.getLogger(__name__)
 

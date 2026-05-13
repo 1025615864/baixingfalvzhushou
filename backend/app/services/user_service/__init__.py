@@ -1,83 +1,113 @@
 """User service."""
 from __future__ import annotations
-import time
-import enum
 from typing import Optional
-from dataclasses import dataclass, field
+from sqlalchemy import select, or_, func
+from sqlalchemy.ext.asyncio import AsyncSession
 
-
-class UserStatus(enum.Enum):
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-    BANNED = "banned"
-    PENDING = "pending"
-
-
-@dataclass
-class User:
-    id: int
-    username: str
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    status: UserStatus = UserStatus.ACTIVE
-    created_at: float = field(default_factory=time.time)
-    last_login: Optional[float] = None
-    metadata: dict = field(default_factory=dict)
+from app.models.user import User
+from app.schemas.user import UserCreate, UserUpdate
+from app.utils.security import hash_password, verify_password
 
 
 class UserService:
-    def __init__(self):
-        self._users: dict[int, User] = {}
-        self._next_id = 1
+    @staticmethod
+    async def get_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
+        result = await db.execute(select(User).where(User.id == user_id))
+        return result.scalar_one_or_none()
 
-    async def create_user(self, username: str, email: Optional[str] = None, phone: Optional[str] = None) -> User:
-        user_id = self._next_id
-        self._next_id += 1
-        user = User(id=user_id, username=username, email=email, phone=phone)
-        self._users[user_id] = user
+    @staticmethod
+    async def get_by_username(db: AsyncSession, username: str) -> Optional[User]:
+        result = await db.execute(select(User).where(User.username == username))
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_by_email(db: AsyncSession, email: str) -> Optional[User]:
+        result = await db.execute(select(User).where(User.email == email))
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_by_username_or_email(db: AsyncSession, username_or_email: str) -> Optional[User]:
+        result = await db.execute(
+            select(User).where(or_(User.username == username_or_email, User.email == username_or_email))
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def create(db: AsyncSession, user_data: UserCreate) -> User:
+        existing = await db.execute(
+            select(User).where(or_(User.username == user_data.username, User.email == user_data.email))
+        )
+        if existing.scalar_one_or_none():
+            raise ValueError("用户名或邮箱已被使用")
+        nickname = user_data.nickname or user_data.username
+        user = User(
+            username=user_data.username,
+            email=user_data.email,
+            nickname=nickname,
+            hashed_password=hash_password(user_data.password),
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
         return user
 
-    async def get_user(self, user_id: int) -> Optional[User]:
-        return self._users.get(user_id)
+    @staticmethod
+    async def update(db: AsyncSession, user: User, user_data: UserUpdate) -> User:
+        update_dict = user_data.model_dump(exclude_unset=True)
+        if "phone" in update_dict:
+            new_phone = update_dict["phone"]
+            if new_phone != user.phone:
+                user.phone_verified = False
+                user.phone_verified_at = None
+        for key, value in update_dict.items():
+            if hasattr(user, key):
+                setattr(user, key, value)
+        await db.commit()
+        await db.refresh(user)
+        return user
 
-    async def get_user_by_username(self, username: str) -> Optional[User]:
-        for user in self._users.values():
-            if user.username == username:
-                return user
-        return None
-
-    async def update_user(self, user_id: int, **kwargs) -> Optional[User]:
-        user = self._users.get(user_id)
-        if not user:
+    @staticmethod
+    async def authenticate(db: AsyncSession, username_or_email: str, password: str) -> Optional[User]:
+        result = await db.execute(
+            select(User).where(or_(User.username == username_or_email, User.email == username_or_email))
+        )
+        user = result.scalar_one_or_none()
+        if user is None:
             return None
-        for k, v in kwargs.items():
-            if hasattr(user, k):
-                setattr(user, k, v)
+        if not verify_password(password, user.hashed_password):
+            return None
         return user
 
-    async def delete_user(self, user_id: int) -> bool:
-        if user_id in self._users:
-            del self._users[user_id]
-            return True
-        return False
+    @staticmethod
+    async def is_username_taken(db: AsyncSession, username: str) -> bool:
+        result = await db.execute(select(User).where(User.username == username))
+        return result.scalar_one_or_none() is not None
 
-    async def list_users(self, limit: int = 20, offset: int = 0) -> list[User]:
-        users = list(self._users.values())
-        return users[offset:offset + limit]
+    @staticmethod
+    async def is_email_taken(db: AsyncSession, email: str) -> bool:
+        result = await db.execute(select(User).where(User.email == email))
+        return result.scalar_one_or_none() is not None
 
-    async def ban_user(self, user_id: int) -> dict:
-        user = self._users.get(user_id)
-        if not user:
-            return {"success": False, "error": "用户不存在"}
-        user.status = UserStatus.BANNED
-        return {"success": True}
-
-    async def activate_user(self, user_id: int) -> dict:
-        user = self._users.get(user_id)
-        if not user:
-            return {"success": False, "error": "用户不存在"}
-        user.status = UserStatus.ACTIVE
-        return {"success": True}
+    @staticmethod
+    async def get_user_list(db: AsyncSession, page: int = 1, page_size: int = 10, keyword: Optional[str] = None) -> tuple[list[User], int]:
+        query = select(User)
+        count_query = select(func.count()).select_from(User)
+        if keyword:
+            keyword_filter = or_(
+                User.username.ilike(f"%{keyword}%"),
+                User.email.ilike(f"%{keyword}%"),
+                User.nickname.ilike(f"%{keyword}%"),
+            )
+            query = query.where(keyword_filter)
+            count_query = count_query.where(keyword_filter)
+        query = query.order_by(User.id.desc())
+        total_result = await db.execute(count_query)
+        total = total_result.scalar()
+        offset = (page - 1) * page_size
+        query = query.offset(offset).limit(page_size)
+        result = await db.execute(query)
+        users = list(result.scalars().all())
+        return users, total
 
 
 user_service = UserService()

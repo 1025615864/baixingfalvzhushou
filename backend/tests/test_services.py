@@ -8,6 +8,7 @@ from app.services.email.storage import (
     _email_verification_tokens as _email_verification_tokens_dict,
     _reset_tokens as _reset_tokens_dict,
 )
+from tests.conftest import TEST_PASSWORD
 
 from app.services.cache_service import cache_service, _memory_cache
 
@@ -266,9 +267,9 @@ class TestSecurity:
         """测试密码哈希"""
         from app.utils.security import hash_password, verify_password
         
-        password = "TestPassword123"
+        password = TEST_PASSWORD
         hashed = hash_password(password)
-        
+
         assert hashed != password
         assert verify_password(password, hashed) is True
         assert verify_password("wrong", hashed) is False

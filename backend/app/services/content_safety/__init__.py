@@ -27,8 +27,8 @@ class ContentSafetyFilter:
     HIGH_RISK_PATTERNS = ["自杀", "自残", "伤害他人"]
     SENSITIVE_PATTERNS = {"政治敏感": ["政府腐败", "政治"]}
 
-    PHONE_PATTERN = re.compile(r"1[3-9]\d{9}")
-    ID_CARD_PATTERN = re.compile(r"\d{17}[\dXx]")
+    PHONE_PATTERN = re.compile(r"(?<!\d)(1[3-9]\d{9})(?!\d)")
+    ID_CARD_PATTERN = re.compile(r"(?<!\d)(\d{18})(?!\d)")
 
     def check_input(self, text: str) -> SafetyCheckResult:
         for p in self.BLOCKED_PATTERNS:

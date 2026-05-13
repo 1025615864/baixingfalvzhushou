@@ -5,13 +5,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config.settings import get_settings
+from .database import engine
+from sqlalchemy import text
 
 try:
     from services.common.security import get_cors_config
 except ImportError:
     def get_cors_config():
         return {
-            "allow_origins": ["*"],
+            "allow_origins": os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(","),
             "allow_credentials": True,
             "allow_methods": ["*"],
             "allow_headers": ["*"],
@@ -43,6 +45,16 @@ async def lifespan(app: FastAPI):
         otlp_endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
     )
 
+    from app.database import engine, Base
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    kafka_enabled = os.getenv("KAFKA_ENABLED", "false").lower() in {"1", "true", "yes"}
+    if kafka_enabled:
+        from app.events import init_kafka_consumer
+        kafka_bootstrap = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
+        await init_kafka_consumer(kafka_bootstrap)
+
     consul = get_consul_registry()
     if consul and os.getenv("CONSUL_ENABLED", "").lower() in {"1", "true", "yes"}:
         host = os.getenv("SERVICE_HOST", "localhost")
@@ -58,6 +70,10 @@ async def lifespan(app: FastAPI):
         )
 
     yield
+
+    if kafka_enabled:
+        from app.events import close_kafka_consumer
+        await close_kafka_consumer()
 
     if consul and os.getenv("CONSUL_ENABLED", "").lower() in {"1", "true", "yes"}:
         port = int(os.getenv("SERVICE_PORT", "8009"))
@@ -81,7 +97,13 @@ def create_app() -> FastAPI:
 
     @app.get("/health/ready")
     async def readiness_check():
-        return {"status": "ready"}
+        try:
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            return {"status": "ready"}
+        except Exception as e:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(status_code=503, content={"status": "not_ready", "error": str(e)})
 
     @app.get("/health/live")
     async def liveness_check():

@@ -59,6 +59,7 @@ class DeadLetterQueue:
             client = await self._get_client()
             return await client.llen(self.dlq_key)
         except Exception:
+            logger.error("获取死信队列大小失败")
             return 0
 
 
@@ -87,6 +88,7 @@ class EventIdempotencyStore:
             key = self._generate_event_key(topic, partition, offset)
             return await client.exists(key) > 0
         except Exception:
+            logger.error("检查事件是否已处理失败")
             return False
 
     async def mark_processed(self, topic: str, partition: int, offset: int):
@@ -95,7 +97,7 @@ class EventIdempotencyStore:
             key = self._generate_event_key(topic, partition, offset)
             await client.setex(key, self.ttl, "1")
         except Exception:
-            pass
+            logger.exception("标记事件已处理失败")
 
     async def is_event_processed(self, event_id: str) -> bool:
         if not event_id:
@@ -105,6 +107,7 @@ class EventIdempotencyStore:
             key = f"event:id:{event_id}"
             return await client.exists(key) > 0
         except Exception:
+            logger.error("检查事件ID是否已处理失败")
             return False
 
     async def mark_event_processed(self, event_id: str):
@@ -115,7 +118,7 @@ class EventIdempotencyStore:
             key = f"event:id:{event_id}"
             await client.setex(key, self.ttl, "1")
         except Exception:
-            pass
+            logger.exception("标记事件ID已处理失败")
 
 
 class UserEventConsumer:
@@ -249,7 +252,7 @@ class UserEventConsumer:
                     try:
                         await self._consumer.stop()
                     except Exception:
-                        pass
+                        logger.error("停止Kafka消费者失败")
                     self._consumer = None
                 await asyncio.sleep(self._reconnect_delay)
                 self._reconnect_delay = min(self._reconnect_delay * 2, self._max_reconnect_delay)

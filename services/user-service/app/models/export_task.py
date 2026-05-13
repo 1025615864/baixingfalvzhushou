@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional
 from sqlalchemy import String, DateTime, Integer, Text, JSON, Index
 from sqlalchemy.orm import Mapped, mapped_column
-from .database import Base
+from ..database import Base
 
 
 class ExportTask(Base):

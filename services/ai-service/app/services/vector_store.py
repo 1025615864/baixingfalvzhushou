@@ -1,13 +1,23 @@
 """向量数据库服务 - Chroma"""
 import os
+import logging
 from typing import Optional
-import chromadb
-from chromadb.config import Settings as ChromaSettings
-from chromadb.api.models.Collection import Collection
+
+try:
+    import chromadb
+    from chromadb.config import Settings as ChromaSettings
+    from chromadb.api.models.Collection import Collection
+    HAS_CHROMADB = True
+except ImportError:
+    HAS_CHROMADB = False
+    chromadb = None
+    ChromaSettings = None
+    Collection = None
 
 from app.config.settings import get_settings
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 class ChineseEmbeddingFunction:
@@ -48,6 +58,13 @@ class VectorStore:
     """Chroma向量数据库封装"""
 
     def __init__(self, collection_name: str = "legal_docs"):
+        if not HAS_CHROMADB:
+            logger.warning("chromadb not installed, vector store unavailable")
+            self.client = None
+            self.collection = None
+            self.collection_name = collection_name
+            return
+
         self.persist_directory = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
             "data",

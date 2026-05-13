@@ -1,32 +1,29 @@
 /**
- * WechatLoginButton - 微信登录按钮组件
- * 支持公众号和小程序登录方式
+ * WechatLoginButton - 微信扫码登录按钮组件
+ * 真实二维码生成 + 状态轮询 + 自动登录
  */
+import { useState, useRef, useCallback } from 'react';
 
-import { useState } from 'react';
+import { useAuthStore } from '@/features/auth/store/authStore';
+import { authKeys } from '@/features/auth/hooks/useAuth';
+import { setToken } from '@/shared/lib/security/tokenStorage';
+import { api } from '@/shared/lib/api/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import type { LoginResponse } from '@/features/auth/types';
 
-import { useWechatLogin, useSilentLogin } from '../hooks/useWechat';
+type QrCodeStatus = 'loading' | 'pending' | 'scanned' | 'confirmed' | 'expired' | 'error';
 
 interface WechatLoginButtonProps {
-  /** 登录类型：official-公众号，mini_program-小程序 */
   loginType: 'official' | 'mini_program';
-  /** 按钮尺寸：small-小，medium-中（默认），large-大 */
   size?: 'small' | 'medium' | 'large';
-  /** 按钮样式：default-默认（绿色），outline-描边 */
   variant?: 'default' | 'outline';
-  /** 登录成功回调 */
-  onLoginSuccess?: (sessionToken: string, openid: string) => void;
-  /** 登录失败回调 */
+  onLoginSuccess?: (token: string, username: string) => void;
   onLoginFailure?: (error: Error) => void;
-  /** 自定义按钮文字 */
   children?: string;
-  /** 是否显示扫码登录 */
   showQrCode?: boolean;
 }
 
-/**
- * 微信图标组件
- */
 function WechatIcon(): JSX.Element {
   return (
     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -35,9 +32,6 @@ function WechatIcon(): JSX.Element {
   );
 }
 
-/**
- * 加载图标组件
- */
 function LoaderIcon(): JSX.Element {
   return (
     <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -46,9 +40,6 @@ function LoaderIcon(): JSX.Element {
   );
 }
 
-/**
- * 关闭图标组件
- */
 function CloseIcon(): JSX.Element {
   return (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -57,107 +48,148 @@ function CloseIcon(): JSX.Element {
   );
 }
 
-/**
- * 二维码图标组件
- */
-function QrCodeIcon(): JSX.Element {
-  return (
-    <svg className="w-20 h-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v1m6 11h2m-6 0h-2v4h2v-4zM6 20h2v-4H6v4zm6-6h2v-4h-2v4zm-6 0h2v-4H6v4zm12-6h2V4h-2v4zM6 10h2V4H6v6zm6-6h2V4h-2v4z" />
-    </svg>
-  );
-}
-
-/**
- * 微信登录按钮组件
- */
 export function WechatLoginButton({
-  loginType,
+  loginType: _loginType,
   size = 'medium',
   variant = 'default',
   onLoginSuccess,
   onLoginFailure,
   children,
-  showQrCode = false,
+  showQrCode: _showQrCode = false,
 }: WechatLoginButtonProps): JSX.Element {
   const [isQrCodeModalOpen, setIsQrCodeModalOpen] = useState(false);
-  const { login, isLoggingIn } = useWechatLogin();
-  const { silentLogin } = useSilentLogin();
+  const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
+  const [qrcodeId, setQrcodeId] = useState<string | null>(null);
+  const [qrStatus, setQrStatus] = useState<QrCodeStatus>('loading');
+  const [expireSeconds, setExpireSeconds] = useState(300);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // 按钮尺寸样式
+  const setAuth = useAuthStore((state) => state.setAuth);
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const sizeClasses = {
     small: 'px-3 py-1.5 text-sm',
     medium: 'px-4 py-2 text-sm',
     large: 'px-6 py-3 text-base',
   };
 
-  // 按钮样式变体
   const variantClasses = {
     default: 'bg-green-600 text-white hover:bg-green-700 border-transparent',
     outline: 'bg-white text-green-600 border-green-600 hover:bg-green-50',
   };
 
-  /**
-   * 处理登录
-   */
-  const handleLogin = (): void => {
-    void (async (): Promise<void> => {
+  const clearTimers = useCallback(() => {
+    if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null; }
+    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
+  }, []);
+
+  const fetchQrCode = useCallback(async () => {
+    setQrStatus('loading');
+    clearTimers();
     try {
-      // 先尝试静默登录
-      const silentResult = silentLogin();
-      if (silentResult?.success && silentResult.sessionToken) {
-        onLoginSuccess?.(silentResult.sessionToken, silentResult.userInfo?.openid || '');
-        return;
-      }
+      const response = await fetch('/api/wechat/qrcode', { credentials: 'include' });
+      if (!response.ok) throw new Error('获取二维码失败');
 
-      if (loginType === 'official' && showQrCode) {
-        // 公众号扫码登录
-        setIsQrCodeModalOpen(true);
-        return;
-      }
+      const data = await response.json();
+      setQrcodeId(data.qrcode_id);
+      setQrCodeImage(`data:image/png;base64,${data.qrcode_base64}`);
+      setExpireSeconds(data.expire_seconds);
+      setQrStatus('pending');
 
-      // 小程序登录或其他方式
-      const mockCode = `mock_code_${Date.now()}`;
-      const result = await login({
-        code: mockCode,
-      });
+      let remaining = data.expire_seconds;
+      countdownRef.current = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          setQrStatus('expired');
+          clearTimers();
+        }
+        setExpireSeconds(Math.max(0, remaining));
+      }, 1000);
 
-      if (result.success && result.sessionToken) {
-        // 保存会话
-        localStorage.setItem('wechat_session_token', result.sessionToken);
-        onLoginSuccess?.(result.sessionToken, result.userInfo?.openid || '');
-      } else {
-        throw new Error(result.errorMessage || '登录失败');
-      }
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error('登录失败');
-      onLoginFailure?.(err);
+      pollTimerRef.current = setInterval(async () => {
+        try {
+          const statusResp = await fetch(`/api/wechat/qrcode/status/${data.qrcode_id}`, {
+            credentials: 'include',
+          });
+          if (!statusResp.ok) return;
+          const statusData = await statusResp.json();
+
+          if (statusData.status === 'scanned') {
+            setQrStatus('scanned');
+          }
+          if (statusData.status === 'confirmed' && statusData.token) {
+            setQrStatus('confirmed');
+            clearTimers();
+            await handleWechatLogin(statusData.token);
+          }
+          if (statusData.status === 'expired') {
+            setQrStatus('expired');
+            clearTimers();
+          }
+        } catch {
+          // 轮询失败静默处理
+        }
+      }, 2000);
+    } catch {
+      setQrStatus('error');
     }
-    })();
-  };
+  }, [clearTimers]);
 
-  /**
-   * 处理扫码登录成功
-   */
-  const handleQrCodeLogin = (): void => {
-    void (async (): Promise<void> => {
-      // 模拟扫码登录成功
-      const mockCode = `mock_qrcode_${Date.now()}`;
-      const result = await login({
-        code: mockCode,
+  const handleWechatLogin = useCallback(async (wechatToken: string) => {
+    setIsLoggingIn(true);
+    try {
+      const response = await api.post<LoginResponse>('/auth/wechat/login', {
+        code: wechatToken,
+        state: '',
       });
 
-      if (result.success && result.sessionToken) {
-        localStorage.setItem('wechat_session_token', result.sessionToken);
-        setIsQrCodeModalOpen(false);
-        onLoginSuccess?.(result.sessionToken, result.userInfo?.openid || '');
-      } else {
-        throw new Error(result.errorMessage || '扫码登录失败');
+      if (response.token?.access_token) {
+        setToken(response.token.access_token);
       }
-    })();
+      setAuth(response.user);
+      void queryClient.setQueryData(authKeys.user(), response.user);
+
+      setIsQrCodeModalOpen(false);
+      clearTimers();
+      onLoginSuccess?.(response.token?.access_token || '', response.user.username);
+      navigate('/');
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error('微信登录失败');
+      onLoginFailure?.(err);
+    } finally {
+      setIsLoggingIn(false);
+    }
+  }, [clearTimers, onLoginSuccess, onLoginFailure, setAuth, queryClient, navigate]);
+
+  const handleOpenQrCode = () => {
+    setIsQrCodeModalOpen(true);
+    fetchQrCode();
   };
 
-  const buttonText = children || (loginType === 'official' ? '微信登录' : '小程序登录');
+  const handleClose = () => {
+    setIsQrCodeModalOpen(false);
+    clearTimers();
+    setQrStatus('loading');
+  };
+
+  const handleLogin = () => {
+    handleOpenQrCode();
+  };
+
+  const statusText: Record<QrCodeStatus, string> = {
+    loading: '正在生成二维码...',
+    pending: '请使用微信扫一扫登录',
+    scanned: '已扫码，请在手机上确认登录',
+    confirmed: '登录成功！',
+    expired: '二维码已过期',
+    error: '二维码生成失败',
+  };
+
+  const buttonText = children || '微信登录';
 
   return (
     <>
@@ -175,63 +207,86 @@ export function WechatLoginButton({
         `}
       >
         {isLoggingIn ? (
-          <>
-            <LoaderIcon />
-            <span>登录中...</span>
-          </>
+          <><LoaderIcon /><span>登录中...</span></>
         ) : (
-          <>
-            <WechatIcon />
-            <span>{buttonText}</span>
-          </>
+          <><WechatIcon /><span>{buttonText}</span></>
         )}
       </button>
 
-      {/* 二维码登录弹窗 */}
       {isQrCodeModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full mx-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">
-                微信扫码登录
-              </h3>
-              <button
-                onClick={() => setIsQrCodeModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
+              <h3 className="text-lg font-medium text-gray-900">微信扫码登录</h3>
+              <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 transition-colors">
                 <CloseIcon />
               </button>
             </div>
-            
-            <div className="flex flex-col items-center py-6">
-              {/* 二维码区域 */}
-              <div className="w-48 h-48 bg-gray-100 rounded-lg flex items-center justify-center border-2 border-gray-200">
-                <div className="text-center">
-                  <div className="text-gray-400 mb-2">
-                    <QrCodeIcon />
-                  </div>
-                  <p className="text-sm text-gray-500">
-                    模拟二维码
-                  </p>
+
+            <div className="flex flex-col items-center py-4">
+              {qrStatus === 'loading' && (
+                <div className="w-48 h-48 bg-gray-100 rounded-lg flex items-center justify-center border-2 border-gray-200">
+                  <LoaderIcon />
                 </div>
-              </div>
-              
-              <p className="mt-4 text-sm text-gray-600 text-center">
-                请使用微信扫一扫登录
-              </p>
-              
-              {/* 模拟扫码成功按钮（仅用于演示） */}
-              <button
-                onClick={handleQrCodeLogin}
-                disabled={isLoggingIn}
-                className="mt-6 w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
-              >
-                {isLoggingIn ? '登录中...' : '模拟扫码成功'}
-              </button>
+              )}
+
+              {qrStatus === 'error' && (
+                <div className="w-48 h-48 bg-red-50 rounded-lg flex flex-col items-center justify-center border-2 border-red-200">
+                  <p className="text-red-500 text-sm mb-2">二维码加载失败</p>
+                  <button onClick={fetchQrCode} className="text-blue-600 text-sm underline">
+                    点击重试
+                  </button>
+                </div>
+              )}
+
+              {qrStatus === 'expired' && (
+                <div className="w-48 h-48 bg-yellow-50 rounded-lg flex flex-col items-center justify-center border-2 border-yellow-200">
+                  <p className="text-yellow-600 text-sm mb-2">二维码已过期</p>
+                  <button onClick={fetchQrCode} className="text-blue-600 text-sm underline">
+                    刷新二维码
+                  </button>
+                </div>
+              )}
+
+              {(qrStatus === 'pending' || qrStatus === 'scanned' || qrStatus === 'confirmed') && qrCodeImage && (
+                <div className="relative">
+                  <img
+                    src={qrCodeImage}
+                    alt="微信扫码登录二维码"
+                    className={`w-48 h-48 rounded-lg border-2 ${
+                      qrStatus === 'confirmed' ? 'border-green-500 opacity-60' : 'border-gray-300'
+                    } ${qrStatus === 'scanned' ? 'border-blue-500' : ''}`}
+                  />
+                  {qrStatus === 'scanned' && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-lg">
+                      <span className="bg-blue-500 text-white px-3 py-1 rounded-full text-sm">已扫码</span>
+                    </div>
+                  )}
+                  {qrStatus === 'confirmed' && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-lg">
+                      <span className="bg-green-500 text-white px-3 py-1 rounded-full text-sm">已确认</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <p className="mt-3 text-sm text-gray-600">{statusText[qrStatus]}</p>
+
+              {(qrStatus === 'pending' || qrStatus === 'scanned') && (
+                <p className="mt-1 text-xs text-gray-400">
+                  有效期剩余 {expireSeconds} 秒
+                </p>
+              )}
             </div>
-            
-            <div className="mt-4 text-xs text-gray-500 text-center">
-              刷新二维码 | 使用密码登录
+
+            <div className="mt-4 flex justify-center space-x-4 text-xs text-gray-500">
+              <button onClick={fetchQrCode} className="hover:text-gray-700 underline">
+                刷新二维码
+              </button>
+              <span>|</span>
+              <button onClick={handleClose} className="hover:text-gray-700 underline">
+                使用密码登录
+              </button>
             </div>
           </div>
         </div>

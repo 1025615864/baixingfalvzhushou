@@ -40,4 +40,5 @@ class Comment(Base):
     __table_args__ = (
         Index("idx_comment_post_parent", "post_id", "parent_id"),
         Index("idx_comment_floor", "post_id", "floor_number"),
+        Index("idx_comment_post_created", "post_id", "created_at"),
     )

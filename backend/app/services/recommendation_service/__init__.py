@@ -3,6 +3,11 @@ from __future__ import annotations
 import time
 from typing import Optional
 
+try:
+    from app.services.user_interest_service import user_interest_service
+except Exception:
+    user_interest_service = None
+
 
 def _generate_lawyer_reason(lawyer, interests: list[str], score: float) -> str:
     rating = getattr(lawyer, 'rating', 0)

@@ -23,7 +23,7 @@ async def test_upload_image_local_provider_serves_file(client: AsyncClient, test
         username="u_upload_local",
         email="u_upload_local@example.com",
         nickname="u_upload_local",
-        hashed_password=hash_password("Test123456"),
+        hashed_password=hash_password(TEST_PASSWORD),
         role="user",
         is_active=True,
     )
@@ -57,7 +57,7 @@ async def test_upload_image_moderation_rejects(client: AsyncClient, test_session
         username="u_upload_mod_reject",
         email="u_upload_mod_reject@example.com",
         nickname="u_upload_mod_reject",
-        hashed_password=hash_password("Test123456"),
+        hashed_password=hash_password(TEST_PASSWORD),
         role="user",
         is_active=True,
     )
@@ -100,7 +100,7 @@ async def test_upload_image_moderation_error_fail_closed(client: AsyncClient, te
         username="u_upload_mod_err",
         email="u_upload_mod_err@example.com",
         nickname="u_upload_mod_err",
-        hashed_password=hash_password("Test123456"),
+        hashed_password=hash_password(TEST_PASSWORD),
         role="user",
         is_active=True,
     )
@@ -143,7 +143,7 @@ async def test_upload_image_moderation_error_fail_open(client: AsyncClient, test
         username="u_upload_mod_open",
         email="u_upload_mod_open@example.com",
         nickname="u_upload_mod_open",
-        hashed_password=hash_password("Test123456"),
+        hashed_password=hash_password(TEST_PASSWORD),
         role="user",
         is_active=True,
     )
@@ -223,7 +223,7 @@ async def test_upload_image_local_provider_blocked_when_require_object_storage(
         username="u_upload_blocked",
         email="u_upload_blocked@example.com",
         nickname="u_upload_blocked",
-        hashed_password=hash_password("Test123456"),
+        hashed_password=hash_password(TEST_PASSWORD),
         role="user",
         is_active=True,
     )
@@ -259,7 +259,7 @@ async def test_upload_image_virus_scan_found_rejected(client: AsyncClient, test_
         username="u_upload_virus",
         email="u_upload_virus@example.com",
         nickname="u_upload_virus",
-        hashed_password=hash_password("Test123456"),
+        hashed_password=hash_password(TEST_PASSWORD),
         role="user",
         is_active=True,
     )
@@ -300,7 +300,7 @@ async def test_upload_image_virus_scan_error_fail_closed(client: AsyncClient, te
         username="u_upload_scan_err",
         email="u_upload_scan_err@example.com",
         nickname="u_upload_scan_err",
-        hashed_password=hash_password("Test123456"),
+        hashed_password=hash_password(TEST_PASSWORD),
         role="user",
         is_active=True,
     )
@@ -341,7 +341,7 @@ async def test_upload_image_virus_scan_error_fail_open(client: AsyncClient, test
         username="u_upload_scan_open",
         email="u_upload_scan_open@example.com",
         nickname="u_upload_scan_open",
-        hashed_password=hash_password("Test123456"),
+        hashed_password=hash_password(TEST_PASSWORD),
         role="user",
         is_active=True,
     )

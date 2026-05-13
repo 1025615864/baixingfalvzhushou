@@ -40,7 +40,7 @@ class CaseRecommendationService:
             if results and results.get("embeddings"):
                 return results["embeddings"][0]
         except Exception:
-            pass
+            logger.exception("Failed to get case recommendations")
         return None
 
     def _search_vectors(self, query: str, top_k: int) -> List[Dict]:

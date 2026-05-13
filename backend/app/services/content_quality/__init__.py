@@ -90,7 +90,13 @@ class ContentQualityScoringService:
         for s in self._scores.values():
             lvl = s["ai_level"]
             dist[lvl] = dist.get(lvl, 0) + 1
-        return {"total_content": total, "quality_distribution": dist, "total_votes": sum(s["vote_stats"]["up"] + s["vote_stats"]["down"] for s in self._scores.values())}
+        total_votes = 0
+        for s in self._scores.values():
+            vs = s["vote_stats"]
+            up = vs.get("up", vs.get("total_up", 0) or 0)
+            down = vs.get("down", vs.get("total_down", 0) or 0)
+            total_votes += int(up) + int(down)
+        return {"total_content": total, "quality_distribution": dist, "total_votes": total_votes}
 
 
 content_quality_service = ContentQualityScoringService()

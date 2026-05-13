@@ -9,7 +9,14 @@ from app.database import get_db
 from app.models.archive import LegalCase, CaseCategory
 from app.services.archive_service import ArchiveService
 from app.dependencies.auth import get_current_user, UserContext, check_permission
-from services.common.services.audit_service import AuditService
+try:
+    from services.common.services.audit_service import AuditService
+except ImportError:
+    class AuditService:
+        def __init__(self, db=None):
+            self.db = db
+        async def log_action(self, *args, **kwargs):
+            pass
 from app.middleware.audit_middleware import get_audit_context
 
 router = APIRouter(prefix="/api/v1/archive", tags=["案例管理"])

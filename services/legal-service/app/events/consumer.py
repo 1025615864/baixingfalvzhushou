@@ -76,6 +76,7 @@ class EventIdempotencyStore:
             client = await self._get_client()
             return await client.exists(f"event:id:{event_id}") > 0
         except Exception:
+            logger.error("检查事件是否已处理失败")
             return False
 
     async def mark_event_processed(self, event_id: str):
@@ -85,7 +86,7 @@ class EventIdempotencyStore:
             client = await self._get_client()
             await client.setex(f"event:id:{event_id}", self.ttl, "1")
         except Exception:
-            pass
+            logger.exception("标记事件已处理失败")
 
 
 class LegalEventConsumer:
@@ -197,7 +198,7 @@ class LegalEventConsumer:
                     try:
                         await self._consumer.stop()
                     except Exception:
-                        pass
+                        logger.error("停止Kafka消费者失败")
                     self._consumer = None
                 await asyncio.sleep(self._reconnect_delay)
 

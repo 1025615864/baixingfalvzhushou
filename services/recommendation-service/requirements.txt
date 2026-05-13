@@ -9,3 +9,5 @@ redis>=5.0.0
 numpy>=1.24.0
 httpx>=0.27.0
 aiokafka>=0.10.0
+alembic>=1.13.0
+psycopg2-binary>=2.9.9

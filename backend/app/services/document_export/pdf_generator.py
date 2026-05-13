@@ -149,9 +149,9 @@ class PDFGenerator:
 
 
 async def generate_contract_pdf(title: str = "", content: str = "", db=None, review_id: str | None = None, options: dict | None = None, **kwargs) -> dict:
-    if review_id and db is not None:
-        raise PDFGenerationError(f"未找到审查记录: {review_id}")
     if not WEASYPRINT_AVAILABLE:
         raise PDFGenerationError("weasyprint 依赖未安装，无法生成PDF")
+    if review_id and db is not None:
+        raise PDFGenerationError(f"未找到审查记录: {review_id}")
     generator = PDFGenerator()
     return await generator.generate(title=title, content=content, **kwargs)

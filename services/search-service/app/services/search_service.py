@@ -1,7 +1,8 @@
 import logging
 from typing import List, Dict, Optional
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import SearchIndex, HotSearch, SearchLog, SearchItem
@@ -160,10 +161,14 @@ class SearchService:
         if search_type != "all":
             stmt = stmt.where(SearchIndex.item_type == search_type)
 
+        search_tsquery = func.plainto_tsquery('simple', query)
         stmt = stmt.where(
-            SearchIndex.title.ilike(f"%{query}%") |
-            SearchIndex.content.ilike(f"%{query}%") |
-            SearchIndex.keywords.ilike(f"%{query}%")
+            or_(
+                SearchIndex.search_vector.op('@@')(search_tsquery),
+                SearchIndex.title.ilike(f"%{query}%"),
+            )
+        ).order_by(
+            func.ts_rank(SearchIndex.search_vector, search_tsquery).desc()
         )
 
         stmt = stmt.limit(limit)
@@ -292,6 +297,43 @@ class SearchService:
         await session.flush()
 
         await cache_service.delete("search:hot:10")
+
+    async def update_search_vector(self, db: AsyncSession, item_id: int) -> None:
+        from sqlalchemy import update
+        stmt = (
+            update(SearchIndex)
+            .where(SearchIndex.id == item_id)
+            .values(
+                search_vector=func.to_tsvector(
+                    'simple',
+                    func.coalesce(SearchIndex.title, '') + ' ' + func.coalesce(SearchIndex.content, '')
+                )
+            )
+        )
+        await db.execute(stmt)
+        await db.commit()
+
+    async def index_document(
+        self,
+        db: AsyncSession,
+        item_type: str,
+        item_id: int,
+        title: str,
+        content: str = "",
+        keywords: str = "",
+    ) -> SearchIndex:
+        index = SearchIndex(
+            item_type=item_type,
+            item_id=item_id,
+            title=title,
+            content=content,
+            keywords=keywords,
+            search_vector=func.to_tsvector('simple', f"{title} {content}"),
+        )
+        db.add(index)
+        await db.commit()
+        await db.refresh(index)
+        return index
 
     async def _search_news(self, query: str, limit: int) -> List[SearchItem]:
         try:

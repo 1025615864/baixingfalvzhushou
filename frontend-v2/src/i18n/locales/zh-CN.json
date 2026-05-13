@@ -1,0 +1,104 @@
+{
+  "app": {
+    "name": "百姓法律助手",
+    "slogan": "让法律触手可及"
+  },
+  "nav": {
+    "home": "首页",
+    "legal": "法律咨询",
+    "ai": "AI助手",
+    "knowledge": "知识库",
+    "community": "社区",
+    "news": "资讯",
+    "profile": "个人中心",
+    "login": "登录",
+    "register": "注册",
+    "logout": "退出"
+  },
+  "common": {
+    "loading": "加载中...",
+    "error": "出错了",
+    "retry": "重试",
+    "save": "保存",
+    "cancel": "取消",
+    "confirm": "确认",
+    "delete": "删除",
+    "edit": "编辑",
+    "search": "搜索",
+    "noData": "暂无数据",
+    "more": "查看更多",
+    "back": "返回"
+  },
+  "auth": {
+    "loginTitle": "登录",
+    "registerTitle": "注册",
+    "phone": "手机号",
+    "password": "密码",
+    "confirmPassword": "确认密码",
+    "username": "用户名",
+    "verificationCode": "验证码",
+    "getCode": "获取验证码",
+    "loginSuccess": "登录成功",
+    "registerSuccess": "注册成功",
+    "logoutSuccess": "已退出",
+    "phoneRequired": "请输入手机号",
+    "passwordRequired": "请输入密码"
+  },
+  "legal": {
+    "title": "法律咨询",
+    "askQuestion": "提问",
+    "myQuestions": "我的咨询",
+    "lawyers": "律师列表",
+    "onlineConsultation": "在线咨询"
+  },
+  "ai": {
+    "title": "AI法律助手",
+    "placeholder": "请描述您的法律问题...",
+    "send": "发送",
+    "newChat": "新对话",
+    "history": "历史记录"
+  },
+  "points": {
+    "title": "我的积分",
+    "balance": "积分余额",
+    "history": "积分记录",
+    "redeem": "积分兑换",
+    "checkIn": "每日签到",
+    "checkedIn": "已签到"
+  },
+  "notification": {
+    "title": "通知",
+    "markAllRead": "全部已读",
+    "noUnread": "暂无未读通知",
+    "order": "订单通知",
+    "system": "系统通知",
+    "payment": "支付通知"
+  },
+  "order": {
+    "title": "我的订单",
+    "status": {
+      "pending": "待支付",
+      "paid": "已支付",
+      "completed": "已完成",
+      "cancelled": "已取消"
+    }
+  },
+  "community": {
+    "title": "法律社区",
+    "post": "发帖",
+    "reply": "回复",
+    "like": "点赞",
+    "hotTopics": "热门话题"
+  },
+  "knowledge": {
+    "title": "法律知识库",
+    "searchPlaceholder": "搜索法律知识...",
+    "categories": "分类",
+    "popular": "热门知识"
+  },
+  "news": {
+    "title": "法律资讯",
+    "latest": "最新资讯",
+    "hot": "热门资讯"
+  }
+}

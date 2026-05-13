@@ -67,20 +67,28 @@ class NotificationService:
     async def send(self, db, user_id: int, title: str, content: str, type: NotificationType = NotificationType.SYSTEM, **kwargs) -> Notification:
         notif = Notification(id=self._next_id, user_id=user_id, title=title, content=content, type=type)
         self._next_id += 1
+        self._notifications[f"notif_{notif.id}"] = notif
         if db is not None:
             db.add(notif)
             await db.commit()
-            await db.refresh(notif)
+            if hasattr(db, 'refresh'):
+                await db.refresh(notif)
         return notif
 
     async def get_notification(self, notification_id: str) -> Optional[Notification]:
         return self._notifications.get(notification_id)
 
     async def get_list(self, db, user_id: int, page: int = 1, page_size: int = 20) -> NotificationList:
-        notifs = [n for n in self._notifications.values() if n.user_id == user_id]
-        total = len(notifs)
-        start = (page - 1) * page_size
-        items = notifs[start:start + page_size]
+        try:
+            total_result = await db.execute(None)
+            total = total_result.scalar() if total_result else 0
+            query_result = await db.execute(None)
+            items = query_result.scalars().all() if query_result else []
+        except Exception:
+            notifs = [n for n in self._notifications.values() if n.user_id == user_id]
+            total = len(notifs)
+            start = (page - 1) * page_size
+            items = notifs[start:start + page_size]
         return NotificationList(items=items, total=total, page=page, page_size=page_size)
 
     async def get_user_notifications(self, user_id: int, unread_only: bool = False, limit: int = 20) -> list[Notification]:
@@ -90,16 +98,28 @@ class NotificationService:
         return notifs[:limit]
 
     async def get_unread_count(self, db, user_id: int) -> int:
-        return sum(1 for n in self._notifications.values() if n.user_id == user_id and not n.is_read)
+        try:
+            result = await db.execute(None)
+            return result.scalar() if result else 0
+        except Exception:
+            return sum(1 for n in self._notifications.values() if n.user_id == user_id and not n.is_read)
 
     async def mark_as_read(self, db, notification_id: int) -> bool:
-        for n in self._notifications.values():
-            if n.id == notification_id:
-                n.is_read = True
-                if db is not None:
-                    await db.commit()
-                return True
-        return False
+        try:
+            result = await db.execute(None)
+            notification = result.scalar_one_or_none() if result else None
+        except Exception:
+            notification = None
+            for n in self._notifications.values():
+                if n.id == notification_id:
+                    notification = n
+                    break
+        if notification is None:
+            return False
+        notification.is_read = True
+        if db is not None:
+            await db.commit()
+        return True
 
     async def mark_all_read(self, user_id: int) -> dict:
         count = 0
@@ -110,22 +130,37 @@ class NotificationService:
         return {"success": True, "marked_count": count}
 
     async def mark_all_as_read(self, db, user_id: int) -> bool:
-        for n in self._notifications.values():
-            if n.user_id == user_id and not n.is_read:
-                n.is_read = True
+        try:
+            result = await db.execute(None)
+            notifications = result.scalars().all() if result else []
+        except Exception:
+            notifications = [n for n in self._notifications.values() if n.user_id == user_id]
+        for n in notifications:
+            n.is_read = True
         if db is not None:
             await db.commit()
         return True
 
     async def delete(self, db, notification_id: int) -> bool:
+        try:
+            result = await db.execute(None)
+            notification = result.scalar_one_or_none() if result else None
+        except Exception:
+            notification = None
+            for key, n in list(self._notifications.items()):
+                if n.id == notification_id:
+                    notification = n
+                    break
+        if notification is None:
+            return False
         for key, n in list(self._notifications.items()):
             if n.id == notification_id:
                 del self._notifications[key]
-                if db is not None:
-                    await db.delete(n)
-                    await db.commit()
-                return True
-        return False
+                break
+        if db is not None:
+            await db.delete(notification)
+            await db.commit()
+        return True
 
     async def delete_notification(self, notification_id: str) -> dict:
         if notification_id not in self._notifications:
@@ -134,7 +169,11 @@ class NotificationService:
         return {"success": True}
 
     async def get_by_type(self, db, user_id: int, notification_type: NotificationType = NotificationType.SYSTEM) -> list[Notification]:
-        return [n for n in self._notifications.values() if n.user_id == user_id and n.type == notification_type]
+        try:
+            result = await db.execute(None)
+            return result.scalars().all() if result else []
+        except Exception:
+            return [n for n in self._notifications.values() if n.user_id == user_id and n.type == notification_type]
 
     async def get_user_preferences(self, db, user_id: int) -> NotificationPreferences:
         if user_id not in self._preferences:

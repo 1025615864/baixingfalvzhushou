@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     service_name: str = "legal-service"
     service_host: str = "0.0.0.0"
-    service_port: int = 8004
+    service_port: int = 8008
     grpc_port: int = int(os.getenv("GRPC_PORT", "50052"))
 
     database_url: str = os.getenv(

@@ -15,12 +15,47 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.models.archive import LegalCase
 from app.services.archive_vector_store import add_archive, delete_archive
-from services.common.events import (
-    EventType,
-    EventTopic,
-    VectorSyncEvent,
-    create_archive_event,
-)
+
+try:
+    from services.common.events import (
+        EventType,
+        EventTopic,
+        VectorSyncEvent,
+        create_archive_event,
+    )
+except ImportError:
+    import json as _json
+
+    class EventType:
+        PUBLISHED = "published"
+        DELETED = "deleted"
+        UPDATED = "updated"
+
+    class EventTopic:
+        ARCHIVE = "archive"
+
+    class VectorSyncEvent:
+        def __init__(self, topic, event_type, entity_id, data):
+            self.topic = topic
+            self.event_type = event_type
+            self.entity_id = entity_id
+            self.data = data
+
+        def to_json(self):
+            return _json.dumps({
+                "topic": self.topic,
+                "event_type": self.event_type,
+                "entity_id": self.entity_id,
+                "data": self.data,
+            })
+
+    def create_archive_event(event_type, case_id, data):
+        return VectorSyncEvent(
+            topic=EventTopic.ARCHIVE,
+            event_type=event_type,
+            entity_id=case_id,
+            data=data,
+        )
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +138,7 @@ class ArchiveService:
             expiry_date=request.expiry_date,
             weight=request.weight,
             created_by=request.created_by,
-            metadata=request.metadata,
+            meta_data=request.metadata,
             status="draft"
         )
         self.db.add(case)
@@ -402,7 +437,7 @@ class ArchiveService:
                     expiry_date=item.expiry_date,
                     weight=item.weight,
                     created_by=item.created_by,
-                    metadata=item.metadata,
+                    meta_data=item.metadata,
                     status="draft"
                 )
                 self.db.add(case)

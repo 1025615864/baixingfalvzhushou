@@ -102,7 +102,7 @@ class AIEventConsumer:
                     try:
                         await self._consumer.stop()
                     except Exception:
-                        pass
+                        logger.exception("Failed to stop consumer during error recovery")
                     self._consumer = None
                 await asyncio.sleep(self._reconnect_delay)
 

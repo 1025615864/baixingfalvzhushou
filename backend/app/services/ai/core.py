@@ -24,9 +24,11 @@ class AICore:
     def _encoding_for_model(cls, model: Optional[str]):
         try:
             import tiktoken
+            if not model:
+                return tiktoken.get_encoding("cl100k_base")
             try:
                 return tiktoken.encoding_for_model(model)
-            except KeyError:
+            except (KeyError, ValueError):
                 return tiktoken.get_encoding("cl100k_base")
         except ImportError:
             return None

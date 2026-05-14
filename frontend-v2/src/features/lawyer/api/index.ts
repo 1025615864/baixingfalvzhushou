@@ -73,7 +73,11 @@ import type {
 // API 基础路径 - 修正为与后端一致
 // 后端路由: /lawyers (律师管理), /lawyer/schedules (日程), /consultations (咨询)
 const API_BASE = '/lawyers';  // 修正: 后端 prefix="/lawyers"
+const REVIEW_API_BASE = '/reviews';
+const SCHEDULE_API_BASE = '/lawyer/schedules';
+const CONSULTATION_API_BASE = '/consultations';
 const LAWFIRM_API_BASE = '/lawfirm';  // 律所基础路径
+const VERIFICATION_API_BASE = '/verification';
 
 /** API 错误响应 */
 interface ApiErrorResponse {
@@ -503,7 +507,7 @@ export async function getLawyerAvailableSlots(lawyerId: string, date: string): P
     lawyer_id: number;
     date: string;
     slots: AvailableSlotResponseSnake[];
-  }>(`${LAWFIRM_API_BASE}/lawyers/${lawyerId}/available-slots`, {
+  }>(`${API_BASE}/${lawyerId}/available-slots`, {
     params: { date },
   });
 
@@ -550,7 +554,7 @@ export async function getMyConsultations(params: GetMyConsultationsRequest = {})
     total: number;
     page: number;
     page_size: number;
-  }>(`${LAWFIRM_API_BASE}/consultations`, {
+  }>(`${CONSULTATION_API_BASE}`, {
     params: {
       ...(params.page && { page: params.page }),
       ...(params.pageSize && { page_size: params.pageSize }),
@@ -570,7 +574,7 @@ export async function getMyConsultations(params: GetMyConsultationsRequest = {})
  * 取消咨询
  */
 export async function cancelConsultation(consultationId: string): Promise<CancelConsultationResponse> {
-  const response = await apiClient.post<ConsultationResponseSnake>(`${LAWFIRM_API_BASE}/consultations/${consultationId}/cancel`);
+  const response = await apiClient.post<ConsultationResponseSnake>(`${CONSULTATION_API_BASE}/${consultationId}/cancel`);
 
   return {
     consultation: transformConsultation(response.data),
@@ -618,7 +622,7 @@ export async function getLawyerReviewSummary(lawyerId: string): Promise<ReviewSu
  * 提交律师认证申请
  */
 export async function submitVerification(request: SubmitVerificationRequest): Promise<SubmitVerificationResponse> {
-  const response = await apiClient.post<SubmitVerificationResponse>(`${LAWFIRM_API_BASE}/verification/apply`, {
+  const response = await apiClient.post<SubmitVerificationResponse>(`${VERIFICATION_API_BASE}/submit`, {
     real_name: request.realName,
     id_card_no: request.idCardNo,
     license_no: request.licenseNo,
@@ -638,7 +642,7 @@ export async function submitVerification(request: SubmitVerificationRequest): Pr
  * 获取认证状态
  */
 export async function getVerificationStatus(): Promise<VerificationStatusResponse> {
-  const { data } = await apiClient.get<VerificationStatusResponseSnake>(`${LAWFIRM_API_BASE}/verification/status`);
+  const { data } = await apiClient.get<VerificationStatusResponseSnake>(`${VERIFICATION_API_BASE}/status`);
   return transformVerificationStatus(data);
 }
 
@@ -647,16 +651,16 @@ export async function getVerificationStatus(): Promise<VerificationStatusRespons
 /**
  * 获取我的律师主页
  */
-export async function getMyHomepage(): Promise<LawyerHomepage> {
-  const { data } = await apiClient.get<LawyerHomepageResponseSnake>(`${LAWFIRM_API_BASE}/lawyer/homepage`);
+export async function getMyHomepage(lawyerId: string): Promise<LawyerHomepage> {
+  const { data } = await apiClient.get<LawyerHomepageResponseSnake>(`${API_BASE}/${lawyerId}/homepage`);
   return transformHomepage(data);
 }
 
 /**
  * 创建律师主页
  */
-export async function createHomepage(request: CreateHomepageRequest): Promise<LawyerHomepage> {
-  const response = await apiClient.post<LawyerHomepageResponseSnake>(`${LAWFIRM_API_BASE}/lawyer/homepage`, {
+export async function createHomepage(lawyerId: string, request: CreateHomepageRequest): Promise<LawyerHomepage> {
+  const response = await apiClient.post<LawyerHomepageResponseSnake>(`${API_BASE}/${lawyerId}/homepage`, {
     banner_image: request.bannerImage,
     profile_image: request.profileImage,
     slogan: request.slogan,
@@ -690,8 +694,8 @@ export async function createHomepage(request: CreateHomepageRequest): Promise<La
 /**
  * 更新律师主页
  */
-export async function updateHomepage(request: UpdateHomepageRequest): Promise<LawyerHomepage> {
-  const response = await apiClient.put<LawyerHomepageResponseSnake>(`${LAWFIRM_API_BASE}/lawyer/homepage`, {
+export async function updateHomepage(lawyerId: string, request: UpdateHomepageRequest): Promise<LawyerHomepage> {
+  const response = await apiClient.put<LawyerHomepageResponseSnake>(`${API_BASE}/${lawyerId}/homepage`, {
     banner_image: request.bannerImage,
     profile_image: request.profileImage,
     slogan: request.slogan,
@@ -725,16 +729,16 @@ export async function updateHomepage(request: UpdateHomepageRequest): Promise<La
 /**
  * 发布律师主页
  */
-export async function publishHomepage(): Promise<LawyerHomepage> {
-  const response = await apiClient.post<LawyerHomepageResponseSnake>(`${LAWFIRM_API_BASE}/lawyer/homepage/publish`);
+export async function publishHomepage(lawyerId: string): Promise<LawyerHomepage> {
+  const response = await apiClient.post<LawyerHomepageResponseSnake>(`${API_BASE}/${lawyerId}/homepage/publish`);
   return transformHomepage(response.data);
 }
 
 /**
  * 取消发布律师主页
  */
-export async function unpublishHomepage(): Promise<LawyerHomepage> {
-  const response = await apiClient.post<LawyerHomepageResponseSnake>(`${LAWFIRM_API_BASE}/lawyer/homepage/unpublish`);
+export async function unpublishHomepage(lawyerId: string): Promise<LawyerHomepage> {
+  const response = await apiClient.post<LawyerHomepageResponseSnake>(`${API_BASE}/${lawyerId}/homepage/unpublish`);
   return transformHomepage(response.data);
 }
 
@@ -742,7 +746,7 @@ export async function unpublishHomepage(): Promise<LawyerHomepage> {
  * 获取律师公开主页
  */
 export async function getPublicHomepage(lawyerId: string): Promise<LawyerHomepagePublic> {
-  const { data } = await apiClient.get<LawyerHomepagePublicResponseSnake>(`${LAWFIRM_API_BASE}/lawyer/homepage/lawyers/${lawyerId}`);
+  const { data } = await apiClient.get<LawyerHomepagePublicResponseSnake>(`${API_BASE}/${lawyerId}/homepage/public`);
   return transformHomepagePublic(data);
 }
 
@@ -751,17 +755,20 @@ export async function getPublicHomepage(lawyerId: string): Promise<LawyerHomepag
 /**
  * 获取推广链接列表
  */
-export async function getPromotionLinks(params: {
-  isActive?: boolean;
-  page?: number;
-  pageSize?: number;
-} = {}): Promise<PromotionLinkListResponse> {
+export async function getPromotionLinks(
+  lawyerId: string,
+  params: {
+    isActive?: boolean;
+    page?: number;
+    pageSize?: number;
+  } = {}
+): Promise<PromotionLinkListResponse> {
   const { data } = await apiClient.get<{
     items: PromotionLinkResponseSnake[];
     total: number;
     page: number;
     page_size: number;
-  }>(`${LAWFIRM_API_BASE}/lawyer/promotion-links`, {
+  }>(`${API_BASE}/${lawyerId}/promotion-links`, {
     params: {
       ...(params.isActive !== undefined && { is_active: params.isActive }),
       ...(params.page && { page: params.page }),
@@ -780,8 +787,11 @@ export async function getPromotionLinks(params: {
 /**
  * 创建推广链接
  */
-export async function createPromotionLink(request: CreatePromotionLinkRequest): Promise<LawyerPromotionLink> {
-  const response = await apiClient.post<PromotionLinkResponseSnake>(`${LAWFIRM_API_BASE}/lawyer/promotion-links`, {
+export async function createPromotionLink(
+  lawyerId: string,
+  request: CreatePromotionLinkRequest
+): Promise<LawyerPromotionLink> {
+  const response = await apiClient.post<PromotionLinkResponseSnake>(`${API_BASE}/${lawyerId}/promotion-links`, {
     link_name: request.linkName,
     description: request.description,
   });
@@ -792,8 +802,8 @@ export async function createPromotionLink(request: CreatePromotionLinkRequest): 
 /**
  * 获取推广链接详情
  */
-export async function getPromotionLink(linkId: string): Promise<LawyerPromotionLink> {
-  const response = await apiClient.get<PromotionLinkResponseSnake>(`${LAWFIRM_API_BASE}/lawyer/promotion-links/${linkId}`);
+export async function getPromotionLink(lawyerId: string, linkId: string): Promise<LawyerPromotionLink> {
+  const response = await apiClient.get<PromotionLinkResponseSnake>(`${API_BASE}/${lawyerId}/promotion-links/${linkId}`);
   return transformPromotionLink(response.data);
 }
 
@@ -969,7 +979,7 @@ export async function getVerificationList(params: GetVerificationListParams = {}
     total: number;
     page: number;
     page_size: number;
-  }>(`${LAWFIRM_API_BASE}/admin/verifications`, {
+  }>(`${VERIFICATION_API_BASE}/list`, {
     params: {
       ...(params.page && { page: params.page }),
       ...(params.pageSize && { page_size: params.pageSize }),
@@ -998,7 +1008,7 @@ export async function reviewVerification(
   id: string,
   request: ReviewVerificationRequest
 ): Promise<LawyerVerification> {
-  const response = await apiClient.post<VerificationResponseSnake>(`${LAWFIRM_API_BASE}/admin/verifications/${id}/review`, {
+  const response = await apiClient.post<VerificationResponseSnake>(`${VERIFICATION_API_BASE}/${id}/review`, {
     approved: request.approved,
     reject_reason: request.rejectReason,
   });

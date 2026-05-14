@@ -3,7 +3,34 @@
 // ============================================
 
 /** 用户角色 */
-export type UserRole = 'user' | 'lawyer' | 'admin' | 'super_admin';
+export type UserRole = 'user' | 'lawyer' | 'moderator' | 'forum_admin' | 'news_admin' | 'ai_admin' | 'lawyer_admin' | 'cs_agent' | 'admin' | 'super_admin';
+
+export const ROLE_LABELS: Record<UserRole, string> = {
+  user: '普通用户',
+  lawyer: '律师',
+  moderator: '审核员',
+  forum_admin: '论坛服务管理员',
+  news_admin: '新闻服务管理员',
+  ai_admin: 'AI 服务管理员',
+  lawyer_admin: '律师服务管理员',
+  cs_agent: '客服',
+  admin: '管理员',
+  super_admin: '超级管理员',
+};
+
+export interface AccessibleDashboard {
+  key: string;
+  path: string;
+  label: string;
+  icon: string;
+  description: string;
+}
+
+export interface DashboardsResponse {
+  role: UserRole;
+  role_label: string;
+  panels: AccessibleDashboard[];
+}
 
 /** 用户对象 - 与后端返回格式一致 */
 export interface User {

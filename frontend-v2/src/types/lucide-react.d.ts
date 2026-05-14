@@ -115,7 +115,14 @@ declare module 'lucide-react' {
   export const Bookmark: LucideIcon;
   export const Tag: LucideIcon;
   export const Award: LucideIcon;
+  export const LayoutDashboard: LucideIcon;
   export const Crown: LucideIcon;
+  export const Newspaper: LucideIcon;
+  export const Brain: LucideIcon;
+  export const FileWarning: LucideIcon;
+  export const FileDown: LucideIcon;
+  export const FileCheck: LucideIcon;
+  export const GitBranch: LucideIcon;
   export const Gift: LucideIcon;
   export const Sparkles: LucideIcon;
   export const Zap: LucideIcon;

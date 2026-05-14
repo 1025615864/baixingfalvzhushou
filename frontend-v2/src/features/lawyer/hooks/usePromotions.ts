@@ -41,8 +41,8 @@ export function usePromotionLinks(params: {
 } = {}) {
   return useQuery<PromotionLinkListResponse, Error>({
     queryKey: PROMOTION_KEYS.list(params),
-    queryFn: () => getPromotionLinksApi(params),
-    staleTime: 2 * 60 * 1000, // 2分钟缓存
+    queryFn: () => getPromotionLinksApi('me', params),
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -52,8 +52,8 @@ export function usePromotionLinks(params: {
 export function usePromotionLink(linkId: string) {
   return useQuery<LawyerPromotionLink, Error>({
     queryKey: PROMOTION_KEYS.detail(linkId),
-    queryFn: () => getPromotionLinkApi(linkId),
-    staleTime: 5 * 60 * 1000, // 5分钟缓存
+    queryFn: () => getPromotionLinkApi('me', linkId),
+    staleTime: 5 * 60 * 1000,
     enabled: !!linkId,
   });
 }
@@ -76,8 +76,8 @@ export function usePromotionLinkStats(linkId: string) {
 export function useCreatePromotionLink() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (data: CreatePromotionLinkRequest) => createPromotionLinkApi(data),
+  return useMutation<LawyerPromotionLink, Error, CreatePromotionLinkRequest>({
+    mutationFn: (data) => createPromotionLinkApi('me', data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: PROMOTION_KEYS.lists() });
     },

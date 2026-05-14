@@ -30,11 +30,11 @@ const HOMEPAGE_KEYS = {
 /**
  * 获取我的主页
  */
-export function useMyHomepage() {
+export function useMyHomepage(lawyerId?: string) {
   return useQuery<LawyerHomepage, Error>({
     queryKey: HOMEPAGE_KEYS.my(),
-    queryFn: getMyHomepageApi,
-    staleTime: 5 * 60 * 1000, // 5分钟缓存
+    queryFn: () => getMyHomepageApi(lawyerId || 'me'),
+    staleTime: 5 * 60 * 1000,
     retry: false,
   });
 }
@@ -51,28 +51,23 @@ export function usePublicHomepage(lawyerId: string) {
   });
 }
 
-/**
- * 创建主页
- */
 export function useCreateHomepage() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (data: CreateHomepageRequest) => createHomepageApi(data),
+  return useMutation<LawyerHomepage, Error, CreateHomepageRequest>({
+    mutationFn: (data) => createHomepageApi('me', data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: HOMEPAGE_KEYS.my() });
     },
   });
 }
 
-/**
- * 更新主页
- */
+
 export function useUpdateHomepage() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (data: UpdateHomepageRequest) => updateHomepageApi(data),
+  return useMutation<LawyerHomepage, Error, UpdateHomepageRequest>({
+    mutationFn: (data) => updateHomepageApi('me', data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: HOMEPAGE_KEYS.my() });
     },

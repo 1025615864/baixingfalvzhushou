@@ -9,7 +9,7 @@
 import json
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Callable, Coroutine, Optional
 from enum import Enum
 from dataclasses import dataclass, field
@@ -54,10 +54,10 @@ class SagaExecutionLog(Base):
     steps_log = Column(JSON, nullable=True)
     error_message = Column(String(500), nullable=True)
     metadata = Column(JSON, nullable=True)
-    started_at = Column(DateTime, default=datetime.utcnow)
+    started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     completed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index("ix_saga_type_status", "saga_type", "status"),
@@ -147,7 +147,7 @@ class SagaOrchestrator:
                     return self._build_result(SagaStatus.FAILED, log)
 
             log.status = SagaStatus.COMPLETED.value
-            log.completed_at = datetime.utcnow()
+            log.completed_at = datetime.now(timezone.utc)
             log.steps_log = self._serialize_results()
             db.commit()
 
@@ -158,7 +158,7 @@ class SagaOrchestrator:
             logger.error(f"Saga {saga_id}: Unexpected error: {e}")
             log.status = SagaStatus.FAILED.value
             log.error_message = str(e)
-            log.completed_at = datetime.utcnow()
+            log.completed_at = datetime.now(timezone.utc)
             db.commit()
             await self._compensate(db, log, **kwargs)
             return self._build_result(SagaStatus.FAILED, log)
@@ -171,14 +171,14 @@ class SagaOrchestrator:
         result = StepExecutionResult(
             step_name=step.name,
             status=StepStatus.PENDING,
-            started_at=datetime.utcnow(),
+            started_at=datetime.now(timezone.utc),
         )
 
         for attempt in range(step.max_retries):
             try:
                 result.result = await step.action(**kwargs)
                 result.status = StepStatus.SUCCESS
-                result.completed_at = datetime.utcnow()
+                result.completed_at = datetime.now(timezone.utc)
                 logger.info(f"Step {step.name} succeeded on attempt {attempt + 1}")
                 return result
             except Exception as e:
@@ -188,7 +188,7 @@ class SagaOrchestrator:
                     await self._wait_before_retry(attempt)
 
         result.status = StepStatus.FAILED
-        result.completed_at = datetime.utcnow()
+        result.completed_at = datetime.now(timezone.utc)
         return result
 
     async def _compensate(self, db, log: SagaExecutionLog, **kwargs):
@@ -209,7 +209,7 @@ class SagaOrchestrator:
                     step_result.error = f"Compensation failed: {e}"
 
         log.status = SagaStatus.COMPENSATED.value
-        log.completed_at = datetime.utcnow()
+        log.completed_at = datetime.now(timezone.utc)
         log.steps_log = self._serialize_results()
         db.commit()
 

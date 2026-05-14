@@ -12,7 +12,7 @@ import hmac
 import hashlib
 import logging
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import jwt, JWTError
 from sqlalchemy import Column, String, Boolean, DateTime, Integer
@@ -32,7 +32,7 @@ class JWTKey(Base):
     secret = Column(String(256), nullable=False)
     algorithm = Column(String(20), default="HS256")
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     expires_at = Column(DateTime, nullable=True)
     rotated_at = Column(DateTime, nullable=True)
 
@@ -52,7 +52,7 @@ class JWTKeyManager:
         active_key = db.query(JWTKey).filter(JWTKey.is_active == True).order_by(JWTKey.version.desc()).first()
 
         if active_key:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             if active_key.expires_at and active_key.expires_at < now:
                 return self._rotate_key(db, active_key)
             return active_key.version, active_key.secret
@@ -62,7 +62,7 @@ class JWTKeyManager:
     def _create_initial_key(self, db) -> tuple[int, str]:
         """创建初始密钥"""
         secret = secrets.token_hex(32)
-        expires_at = datetime.utcnow() + timedelta(days=self.rotation_days)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=self.rotation_days)
 
         key = JWTKey(
             version=1,
@@ -82,7 +82,7 @@ class JWTKeyManager:
         """轮换密钥"""
         new_version = old_key.version + 1
         secret = secrets.token_hex(32)
-        expires_at = datetime.utcnow() + timedelta(days=self.rotation_days)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=self.rotation_days)
 
         new_key = JWTKey(
             version=new_version,
@@ -93,7 +93,7 @@ class JWTKeyManager:
         )
 
         old_key.is_active = False
-        old_key.rotated_at = datetime.utcnow()
+        old_key.rotated_at = datetime.now(timezone.utc)
 
         db.add(new_key)
         db.commit()
@@ -123,7 +123,7 @@ class JWTKeyManager:
         """创建 JWT token"""
         version, secret = self.get_active_key()
 
-        expire = datetime.utcnow() + timedelta(minutes=expires_minutes)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
         payload["exp"] = int(expire.timestamp())
         payload["kid"] = version
 
@@ -137,7 +137,7 @@ class JWTKeyManager:
             keys = db.query(JWTKey).filter(JWTKey.is_active == True).all()
             keys += db.query(JWTKey).filter(
                 JWTKey.is_active == False,
-                JWTKey.rotated_at > datetime.utcnow() - timedelta(days=self.grace_period_days),
+                JWTKey.rotated_at > datetime.now(timezone.utc) - timedelta(days=self.grace_period_days),
             ).all()
 
             for key in keys:
@@ -167,7 +167,7 @@ class JWTKeyManager:
         """清理过期密钥"""
         db = self.db_session_factory()
         try:
-            cutoff = datetime.utcnow() - timedelta(days=self.grace_period_days + 30)
+            cutoff = datetime.now(timezone.utc) - timedelta(days=self.grace_period_days + 30)
             deleted = db.query(JWTKey).filter(
                 JWTKey.is_active == False,
                 JWTKey.rotated_at < cutoff,

@@ -144,9 +144,9 @@ def require_roles(*allowed_roles: str):
 
 def create_access_token(user_id: int, role: str = "user") -> str:
     """创建访问令牌（用于测试）"""
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
-    expire = datetime.utcnow() + timedelta(minutes=60)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=60)
     payload = {
         "sub": str(user_id),
         "user_id": user_id,

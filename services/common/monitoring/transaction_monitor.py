@@ -9,7 +9,7 @@
 """
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
@@ -29,7 +29,7 @@ class TransactionMonitor:
     def get_saga_stats(self, hours: int = 24) -> dict:
         """获取 Saga 执行统计"""
         db = self.db_session_factory()
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
         try:
             total = (
@@ -134,7 +134,7 @@ class TransactionMonitor:
 
             pending_oldest_age = None
             if pending_oldest:
-                pending_oldest_age = (datetime.utcnow() - pending_oldest[0]).total_seconds()
+                pending_oldest_age = (datetime.now(timezone.utc) - pending_oldest[0]).total_seconds()
 
             return {
                 "pending": pending,
@@ -148,7 +148,7 @@ class TransactionMonitor:
     def get_failed_sagas(self, hours: int = 24, limit: int = 50) -> list[dict]:
         """获取失败的 Saga 列表"""
         db = self.db_session_factory()
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
         try:
             failed = (
@@ -180,7 +180,7 @@ class TransactionMonitor:
     def get_stuck_sagas(self, timeout_minutes: int = 30) -> list[dict]:
         """获取卡住的 Saga（运行中但超时）"""
         db = self.db_session_factory()
-        cutoff = datetime.utcnow() - timedelta(minutes=timeout_minutes)
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=timeout_minutes)
 
         try:
             stuck = (
@@ -201,7 +201,7 @@ class TransactionMonitor:
                     "current_step": s.current_step,
                     "total_steps": s.total_steps,
                     "started_at": s.started_at.isoformat() if s.started_at else None,
-                    "stuck_minutes": (datetime.utcnow() - s.started_at).total_seconds() / 60,
+                    "stuck_minutes": (datetime.now(timezone.utc) - s.started_at).total_seconds() / 60,
                 }
                 for s in stuck
             ]

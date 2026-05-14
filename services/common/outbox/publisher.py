@@ -10,7 +10,7 @@
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 from enum import Enum
 from sqlalchemy import Column, Integer, String, DateTime, Text, Index, Boolean
@@ -44,8 +44,8 @@ class OutboxMessage(Base):
     max_retries = Column(Integer, default=3)
     error_message = Column(String(500), nullable=True)
     published_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index("ix_outbox_status_created", "status", "created_at"),
@@ -133,7 +133,7 @@ class OutboxPublisher:
             )
 
             message.status = OutboxStatus.PUBLISHED.value
-            message.published_at = datetime.utcnow()
+            message.published_at = datetime.now(timezone.utc)
             message.error_message = None
             logger.info(f"Published outbox message {message.id} to {message.topic}")
             return True
@@ -191,7 +191,7 @@ class OutboxPublisher:
     def cleanup_old_messages(self, retention_days: int = 30) -> int:
         """清理旧消息"""
         db = self.db_session_factory()
-        cutoff_date = datetime.utcnow() - timedelta(days=retention_days)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=retention_days)
 
         try:
             deleted = (

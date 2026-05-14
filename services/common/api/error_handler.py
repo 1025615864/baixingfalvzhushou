@@ -104,7 +104,7 @@ def create_error_response(
     request_id: Optional[str] = None,
 ) -> JSONResponse:
     """创建统一错误响应"""
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     return JSONResponse(
         status_code=status_code,
@@ -113,7 +113,7 @@ def create_error_response(
             "message": message,
             "details": details,
             "request_id": request_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         },
     )
 
@@ -137,7 +137,7 @@ def create_http_exception(
 
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """全局异常处理器"""
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     request_id = request.headers.get("x-request-id")
 
@@ -151,7 +151,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
                     "message": detail.get("message", str(exc)),
                     "details": detail.get("details"),
                     "request_id": request_id,
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                 },
             )
 
@@ -162,6 +162,6 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
             "message": "内部服务器错误",
             "details": None,
             "request_id": request_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         },
     )

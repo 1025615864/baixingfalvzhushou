@@ -12,7 +12,7 @@ import hashlib
 from typing import Optional
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.orm import DeclarativeBase
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 Base = DeclarativeBase()
@@ -30,7 +30,7 @@ class PasswordHistory(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, nullable=False)
     password_hash = Column(String(128), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 COMMON_WEAK_PASSWORDS = {

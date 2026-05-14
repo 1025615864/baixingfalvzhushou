@@ -1,6 +1,6 @@
 """Kafka事件模块 - 统一事件定义"""
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Any
 from enum import Enum
 
@@ -38,7 +38,7 @@ class VectorSyncEvent:
         self.event_type = event_type
         self.entity_id = entity_id
         self.data = data
-        self.timestamp = timestamp or datetime.utcnow().isoformat()
+        self.timestamp = timestamp or datetime.now(timezone.utc).isoformat()
 
     def to_json(self) -> str:
         return json.dumps({

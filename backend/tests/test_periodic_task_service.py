@@ -222,7 +222,7 @@ class TestMetricsEndpoints:
             status=TaskStatus.FAILED,
             error_message="Test error",
             duration_seconds=1.5,
-            created_at=datetime.utcnow() - timedelta(hours=1),
+            created_at=datetime.now(timezone.utc) - timedelta(hours=1),
         )
         
         mock_result = MagicMock()

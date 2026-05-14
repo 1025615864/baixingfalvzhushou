@@ -1,4 +1,4 @@
-"""API接口测试"""
+﻿"""API接口测试"""
 import base64
 import importlib
 import json
@@ -2316,7 +2316,7 @@ class TestPaymentWeChatNotifyAPI:
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
         from cryptography import x509
         from cryptography.x509.oid import NameOID
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
         from app.utils.wechatpay_v3 import WeChatPayPlatformCert, dump_platform_certs_json
 
@@ -2541,7 +2541,7 @@ class TestPaymentCallbackAdminAPI:
         import base64
         import json
         import time
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
         from cryptography.hazmat.primitives.asymmetric import rsa, padding
         from cryptography.hazmat.primitives import hashes, serialization
@@ -2601,8 +2601,8 @@ class TestPaymentCallbackAdminAPI:
             .issuer_name(issuer)
             .public_key(platform_private_key.public_key())
             .serial_number(x509.random_serial_number())
-            .not_valid_before(datetime.utcnow() - timedelta(days=1))
-            .not_valid_after(datetime.utcnow() + timedelta(days=365))
+            .not_valid_before(datetime.now(timezone.utc) - timedelta(days=1))
+            .not_valid_after(datetime.now(timezone.utc) + timedelta(days=365))
             .sign(platform_private_key, hashes.SHA256())
         )
         cert_pem = cert_obj.public_bytes(serialization.Encoding.PEM).decode("utf-8")

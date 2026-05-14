@@ -5,7 +5,20 @@
 // ==================== 用户角色类型 ====================
 
 /** 用户角色 */
-export type UserRole = 'user' | 'lawyer' | 'admin';
+export type UserRole = 'user' | 'lawyer' | 'moderator' | 'forum_admin' | 'news_admin' | 'ai_admin' | 'lawyer_admin' | 'cs_agent' | 'admin' | 'super_admin';
+
+export const ROLE_OPTIONS: { value: UserRole; label: string; color: string }[] = [
+  { value: 'user', label: '普通用户', color: 'green' },
+  { value: 'lawyer', label: '律师', color: 'blue' },
+  { value: 'moderator', label: '审核员', color: 'orange' },
+  { value: 'forum_admin', label: '论坛管理员', color: 'volcano' },
+  { value: 'news_admin', label: '新闻管理员', color: 'lime' },
+  { value: 'ai_admin', label: 'AI 管理员', color: 'purple' },
+  { value: 'lawyer_admin', label: '律师管理员', color: 'gold' },
+  { value: 'cs_agent', label: '客服', color: 'cyan' },
+  { value: 'admin', label: '管理员', color: 'red' },
+  { value: 'super_admin', label: '超级管理员', color: 'magenta' },
+];
 
 /** 用户状态 */
 export type UserStatus = 'active' | 'inactive';

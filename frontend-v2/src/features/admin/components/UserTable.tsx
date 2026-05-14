@@ -38,7 +38,14 @@ interface UserTableProps {
 
 /** 角色标签配置 */
 const ROLE_CONFIG: Record<UserRole, { color: string; label: string }> = {
+  super_admin: { color: 'magenta', label: '超级管理员' },
   admin: { color: 'red', label: '管理员' },
+  forum_admin: { color: 'volcano', label: '论坛管理员' },
+  news_admin: { color: 'lime', label: '新闻管理员' },
+  ai_admin: { color: 'purple', label: 'AI 管理员' },
+  lawyer_admin: { color: 'gold', label: '律师管理员' },
+  cs_agent: { color: 'cyan', label: '客服' },
+  moderator: { color: 'orange', label: '审核员' },
   lawyer: { color: 'blue', label: '律师' },
   user: { color: 'green', label: '普通用户' },
 };

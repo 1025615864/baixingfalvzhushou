@@ -3,6 +3,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 
 import { Loading } from '@/shared/components/Loading';
 import { NotFoundPage } from '@/pages/NotFound';
+import { AdminAuthGuard } from '@/features/admin-shared/components/AdminAuthGuard';
 
 // 懒加载的页面 - 按功能模块分组
 const RootLayout = lazy(() => import('@/app/layouts/RootLayout').then(m => ({ default: m.RootLayout })));
@@ -85,17 +86,20 @@ const CrossDomainPage = lazy(() => import('@/features/cross-domain/pages/CrossDo
 // System-Config 模块 - 系统配置
 const SystemConfigPage = lazy(() => import('@/features/system-config/pages/SystemConfigPage').then(m => ({ default: m.SystemConfigPage })));
 
-// Forum-Admin 模块 - 论坛管理
-const ForumAdminPage = lazy(() => import('@/features/forum-admin/pages/ForumAdminPage').then(m => ({ default: m.ForumAdminPage })));
+// Forum-Admin 模块 - 论坛管理（旧独立管理页）
+const ForumAdminStandalonePage = lazy(() => import('@/features/forum-admin/pages/ForumAdminPage').then(m => ({ default: m.ForumAdminPage })));
 
-// News-Admin 模块 - 新闻管理
-const NewsAdminPage = lazy(() => import('@/features/news-admin/pages/NewsAdminPage').then(m => ({ default: m.NewsAdminPage })));
+// News-Admin 模块 - 新闻管理（旧独立管理页）
+const NewsAdminStandalonePage = lazy(() => import('@/features/news-admin/pages/NewsAdminPage').then(m => ({ default: m.NewsAdminPage })));
 
 // Membership 模块 - 会员系统
 const VipPage = lazy(() => import('@/features/membership/pages/VipPage').then(m => ({ default: m.VipPage })));
 
 // Lawyer-Matching 模块 - 律师匹配
 const LawyerMatchingPage = lazy(() => import('@/features/lawyer-matching/pages/LawyerMatchingPage').then(m => ({ default: m.LawyerMatchingPage })));
+
+// Lawyer-Case 模块 - 案件管理
+const CaseManagementPage = lazy(() => import('@/features/lawyer-case/pages/CaseManagementPage').then(m => ({ default: m.CaseManagementPage })));
 
 // AI-Consultation 模块 - AI 咨询
 const AIConsultationPage = lazy(() => import('@/features/ai-consultation/pages/AIConsultationPage').then(m => ({ default: m.AIConsultationPage })));
@@ -144,8 +148,16 @@ const TwoFactorSetupPage = lazy(() => import('@/features/security/pages/TwoFacto
 const LoginAuditPage = lazy(() => import('@/features/security/pages/LoginAuditPage').then(m => ({ default: m.LoginAuditPage })));
 const DeviceListPage = lazy(() => import('@/features/security/pages/DeviceListPage').then(m => ({ default: m.DeviceListPage })));
 
-// Admin 模块 - 聚合子路由入口（仅访问 /admin 时加载）
-const AdminRouteShell = lazy(() => import('@/pages/AdminDashboardPage').then(m => ({ default: m.AdminRouteShell })));
+// Admin 模块 - 7 个角色独立 Dashboard
+const SuperAdminPage = lazy(() => import('@/features/admin/pages/SuperAdminPage').then(m => ({ default: m.SuperAdminPage })));
+const GeneralAdminPage = lazy(() => import('@/features/admin/pages/GeneralAdminPage').then(m => ({ default: m.GeneralAdminPage })));
+const ForumAdminPage = lazy(() => import('@/features/admin/pages/ForumAdminPage').then(m => ({ default: m.ForumAdminPage })));
+const NewsAdminPage = lazy(() => import('@/features/admin/pages/NewsAdminPage').then(m => ({ default: m.NewsAdminPage })));
+const AIAdminPage = lazy(() => import('@/features/admin/pages/AIAdminPage').then(m => ({ default: m.AIAdminPage })));
+const LawyerAdminPage = lazy(() => import('@/features/admin/pages/LawyerAdminPage').then(m => ({ default: m.LawyerAdminPage })));
+const CSAdminPage = lazy(() => import('@/features/admin/pages/CSAdminPage').then(m => ({ default: m.CSAdminPage })));
+
+
 
 // Legal Document Mall 模块 - 法律文书商城
 const LegalDocumentMallPage = lazy(() => import('@/features/legal-document-mall/pages/LegalDocumentMallPage').then(m => ({ default: m.default })));
@@ -215,6 +227,7 @@ const router = createBrowserRouter([
       { path: 'vip', element: lazyLoad(VipPage) },
       { path: 'membership', element: lazyLoad(VipPage) },
       { path: 'lawyer-matching', element: lazyLoad(LawyerMatchingPage) },
+      { path: 'cases', element: lazyLoad(CaseManagementPage) },
       { path: 'orders', element: lazyLoad(OrderListPage) },
       { path: 'orders/:orderNo', element: lazyLoad(OrderDetailPage) },
       { path: 'ai-consultation', element: lazyLoad(AIConsultationPage) },
@@ -232,9 +245,39 @@ const router = createBrowserRouter([
       { path: 'posts/:id/edit', element: lazyLoad(EditPostPage) },
       { path: 'forum-assistant', element: lazyLoad(ForumAssistantPage) },
       { path: 'feedback', element: lazyLoad(FeedbackPage) },
-      { path: 'admin/*', element: lazyLoad(AdminRouteShell) },
-      { path: 'forum-admin', element: lazyLoad(ForumAdminPage) },
-      { path: 'news-admin', element: lazyLoad(NewsAdminPage) },
+      // 运营端 - 7 个角色独立 Dashboard（按角色解耦）
+      {
+        path: 'admin/super/*',
+        element: <AdminAuthGuard><Suspense fallback={<Loading fullScreen text="加载超级管理面板..." />}><SuperAdminPage /></Suspense></AdminAuthGuard>,
+      },
+      {
+        path: 'admin/general/*',
+        element: <AdminAuthGuard><Suspense fallback={<Loading fullScreen text="加载通用管理面板..." />}><GeneralAdminPage /></Suspense></AdminAuthGuard>,
+      },
+      {
+        path: 'admin/forum/*',
+        element: <AdminAuthGuard><Suspense fallback={<Loading fullScreen text="加载论坛管理面板..." />}><ForumAdminPage /></Suspense></AdminAuthGuard>,
+      },
+      {
+        path: 'admin/news/*',
+        element: <AdminAuthGuard><Suspense fallback={<Loading fullScreen text="加载新闻管理面板..." />}><NewsAdminPage /></Suspense></AdminAuthGuard>,
+      },
+      {
+        path: 'admin/ai/*',
+        element: <AdminAuthGuard><Suspense fallback={<Loading fullScreen text="加载AI管理面板..." />}><AIAdminPage /></Suspense></AdminAuthGuard>,
+      },
+      {
+        path: 'admin/lawyer/*',
+        element: <AdminAuthGuard><Suspense fallback={<Loading fullScreen text="加载律师管理面板..." />}><LawyerAdminPage /></Suspense></AdminAuthGuard>,
+      },
+      {
+        path: 'admin/cs/*',
+        element: <AdminAuthGuard><Suspense fallback={<Loading fullScreen text="加载客服工作台..." />}><CSAdminPage /></Suspense></AdminAuthGuard>,
+      },
+      // 旧 admin 聚合路由保留回退
+      { path: 'admin/*', element: <AdminAuthGuard><Suspense fallback={<Loading fullScreen text="加载管理后台..." />}><SuperAdminPage /></Suspense></AdminAuthGuard> },
+      { path: 'forum-admin', element: lazyLoad(ForumAdminStandalonePage) },
+      { path: 'news-admin', element: lazyLoad(NewsAdminStandalonePage) },
       // Notification 模块路由
       { path: 'notifications', element: lazyLoad(NotificationCenterPage) },
       // Wechat 模块路由

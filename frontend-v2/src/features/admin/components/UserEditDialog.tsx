@@ -36,10 +36,52 @@ const ROLE_OPTIONS: { value: UserRole; label: string; color: string; description
     description: '可接受咨询、管理案件',
   },
   {
+    value: 'moderator',
+    label: '审核员',
+    color: 'orange',
+    description: '可审核论坛内容',
+  },
+  {
+    value: 'forum_admin',
+    label: '论坛服务管理员',
+    color: 'volcano',
+    description: '全面管理论坛内容与用户',
+  },
+  {
+    value: 'news_admin',
+    label: '新闻服务管理员',
+    color: 'lime',
+    description: '管理新闻内容与来源',
+  },
+  {
+    value: 'ai_admin',
+    label: 'AI 服务管理员',
+    color: 'purple',
+    description: '管理 AI 模型配置与质量',
+  },
+  {
+    value: 'lawyer_admin',
+    label: '律师服务管理员',
+    color: 'gold',
+    description: '管理律师认证与案件派单',
+  },
+  {
+    value: 'cs_agent',
+    label: '客服',
+    color: 'cyan',
+    description: '处理用户反馈与支持工单',
+  },
+  {
     value: 'admin',
     label: '管理员',
     color: 'red',
-    description: '拥有全部管理权限',
+    description: '拥有广泛的管理权限',
+  },
+  {
+    value: 'super_admin',
+    label: '超级管理员',
+    color: 'magenta',
+    description: '拥有系统最高权限',
   },
 ];
 

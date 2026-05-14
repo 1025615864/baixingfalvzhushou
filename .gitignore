@@ -33,6 +33,7 @@ backend/uploads/
 backend/app/__pycache__/
 backend/backups/
 backend/logs/
+backend/.local/
 frontend/node_modules/
 frontend/dist/
 *.pid

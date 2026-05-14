@@ -86,6 +86,7 @@ services:
 
   # Redis指标导出
   redis-exporter:
+    profiles: ["infra"]
     image: oliver006/redis_exporter:v1.60.0
     container_name: baixing_redis_exporter
     environment:
@@ -112,6 +113,7 @@ services:
 
   # Kafka 事件流平台
   zookeeper:
+    profiles: ["infra"]
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: baixing_zookeeper
     environment:
@@ -135,6 +137,7 @@ services:
       - backend-network
 
   kafka:
+    profiles: ["infra"]
     image: confluentinc/cp-kafka:7.5.0
     container_name: baixing_kafka
     depends_on:
@@ -170,6 +173,7 @@ services:
       - backend-network
 
   kafka-ui:
+    profiles: ["infra"]
     image: provectuslabs/kafka-ui:latest
     container_name: baixing_kafka_ui
     depends_on:
@@ -313,6 +317,7 @@ services:
 
   # Prometheus监控服务
   prometheus:
+    profiles: ["infra"]
     image: prom/prometheus:v2.45.0
     container_name: baixing_prometheus
     ports:
@@ -344,6 +349,7 @@ services:
 
   # Grafana监控面板
   grafana:
+    profiles: ["infra"]
     image: grafana/grafana:10.0.0
     container_name: baixing_grafana
     ports:
@@ -373,6 +379,7 @@ services:
 
   # Alertmanager告警服务
   alertmanager:
+    profiles: ["infra"]
     image: prom/alertmanager:v0.26.0
     container_name: baixing_alertmanager
     ports:
@@ -432,6 +439,7 @@ services:
 
   # 法律服务 (8008)
   legal-service:
+    profiles: ["microservice"]
     build:
       context: ./services/legal-service
       dockerfile: Dockerfile
@@ -466,6 +474,7 @@ services:
 
   # 社区服务 (8007)
   community-service:
+    profiles: ["microservice"]
     build:
       context: ./services/community-service
       dockerfile: Dockerfile
@@ -498,6 +507,7 @@ services:
 
   # 新闻服务 (8006)
   news-service:
+    profiles: ["microservice"]
     build:
       context: ./services/news-service
       dockerfile: Dockerfile
@@ -530,6 +540,7 @@ services:
 
   # 搜索服务 (8009)
   search-service:
+    profiles: ["microservice"]
     build:
       context: ./services/search-service
       dockerfile: Dockerfile
@@ -566,6 +577,7 @@ services:
 
   # 推荐服务 (8010)
   recommendation-service:
+    profiles: ["microservice"]
     build:
       context: ./services/recommendation-service
       dockerfile: Dockerfile
@@ -602,6 +614,7 @@ services:
 
   # 通知服务 (8011)
   notification-service:
+    profiles: ["microservice"]
     build:
       context: ./services/notification-service
       dockerfile: Dockerfile
@@ -634,6 +647,7 @@ services:
 
   # 用户服务 (8001)
   user-service:
+    profiles: ["microservice"]
     build:
       context: ./services/user-service
       dockerfile: Dockerfile
@@ -669,6 +683,7 @@ services:
 
   # 积分服务 (8012)
   points-service:
+    profiles: ["microservice"]
     build:
       context: ./services/points-service
       dockerfile: Dockerfile
@@ -701,6 +716,7 @@ services:
 
   # 知识库服务 (8081)
   knowledge-service:
+    profiles: ["microservice"]
     build:
       context: ./services/knowledge-service
       dockerfile: Dockerfile
@@ -733,6 +749,7 @@ services:
 
   # 归档服务 (8013)
   archive-service:
+    profiles: ["microservice"]
     build:
       context: ./services/archive-service
       dockerfile: Dockerfile
@@ -765,6 +782,7 @@ services:
 
   # 订单服务 (8004)
   order-service:
+    profiles: ["microservice"]
     build:
       context: ./services/order-service
       dockerfile: Dockerfile
@@ -797,6 +815,7 @@ services:
 
   # AI 对话服务 (8005)
   ai-service:
+    profiles: ["microservice"]
     build:
       context: ./services/ai-service
       dockerfile: Dockerfile
@@ -836,6 +855,7 @@ services:
 
   # 向量嵌入服务 (8003)
   embedding-service:
+    profiles: ["microservice"]
     build:
       context: ./services/embedding-service
       dockerfile: Dockerfile
@@ -868,6 +888,7 @@ services:
 
   # 支付通道服务 (8002)
   payment-channel-service:
+    profiles: ["microservice"]
     build:
       context: ./services/payment-channel-service
       dockerfile: Dockerfile
@@ -900,6 +921,7 @@ services:
 
   # 账务服务 (8014)
   payment-accounting-service:
+    profiles: ["microservice"]
     build:
       context: ./services/payment-accounting-service
       dockerfile: Dockerfile

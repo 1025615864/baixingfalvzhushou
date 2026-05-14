@@ -320,3 +320,58 @@ async def refresh_token(
         access_token=access_token,
         expires_in=settings.access_token_expire_minutes * 60,
     )
+
+
+@router.get("/me/dashboards", summary="获取当前用户可访问的运营面板")
+async def get_accessible_dashboards(
+        current_user: Annotated[User, Depends(get_current_user)]) -> dict:
+    """根据用户角色返回可访问的运营面板列表"""
+    from ..utils.permissions import Role, ROLE_DASHBOARD_MAP, ROLE_LABELS
+
+    panels = []
+    role = current_user.role
+
+    if role == Role.SUPER_ADMIN:
+        panels = [
+            {"key": "super", "path": "/admin/super", "label": "超级管理", "icon": "Crown", "description": "系统全量管理"},
+            {"key": "general", "path": "/admin/general", "label": "通用管理", "icon": "Layout", "description": "内容与数据管理"},
+            {"key": "forum", "path": "/admin/forum", "label": "论坛管理", "icon": "MessageSquare", "description": "论坛内容与用户管理"},
+            {"key": "news", "path": "/admin/news", "label": "新闻管理", "icon": "Newspaper", "description": "新闻内容与来源管理"},
+            {"key": "ai", "path": "/admin/ai", "label": "AI 管理", "icon": "Brain", "description": "AI 模型与质量监控"},
+            {"key": "lawyer", "path": "/admin/lawyer", "label": "律师管理", "icon": "Scale", "description": "律师认证与案件管理"},
+            {"key": "cs", "path": "/admin/cs", "label": "客服工作台", "icon": "Headphones", "description": "反馈处理与用户支持"},
+        ]
+    elif role == Role.ADMIN:
+        panels = [
+            {"key": "general", "path": "/admin/general", "label": "通用管理", "icon": "Layout", "description": "内容与数据管理"},
+        ]
+    elif role == Role.FORUM_ADMIN:
+        panels = [
+            {"key": "forum", "path": "/admin/forum", "label": "论坛管理", "icon": "MessageSquare", "description": "论坛内容与用户管理"},
+        ]
+    elif role == Role.NEWS_ADMIN:
+        panels = [
+            {"key": "news", "path": "/admin/news", "label": "新闻管理", "icon": "Newspaper", "description": "新闻内容与来源管理"},
+        ]
+    elif role == Role.AI_ADMIN:
+        panels = [
+            {"key": "ai", "path": "/admin/ai", "label": "AI 管理", "icon": "Brain", "description": "AI 模型与质量监控"},
+        ]
+    elif role == Role.LAWYER_ADMIN:
+        panels = [
+            {"key": "lawyer", "path": "/admin/lawyer", "label": "律师管理", "icon": "Scale", "description": "律师认证与案件管理"},
+        ]
+    elif role == Role.CS_AGENT:
+        panels = [
+            {"key": "cs", "path": "/admin/cs", "label": "客服工作台", "icon": "Headphones", "description": "反馈处理与用户支持"},
+        ]
+    elif role == Role.MODERATOR:
+        panels = [
+            {"key": "forum", "path": "/admin/forum", "label": "论坛管理", "icon": "MessageSquare", "description": "论坛内容审核"},
+        ]
+
+    return {
+        "role": role,
+        "role_label": ROLE_LABELS.get(role, role),
+        "panels": panels,
+    }

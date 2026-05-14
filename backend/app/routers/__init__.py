@@ -167,14 +167,40 @@ try:
 except ImportError:
     logger.warning("system_config路由未加载")
 
-# 律师相关
 try:
     from . import lawyer
     api_router.include_router(lawyer.router)
+    api_router.include_router(lawyer.review_router)
+    api_router.include_router(lawyer.schedule_router)
+    api_router.include_router(lawyer.consultation_router)
     api_router.include_router(lawyer.lawfirm_router)
     api_router.include_router(lawyer.verification_router)
+    api_router.include_router(lawyer.matching_router)
+    api_router.include_router(lawyer.dispatch_router)
+    api_router.include_router(lawyer.case_router)
+    api_router.include_router(lawyer.analytics_router)
 except ImportError:
-    logger.warning("lawyer路由未加载")
+    logger.warning("lawyer 路由未加载")
+
+try:
+    from . import lawyer
+    api_router.include_router(lawyer.video_router)
+    api_router.include_router(lawyer.document_router)
+except ImportError:
+    logger.warning("lawyer video/document 路由未加载")
+
+try:
+    from . import im_enhancement
+    api_router.include_router(im_enhancement.router)
+except ImportError:
+    logger.warning("IM增强路由未加载")
+
+try:
+    from . import lawyer_payment
+    api_router.include_router(lawyer_payment.payment_router)
+    api_router.include_router(lawyer_payment.wallet_router)
+except ImportError:
+    logger.warning("lawyer_payment 路由未加载")
 
 # 知识库
 try:
@@ -242,7 +268,7 @@ except ImportError:
 # ==========================================
 import sys as _sys
 
-if "pytest" not in _sys.modules:
+if "pytest" not in _sys:
     try:
         from .microservice_proxy import MICROSERVICES, create_proxy_router, router as proxy_router
 
@@ -253,5 +279,13 @@ if "pytest" not in _sys.modules:
         api_router.include_router(proxy_router)
     except ImportError:
         logger.warning("微服务代理模块未加载")
+
+    try:
+        from .admin_proxy import router as admin_proxy_router
+
+        api_router.include_router(admin_proxy_router)
+        logger.info("管理后台代理路由已注册")
+    except ImportError:
+        logger.warning("管理后台代理模块未加载")
 
 __all__ = ["api_router"]

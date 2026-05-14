@@ -1,6 +1,6 @@
 """文书领域服务"""
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -88,7 +88,7 @@ class DocumentDomainService:
             return None
 
         document.content = content
-        document.updated_at = datetime.utcnow()
+        document.updated_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(document)
         return document
@@ -103,7 +103,7 @@ class DocumentDomainService:
             return None
 
         document.status = new_status
-        document.updated_at = datetime.utcnow()
+        document.updated_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(document)
         return document

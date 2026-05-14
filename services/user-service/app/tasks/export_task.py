@@ -2,7 +2,7 @@
 import json
 import logging
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy import select, update
@@ -95,7 +95,7 @@ class ExportTaskProcessor:
         """处理单个导出任务"""
         try:
             export_task.status = ExportStatus.PROCESSING
-            export_task.started_at = datetime.utcnow()
+            export_task.started_at = datetime.now(timezone.utc)
             export_task.progress = 10
             await session.commit()
 
@@ -115,21 +115,21 @@ class ExportTaskProcessor:
             export_task.progress = 90
             export_task.result_data = result_data
             export_task.status = ExportStatus.COMPLETED
-            export_task.completed_at = datetime.utcnow()
-            export_task.expires_at = datetime.utcnow() + timedelta(hours=TASK_EXPIRY_HOURS)
+            export_task.completed_at = datetime.now(timezone.utc)
+            export_task.expires_at = datetime.now(timezone.utc) + timedelta(hours=TASK_EXPIRY_HOURS)
 
             logger.info(f"Export task completed: task_id={export_task.id}, user_id={export_task.user_id}")
 
         except Exception as e:
             export_task.status = ExportStatus.FAILED
             export_task.error_message = str(e)[:500]
-            export_task.completed_at = datetime.utcnow()
+            export_task.completed_at = datetime.now(timezone.utc)
             logger.error(f"Export task failed: task_id={export_task.id}, error={e}")
 
     async def _cleanup_expired_tasks(self):
         """清理过期的导出任务"""
         async with AsyncSessionLocal() as session:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             stmt = (
                 update(ExportTask)
                 .where(ExportTask.expires_at <= now)

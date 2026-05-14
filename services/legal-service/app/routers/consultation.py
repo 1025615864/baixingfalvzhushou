@@ -1,11 +1,13 @@
 """咨询路由"""
 from typing import Optional
+from datetime import datetime, timezone
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import AsyncSessionLocal
-from ..models import Consultation, ChatMessage
+from ..models import Consultation, ChatMessage, ConsultationPayment
 from ..services.consultation_service import ConsultationService
 from ..middleware.auth import get_current_user, AuthUser
 from ..middleware.rate_limit import check_consultation_rate
@@ -19,6 +21,8 @@ class CreateConsultationRequest(BaseModel):
     title: str
     description: str
     ai_assisted: bool = True
+    lawyer_id: Optional[int] = None
+    consultation_fee: Optional[float] = None
 
 
 class MessageRequest(BaseModel):
@@ -38,6 +42,8 @@ class ConsultationResponse(BaseModel):
     title: str
     status: str
     ai_assisted: bool
+    payment_order_no: Optional[str] = None
+    payment_status: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -60,7 +66,39 @@ async def create_consultation(
         description=body.description,
         ai_assisted=body.ai_assisted,
     )
-    return ApiResponse.success(ConsultationResponse.model_validate(consultation))
+
+    payment_order_no = None
+    payment_status = None
+
+    if body.lawyer_id and body.consultation_fee and body.consultation_fee > 0:
+        await service.assign_lawyer(consultation.id, body.lawyer_id)
+
+        platform_fee = round(body.consultation_fee * 0.15, 2)
+        lawyer_income = round(body.consultation_fee - platform_fee, 2)
+        order_no = f"CONSULT{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:8].upper()}"
+
+        payment = ConsultationPayment(
+            consultation_id=consultation.id,
+            order_no=order_no,
+            amount=body.consultation_fee,
+            platform_fee=platform_fee,
+            lawyer_income=lawyer_income,
+            pay_method="wechat",
+            status="pending",
+        )
+        db.add(payment)
+        await db.commit()
+        await db.refresh(payment)
+
+        payment_order_no = payment.order_no
+        payment_status = payment.status
+
+        await db.refresh(consultation)
+
+    response = ConsultationResponse.model_validate(consultation)
+    response.payment_order_no = payment_order_no
+    response.payment_status = payment_status
+    return ApiResponse.success(response)
 
 
 @router.get("/")

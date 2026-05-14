@@ -1,7 +1,7 @@
 """个人数据导出服务 - 符合个人信息保护法要求"""
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -118,7 +118,7 @@ class DataExportService:
                 "recent_activities": activity_summary[:20],
             },
             "export_info": {
-                "exported_at": datetime.utcnow().isoformat(),
+                "exported_at": datetime.now(timezone.utc).isoformat(),
                 "data_subject_id": user_id,
                 "purpose": "个人数据导出请求",
                 "legal_basis": "《个人信息保护法》第四十五条",

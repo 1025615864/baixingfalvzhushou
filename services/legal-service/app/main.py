@@ -210,10 +210,21 @@ def create_app() -> FastAPI:
     if _redis_client:
         app.add_middleware(IdempotencyMiddleware, redis_client=_redis_client)
 
-    from .routers import consultation_router, lawyer_router, firm_router, review_router, appointment_router, schedule_router, admin_router, cache_admin_router, document_router
+    from .routers import consultation_router, lawyer_router, firm_router, review_router, appointment_router, schedule_router, admin_router, cache_admin_router, document_router, payment_router, wallet_router
     from .routers.invitation import router as invitation_router
     from .routers.firm_admin import router as firm_admin_router
     from .routers.metrics import router as metrics_router
+    from .routers.homepage import router as homepage_router
+    from .routers.promotion import router as promotion_router
+    from .routers.reply_template import router as reply_template_router
+    from .routers.verification import router as verification_router
+    from .routers.matching import router as matching_router
+    from .routers.dispatch import router as dispatch_router
+    from .routers.case import router as case_router
+    from .routers.analytics import router as analytics_router
+    from .routers.video import router as video_router
+    from .routers.document_template import router as document_template_router
+    from .routers.agent import router as agent_router
 
     app.include_router(consultation_router, prefix="/api/v1/legal/consultations", tags=["咨询"])
     app.include_router(lawyer_router, prefix="/api/v1/legal/lawyers", tags=["律师"])
@@ -227,6 +238,19 @@ def create_app() -> FastAPI:
     app.include_router(cache_admin_router, prefix="/api/v1/legal/cache", tags=["缓存管理"])
     app.include_router(metrics_router, prefix="/api/v1/legal/metrics", tags=["监控"])
     app.include_router(document_router, prefix="/api/v1/legal/documents", tags=["文书"])
+    app.include_router(payment_router, prefix="/api/v1/legal/payments", tags=["支付"])
+    app.include_router(wallet_router, prefix="/api/v1/legal/wallets", tags=["钱包"])
+    app.include_router(homepage_router, prefix="/api/v1/legal", tags=["律师主页"])
+    app.include_router(promotion_router, prefix="/api/v1/legal", tags=["推广"])
+    app.include_router(reply_template_router, prefix="/api/v1/legal", tags=["回复模板"])
+    app.include_router(verification_router, prefix="/api/v1/legal", tags=["认证"])
+    app.include_router(matching_router, prefix="/api/v1/legal/matching", tags=["智能匹配"])
+    app.include_router(dispatch_router, prefix="/api/v1/legal/dispatch", tags=["派单"])
+    app.include_router(case_router, prefix="/api/v1/legal/cases", tags=["案件"])
+    app.include_router(analytics_router, prefix="/api/v1/legal/analytics", tags=["数据分析"])
+    app.include_router(video_router, prefix="/api/v1/legal/video", tags=["视频咨询"])
+    app.include_router(document_template_router, prefix="/api/v1/legal/documents", tags=["文书模板"])
+    app.include_router(agent_router, prefix="/api/v1/legal/agent", tags=["AI运营助手"])
 
     @app.get("/health")
     async def health_check():

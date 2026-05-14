@@ -4,7 +4,7 @@
 """
 import logging
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import select, update
@@ -76,7 +76,7 @@ class MembershipExpiryTask:
     async def _check_expiry(self):
         """检查并处理过期会员"""
         async with AsyncSessionLocal() as session:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
 
             stmt = (
                 select(self._get_user_model())

@@ -1,5 +1,5 @@
 """律所律师邀请表"""
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, DateTime, Integer, Text, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
@@ -18,7 +18,7 @@ class LawFirmInvitation(Base):
     message: Mapped[str] = mapped_column(Text, nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     responded_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index("idx_invitation_lawfirm", "lawfirm_id", "status"),

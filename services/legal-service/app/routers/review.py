@@ -1,11 +1,16 @@
 """评价路由"""
+import json
 from typing import Optional
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 
 from ..database import AsyncSessionLocal
 from ..services.review_service import ReviewService
+from ..models.review import Review
+from ..models.review_appeal import ReviewAppeal
 from ..middleware.auth import get_current_user, AuthUser
 from ..schemas.response import ApiResponse, PaginatedData
 
@@ -37,6 +42,16 @@ class LawyerStatsResponse(BaseModel):
     lawyer_id: int
     total: int
     avg_rating: float
+
+
+class AppealRequest(BaseModel):
+    reason: str
+    evidence: Optional[str] = None
+
+
+class AppealReviewRequest(BaseModel):
+    approved: bool
+    reject_reason: Optional[str] = None
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -118,3 +133,103 @@ async def get_lawyer_stats(
         total=stats["total"],
         avg_rating=stats["avg_rating"],
     ))
+
+
+@router.get("/lawyer/{lawyer_id}/tags")
+async def get_lawyer_review_tags(
+    lawyer_id: int,
+    db: AsyncSession = Depends(lambda: AsyncSessionLocal())
+):
+    """获取律师评价标签云"""
+    result = await db.execute(
+        select(Review).where(Review.lawyer_id == lawyer_id)
+    )
+    reviews = result.scalars().all()
+
+    tag_counter = {}
+    for review in reviews:
+        if review.tags:
+            try:
+                tags_list = json.loads(review.tags)
+            except (json.JSONDecodeError, TypeError):
+                continue
+            for tag_line in tags_list:
+                if ":" in tag_line:
+                    tag, count = tag_line.split(":", 1)
+                    tag_counter[tag] = tag_counter.get(tag, 0) + int(count)
+                else:
+                    tag_counter[tag_line] = tag_counter.get(tag_line, 0) + 1
+
+    sorted_tags = sorted(tag_counter.items(), key=lambda x: x[1], reverse=True)
+    tags = [{"tag": t[0], "count": t[1]} for t in sorted_tags]
+    return ApiResponse.success({"lawyer_id": lawyer_id, "tags": tags})
+
+
+@router.post("/{review_id}/appeal")
+async def appeal_review(
+    review_id: int,
+    body: AppealRequest,
+    current_user: AuthUser = Depends(get_current_user),
+    db: AsyncSession = Depends(lambda: AsyncSessionLocal())
+):
+    """律师对差评发起申诉"""
+    review = await db.get(Review, review_id)
+    if not review:
+        raise HTTPException(status_code=404, detail="评价不存在")
+    if review.rating > 2:
+        raise HTTPException(status_code=400, detail="仅1-2星评价可申诉")
+
+    from ..services.lawyer_service import LawyerService
+    lawyer_service = LawyerService(db)
+    lawyer = await lawyer_service.get_by_user_id(current_user.id)
+    if not lawyer or lawyer.id != review.lawyer_id:
+        raise HTTPException(status_code=403, detail="无权申诉此评价")
+
+    existing = await db.scalar(
+        select(ReviewAppeal).where(
+            ReviewAppeal.review_id == review_id,
+            ReviewAppeal.status == "pending",
+        )
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="已有待审核的申诉")
+
+    appeal = ReviewAppeal(
+        review_id=review_id,
+        lawyer_id=lawyer.id,
+        reason=body.reason,
+        evidence=body.evidence,
+    )
+    db.add(appeal)
+    await db.commit()
+    await db.refresh(appeal)
+
+    return ApiResponse.success({"id": appeal.id, "review_id": review_id, "status": "pending"})
+
+
+@router.post("/appeal/{appeal_id}/review")
+async def review_appeal(
+    appeal_id: int,
+    body: AppealReviewRequest,
+    current_user: AuthUser = Depends(get_current_user),
+    db: AsyncSession = Depends(lambda: AsyncSessionLocal())
+):
+    """管理员审核申诉"""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="无权限审核")
+
+    appeal = await db.get(ReviewAppeal, appeal_id)
+    if not appeal:
+        raise HTTPException(status_code=404, detail="申诉不存在")
+
+    appeal.status = "approved" if body.approved else "rejected"
+    appeal.admin_note = body.reject_reason
+    appeal.reviewed_by = current_user.id
+    appeal.reviewed_at = datetime.now()
+    await db.commit()
+
+    return ApiResponse.success({
+        "appeal_id": appeal_id,
+        "status": appeal.status,
+        "message": "申诉已处理",
+    })

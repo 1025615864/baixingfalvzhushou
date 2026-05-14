@@ -1,7 +1,7 @@
 """对话质量评估和Token消耗追踪服务"""
 import os
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -100,7 +100,7 @@ class QualityService:
     ) -> Dict[str, Any]:
         """生成质量报告"""
         if end_date is None:
-            end_date = datetime.utcnow()
+            end_date = datetime.now(timezone.utc)
         if start_date is None:
             if period == "1d":
                 start_date = end_date - timedelta(days=1)
@@ -178,7 +178,7 @@ class QualityService:
     ) -> Dict[str, Any]:
         """获取Token消耗报告"""
         if end_date is None:
-            end_date = datetime.utcnow()
+            end_date = datetime.now(timezone.utc)
         if start_date is None:
             if period == "1d":
                 start_date = end_date - timedelta(days=1)
@@ -242,7 +242,7 @@ class QualityService:
     ) -> Dict[str, Any]:
         """获取成本统计"""
         if end_date is None:
-            end_date = datetime.utcnow()
+            end_date = datetime.now(timezone.utc)
         if start_date is None:
             if period == "1d":
                 start_date = end_date - timedelta(days=1)

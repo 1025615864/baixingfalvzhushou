@@ -1,6 +1,6 @@
 """管理领域服务"""
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -92,7 +92,7 @@ class AdminDomainService:
             return None
 
         verification.status = decision
-        verification.reviewed_at = datetime.utcnow()
+        verification.reviewed_at = datetime.now(timezone.utc)
         verification.review_reason = reason
         await self.db.commit()
         await self.db.refresh(verification)
@@ -104,7 +104,7 @@ class AdminDomainService:
             firm = firm_result.scalar_one_or_none()
             if firm:
                 firm.status = "active"
-                firm.verified_at = datetime.utcnow()
+                firm.verified_at = datetime.now(timezone.utc)
                 await self.db.commit()
 
                 if self.firm_cache:
@@ -144,7 +144,7 @@ class AdminDomainService:
             return None
 
         lawyer.status = "suspended"
-        lawyer.suspended_at = datetime.utcnow()
+        lawyer.suspended_at = datetime.now(timezone.utc)
         lawyer.suspension_reason = reason
         await self.db.commit()
         await self.db.refresh(lawyer)

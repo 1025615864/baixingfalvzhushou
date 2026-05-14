@@ -1,7 +1,7 @@
 """安全测试"""
 import pytest
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services.auth_service import AuthService
@@ -192,7 +192,7 @@ class TestTokenSecurity:
         access_token = login_result["access_token"]
 
         with patch("app.services.auth_service.datetime") as mock_datetime:
-            mock_datetime.utcnow.return_value = datetime.utcnow() + timedelta(hours=25)
+            mock_datetime.now.return_value = datetime.now(timezone.utc) + timedelta(hours=25)
 
             user_info = await auth_service.verify_token(access_token)
             assert user_info is None

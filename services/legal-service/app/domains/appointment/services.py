@@ -1,6 +1,6 @@
 """预约领域服务"""
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 
@@ -163,7 +163,7 @@ class AppointmentDomainService:
             )
 
         appointment.status = new_status
-        appointment.updated_at = datetime.utcnow()
+        appointment.updated_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(appointment)
         return appointment
@@ -238,7 +238,7 @@ class AppointmentDomainService:
         return result.scalar_one_or_none() is not None
 
     async def handle_timeout_appointments(self) -> int:
-        timeout_threshold = datetime.utcnow() - timedelta(minutes=30)
+        timeout_threshold = datetime.now(timezone.utc) - timedelta(minutes=30)
         result = await self.db.execute(
             select(LawyerConsultation).where(
                 and_(
@@ -251,7 +251,7 @@ class AppointmentDomainService:
         count = 0
         for appointment in timed_out:
             appointment.status = AppointmentStatus.PAYMENT_TIMEOUT.value
-            appointment.updated_at = datetime.utcnow()
+            appointment.updated_at = datetime.now(timezone.utc)
             count += 1
         if count > 0:
             await self.db.commit()

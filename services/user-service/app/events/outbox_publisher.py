@@ -9,7 +9,7 @@
 import json
 import logging
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from uuid import uuid4
 
@@ -125,7 +125,7 @@ class OutboxPublisher:
                 )
                 await _event_bus.publish_user_event(user_event, user_id=event.payload.get("user_id", ""))
                 event.status = OutboxStatus.PUBLISHED
-                event.published_at = datetime.utcnow()
+                event.published_at = datetime.now(timezone.utc)
                 logger.info(f"Outbox event published: {event.event_type}")
             else:
                 raise Exception("Kafka producer not initialized")

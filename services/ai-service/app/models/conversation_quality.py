@@ -1,5 +1,5 @@
 """对话质量评估数据模型"""
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, DateTime, Integer, Text, JSON, Float, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
@@ -17,7 +17,7 @@ class ConversationQualityRecord(Base):
     quality_score: Mapped[float] = mapped_column(Float, nullable=False)
     feedback: Mapped[int] = mapped_column(Integer, nullable=True)
     issues: Mapped[dict] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
     __table_args__ = (
         Index("idx_conversation_quality_created", "created_at"),

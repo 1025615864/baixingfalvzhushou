@@ -1,7 +1,7 @@
 """Outbox Publisher - 确保 Kafka 事件不丢失"""
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import select, update
@@ -97,7 +97,7 @@ class OutboxPublisher:
             key=event.id,
         )
         event.status = "published"
-        event.published_at = datetime.utcnow()
+        event.published_at = datetime.now(timezone.utc)
         logger.info(f"Outbox event published: {event.id} -> {event.topic}")
 
     async def _mark_failed(

@@ -1,6 +1,6 @@
 """律所服务"""
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 
@@ -153,7 +153,7 @@ class FirmService:
         if verification:
             verification.status = "approved"
             verification.reviewed_by_user_id = reviewed_by_user_id
-            verification.reviewed_at = datetime.utcnow()
+            verification.reviewed_at = datetime.now(timezone.utc)
 
         await self.db.commit()
         await self.db.refresh(firm)
@@ -188,7 +188,7 @@ class FirmService:
             verification.status = "rejected"
             verification.rejection_reason = reason
             verification.reviewed_by_user_id = reviewed_by_user_id
-            verification.reviewed_at = datetime.utcnow()
+            verification.reviewed_at = datetime.now(timezone.utc)
 
         await self.db.commit()
         await self.db.refresh(firm)
@@ -262,7 +262,7 @@ class FirmService:
             if hasattr(firm, key) and value is not None:
                 setattr(firm, key, value)
 
-        firm.updated_at = datetime.utcnow()
+        firm.updated_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(firm)
 
@@ -288,7 +288,7 @@ class FirmService:
             )
 
         firm.status = FirmStatus.SUSPENDED.value
-        firm.updated_at = datetime.utcnow()
+        firm.updated_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(firm)
 
@@ -315,7 +315,7 @@ class FirmService:
             )
 
         firm.status = FirmStatus.DEACTIVATED.value
-        firm.updated_at = datetime.utcnow()
+        firm.updated_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(firm)
 

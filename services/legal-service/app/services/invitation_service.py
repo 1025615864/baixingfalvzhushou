@@ -1,6 +1,6 @@
 """律所律师邀请服务"""
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
@@ -52,7 +52,7 @@ class InvitationService:
             status="pending",
             firm_role=firm_role if firm_role in self.FIRM_ROLES else "associate",
             message=message,
-            expires_at=datetime.utcnow() + timedelta(days=self.INVITATION_EXPIRY_DAYS),
+            expires_at=datetime.now(timezone.utc) + timedelta(days=self.INVITATION_EXPIRY_DAYS),
         )
         self.db.add(invitation)
         await self.db.commit()
@@ -65,7 +65,7 @@ class InvitationService:
         if not invitation:
             raise ValueError("邀请不存在")
 
-        if invitation.expires_at < datetime.utcnow():
+        if invitation.expires_at < datetime.now(timezone.utc):
             invitation.status = InvitationStatus.EXPIRED.value
             await self.db.commit()
             raise ValueError("邀请已过期")
@@ -77,7 +77,7 @@ class InvitationService:
             )
 
         invitation.status = InvitationStatus.ACCEPTED.value
-        invitation.responded_at = datetime.utcnow()
+        invitation.responded_at = datetime.now(timezone.utc)
 
         lawyer_result = await self.db.execute(
             select(Lawyer).where(Lawyer.id == invitation.lawyer_id)
@@ -85,7 +85,7 @@ class InvitationService:
         lawyer = lawyer_result.scalar_one()
         lawyer.lawfirm_id = invitation.lawfirm_id
         lawyer.firm_role = invitation.firm_role
-        lawyer.joined_at = datetime.utcnow()
+        lawyer.joined_at = datetime.now(timezone.utc)
         lawyer.invited_by = invitation.invited_by_user_id
 
         await self.db.commit()
@@ -105,7 +105,7 @@ class InvitationService:
             )
 
         invitation.status = InvitationStatus.REJECTED.value
-        invitation.responded_at = datetime.utcnow()
+        invitation.responded_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(invitation)
         return invitation
@@ -147,7 +147,7 @@ class InvitationService:
             select(LawFirmInvitation).where(
                 and_(
                     LawFirmInvitation.status == "pending",
-                    LawFirmInvitation.expires_at < datetime.utcnow(),
+                    LawFirmInvitation.expires_at < datetime.now(timezone.utc),
                 )
             )
         )

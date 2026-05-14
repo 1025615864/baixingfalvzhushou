@@ -1,6 +1,6 @@
 """律所管理服务 - 供律所管理员和平台管理员使用"""
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 
@@ -72,9 +72,9 @@ class FirmAdminService:
 
         consultation.lawyer_id = lawyer_id
         consultation.assigned_by_user_id = assigned_by_user_id
-        consultation.assigned_at = datetime.utcnow()
+        consultation.assigned_at = datetime.now(timezone.utc)
         consultation.status = "processing"
-        consultation.updated_at = datetime.utcnow()
+        consultation.updated_at = datetime.now(timezone.utc)
 
         await self.db.commit()
         await self.db.refresh(consultation)

@@ -1,6 +1,6 @@
 """咨询领域服务"""
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -86,7 +86,7 @@ class ConsultationDomainService:
             )
 
         consultation.status = new_status
-        consultation.updated_at = datetime.utcnow()
+        consultation.updated_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(consultation)
         return consultation
@@ -102,7 +102,7 @@ class ConsultationDomainService:
 
         consultation.lawyer_id = lawyer_id
         consultation.status = "processing"
-        consultation.updated_at = datetime.utcnow()
+        consultation.updated_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(consultation)
         return consultation
@@ -168,7 +168,7 @@ class ConsultationDomainService:
             )
 
         consultation.status = ConsultationStatus.ANSWERED.value
-        consultation.updated_at = datetime.utcnow()
+        consultation.updated_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(consultation)
 
@@ -191,7 +191,7 @@ class ConsultationDomainService:
             )
 
         consultation.status = ConsultationStatus.CANCELLED.value
-        consultation.updated_at = datetime.utcnow()
+        consultation.updated_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(consultation)
 

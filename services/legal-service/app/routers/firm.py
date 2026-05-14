@@ -309,3 +309,48 @@ async def remove_lawyer_from_firm(
         raise HTTPException(status_code=404, detail="律师不在该律所或不存在")
 
     return ApiResponse.success({"message": "律师已从律所移除"})
+
+
+@router.get("/{firm_id}/dashboard")
+async def get_firm_dashboard(
+    firm_id: int,
+    current_user: AuthUser = Depends(get_current_user),
+    db: AsyncSession = Depends(lambda: AsyncSessionLocal())
+):
+    """律所数据看板"""
+    from ..services.analytics_service import AnalyticsService
+
+    service = AnalyticsService(db)
+    data = await service.get_firm_dashboard(firm_id)
+    return ApiResponse.success(data)
+
+
+@router.post("/{firm_id}/lawyers/import")
+async def import_lawyers(
+    firm_id: int,
+    lawyer_ids: list[int] = Body(..., embed=True),
+    current_user: AuthUser = Depends(get_current_user),
+    db: AsyncSession = Depends(lambda: AsyncSessionLocal())
+):
+    """批量导入律师到律所"""
+    service = FirmService(db)
+
+    if not await service.is_firm_admin(firm_id, current_user.id):
+        if current_user.role not in ["admin", "platform_firm_admin"]:
+            raise HTTPException(status_code=403, detail="只有律所管理员可以导入律师")
+
+    invitation_service = InvitationService(db)
+    results = []
+    for lawyer_id in lawyer_ids:
+        try:
+            invitation = await invitation_service.create_invitation(
+                lawfirm_id=firm_id,
+                lawyer_id=lawyer_id,
+                invited_by_user_id=current_user.id,
+                firm_role="associate",
+            )
+            results.append({"lawyer_id": lawyer_id, "status": "invited", "invitation_id": invitation.id})
+        except ValueError as e:
+            results.append({"lawyer_id": lawyer_id, "status": "failed", "reason": str(e)})
+
+    return ApiResponse.success({"results": results, "total": len(lawyer_ids), "success": sum(1 for r in results if r["status"] == "invited")})

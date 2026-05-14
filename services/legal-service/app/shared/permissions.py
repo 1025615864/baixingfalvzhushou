@@ -1,4 +1,4 @@
-"""声明式权限系统"""
+"""声明式权限系统 - 业务域隔离角色体系"""
 from enum import Enum
 from typing import Set
 
@@ -48,6 +48,8 @@ class Permission(str, Enum):
     ADMIN_CONSULTATION_ALL = "admin:consultation_all"
 
 
+_ALL_PERMISSIONS: Set[Permission] = set(Permission)
+
 ROLE_PERMISSIONS: dict[str, Set[Permission]] = {
     "user": {
         Permission.CONSULTATION_CREATE,
@@ -74,7 +76,7 @@ ROLE_PERMISSIONS: dict[str, Set[Permission]] = {
         Permission.DOCUMENT_READ,
         Permission.REVIEW_READ,
     },
-    "lawfirm_admin": {
+    "lawfirm_owner": {
         Permission.CONSULTATION_READ,
         Permission.CONSULTATION_ASSIGN,
         Permission.LAWYER_READ,
@@ -87,50 +89,33 @@ ROLE_PERMISSIONS: dict[str, Set[Permission]] = {
         Permission.DOCUMENT_READ,
         Permission.REVIEW_READ,
     },
-    "platform_firm_admin": {
-        Permission.FIRM_READ,
-        Permission.FIRM_MANAGE_ALL,
-        Permission.FIRM_APPROVE,
-        Permission.FIRM_INVITE,
-        Permission.ADMIN_FIRM_ALL,
-        Permission.ADMIN_STATS,
-    },
-    "admin": {
-        Permission.CONSULTATION_CREATE,
+    "legal_ops": {
         Permission.CONSULTATION_READ,
-        Permission.CONSULTATION_REPLY,
         Permission.CONSULTATION_ASSIGN,
-        Permission.CONSULTATION_CANCEL,
-        Permission.CONSULTATION_COMPLETE,
         Permission.LAWYER_READ,
-        Permission.LAWYER_CREATE,
-        Permission.LAWYER_UPDATE,
         Permission.LAWYER_VERIFY,
         Permission.LAWYER_REJECT,
-        Permission.FIRM_CREATE,
         Permission.FIRM_READ,
-        Permission.FIRM_UPDATE,
-        Permission.FIRM_MANAGE_OWN,
+        Permission.APPOINTMENT_READ,
+        Permission.DOCUMENT_READ,
+        Permission.REVIEW_READ,
+        Permission.ADMIN_LAWYER_ALL,
+    },
+    "legal_admin": {
+        Permission.CONSULTATION_READ,
+        Permission.LAWYER_READ,
+        Permission.FIRM_READ,
         Permission.FIRM_MANAGE_ALL,
         Permission.FIRM_APPROVE,
         Permission.FIRM_INVITE,
-        Permission.FIRM_REMOVE_LAWYER,
-        Permission.APPOINTMENT_CREATE,
         Permission.APPOINTMENT_READ,
-        Permission.APPOINTMENT_CANCEL,
-        Permission.APPOINTMENT_MANAGE,
-        Permission.DOCUMENT_CREATE,
         Permission.DOCUMENT_READ,
-        Permission.DOCUMENT_UPDATE,
-        Permission.REVIEW_CREATE,
         Permission.REVIEW_READ,
-        Permission.ADMIN_STATS,
-        Permission.ADMIN_CACHE,
-        Permission.ADMIN_METRICS,
         Permission.ADMIN_FIRM_ALL,
-        Permission.ADMIN_LAWYER_ALL,
-        Permission.ADMIN_CONSULTATION_ALL,
+        Permission.ADMIN_STATS,
     },
+    "admin": _ALL_PERMISSIONS.copy(),
+    "super_admin": _ALL_PERMISSIONS.copy(),
 }
 
 

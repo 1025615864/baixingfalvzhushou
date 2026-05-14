@@ -1,7 +1,7 @@
 """AI Service Kafka 事件定义"""
 
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Any, Dict
 import json
 import uuid
@@ -76,7 +76,7 @@ def create_ai_event(
     return AIEvent(
         event_id=str(uuid.uuid4()),
         event_type=event_type,
-        timestamp=datetime.utcnow().isoformat(),
+        timestamp=datetime.now(timezone.utc).isoformat(),
         version="1.0",
         source=source,
         conversation_id=conversation_id,

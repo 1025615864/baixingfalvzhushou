@@ -1,6 +1,6 @@
 """AI会话API路由"""
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -190,7 +190,7 @@ async def delete_session(
         raise HTTPException(status_code=404, detail="Session not found")
 
     session.is_deleted = True
-    session.deleted_at = datetime.utcnow()
+    session.deleted_at = datetime.now(timezone.utc)
     session.status = "deleted"
 
     await db.execute(
@@ -208,7 +208,7 @@ async def delete_session(
     messages = msg_result.scalars().all()
     for msg in messages:
         msg.is_deleted = True
-        msg.deleted_at = datetime.utcnow()
+        msg.deleted_at = datetime.now(timezone.utc)
 
     await db.commit()
     return {"message": "Session deleted"}
@@ -288,7 +288,7 @@ async def create_message(
 
     session.total_messages += 1
     session.total_tokens += request.tokens
-    session.last_message_at = datetime.utcnow()
+    session.last_message_at = datetime.now(timezone.utc)
 
     await db.commit()
     await db.refresh(message)

@@ -9,6 +9,7 @@ from .account import router as account_router
 from .data_export import router as data_export_router
 from .email_verification import router as email_verification_router
 from .device import router as device_router
+from .admin import router as admin_router
 
 __all__ = [
     "auth_router",
@@ -21,4 +22,5 @@ __all__ = [
     "data_export_router",
     "email_verification_router",
     "device_router",
+    "admin_router",
 ]

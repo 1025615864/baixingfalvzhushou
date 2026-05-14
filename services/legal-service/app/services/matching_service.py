@@ -1,6 +1,6 @@
 """智能匹配服务"""
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 
@@ -147,7 +147,7 @@ class MatchingService:
 
     async def _check_availability(self, lawyer_id: int) -> bool:
         """检查律师今天是否可用"""
-        today = datetime.utcnow().date()
+        today = datetime.now(timezone.utc).date()
         tomorrow = datetime.combine(today, datetime.max.time())
 
         result = await self.db.execute(

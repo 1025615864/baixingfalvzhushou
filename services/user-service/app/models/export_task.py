@@ -1,6 +1,6 @@
 """导出任务模型 - 异步数据导出"""
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy import String, DateTime, Integer, Text, JSON, Index
 from sqlalchemy.orm import Mapped, mapped_column
@@ -25,7 +25,7 @@ class ExportTask(Base):
     file_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         index=True
     )
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -1,5 +1,5 @@
 """LawyerConsultation (Appointment) model"""
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, DateTime, Integer, Float, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
@@ -16,8 +16,8 @@ class LawyerConsultation(Base):
     status: Mapped[str] = mapped_column(String(20), default="pending")
     scheduled_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     price: Mapped[float] = mapped_column(Float, default=0.0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index("idx_appointment_lawyer_time", "lawyer_id", "scheduled_at"),

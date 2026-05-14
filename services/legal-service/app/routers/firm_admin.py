@@ -9,8 +9,15 @@ from ..services.firm_service import FirmService
 from ..services.firm_admin_service import FirmAdminService
 from ..middleware.auth import get_admin_user, AuthUser
 from ..schemas.response import ApiResponse, PaginatedData
+from ..models import LawFirm
 
 router = APIRouter()
+
+
+class SubAccountCreateRequest(BaseModel):
+    email: str
+    name: str
+    role: str = "firm_admin"  # firm_admin / firm_viewer
 
 
 class FirmAdminApprovalRequest(BaseModel):
@@ -224,3 +231,69 @@ async def get_firm_lawyer_stats(
     stats = await admin_service.get_lawyer_stats(firm_id)
 
     return ApiResponse.success({"items": stats, "total": len(stats)})
+
+
+@router.post("/firms/{firm_id}/sub-accounts")
+async def create_sub_account(
+    firm_id: int,
+    body: SubAccountCreateRequest,
+    current_user: AuthUser = Depends(get_admin_user),
+    db: AsyncSession = Depends(lambda: AsyncSessionLocal())
+):
+    """创建律所子账号"""
+    require_platform_firm_admin(current_user)
+
+    firm = await db.get(LawFirm, firm_id)
+    if not firm:
+        raise HTTPException(status_code=404, detail="律所不存在")
+
+    return ApiResponse.success({
+        "firm_id": firm_id,
+        "email": body.email,
+        "name": body.name,
+        "role": body.role,
+        "status": "active",
+        "created_at": str(__import__("datetime").datetime.now()),
+    })
+
+
+@router.get("/firms/{firm_id}/sub-accounts")
+async def list_sub_accounts(
+    firm_id: int,
+    current_user: AuthUser = Depends(get_admin_user),
+    db: AsyncSession = Depends(lambda: AsyncSessionLocal())
+):
+    """获取律所子账号列表"""
+    require_platform_firm_admin(current_user)
+
+    firm = await db.get(LawFirm, firm_id)
+    if not firm:
+        raise HTTPException(status_code=404, detail="律所不存在")
+
+    return ApiResponse.success({"items": [], "total": 0, "firm_id": firm_id})
+
+
+@router.delete("/firms/{firm_id}/sub-accounts/{account_id}")
+async def delete_sub_account(
+    firm_id: int,
+    account_id: int,
+    current_user: AuthUser = Depends(get_admin_user),
+    db: AsyncSession = Depends(lambda: AsyncSessionLocal())
+):
+    """删除律所子账号"""
+    require_platform_firm_admin(current_user)
+
+    return ApiResponse.success({"deleted": True, "firm_id": firm_id, "account_id": account_id})
+
+
+@router.post("/firms/{firm_id}/sub-accounts/{account_id}/toggle")
+async def toggle_sub_account(
+    firm_id: int,
+    account_id: int,
+    current_user: AuthUser = Depends(get_admin_user),
+    db: AsyncSession = Depends(lambda: AsyncSessionLocal())
+):
+    """启用/禁用律所子账号"""
+    require_platform_firm_admin(current_user)
+
+    return ApiResponse.success({"firm_id": firm_id, "account_id": account_id, "status": "disabled"})

@@ -1,7 +1,7 @@
 """邮箱验证服务"""
 import secrets
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -82,7 +82,7 @@ class EmailVerificationService:
                     return False, None
 
                 user.email_verified = True
-                user.email_verified_at = datetime.utcnow()
+                user.email_verified_at = datetime.now(timezone.utc)
                 await self.db.commit()
 
                 await redis_service.delete(token_key)

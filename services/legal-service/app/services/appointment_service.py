@@ -1,6 +1,6 @@
 """预约服务"""
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 
@@ -167,7 +167,7 @@ class AppointmentService:
             )
 
         appointment.status = new_status
-        appointment.updated_at = datetime.utcnow()
+        appointment.updated_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(appointment)
         return appointment
@@ -247,7 +247,7 @@ class AppointmentService:
 
     async def handle_timeout_appointments(self) -> dict:
         """处理超时未支付的预约（后台任务）"""
-        timeout_threshold = datetime.utcnow() - timedelta(minutes=self.PAYMENT_TIMEOUT_MINUTES)
+        timeout_threshold = datetime.now(timezone.utc) - timedelta(minutes=self.PAYMENT_TIMEOUT_MINUTES)
 
         result = await self.db.execute(
             select(LawyerConsultation).where(
@@ -264,7 +264,7 @@ class AppointmentService:
 
         for appointment in timed_out_appointments:
             appointment.status = AppointmentStatus.EXPIRED.value
-            appointment.updated_at = datetime.utcnow()
+            appointment.updated_at = datetime.now(timezone.utc)
             expired_count += 1
 
             released_slots += 1
@@ -279,7 +279,7 @@ class AppointmentService:
 
     async def handle_scheduled_time_past(self) -> dict:
         """处理已过预约时间但未完成的预约（后台任务）"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         completion_threshold = now - timedelta(minutes=30)
 
         result = await self.db.execute(
@@ -295,7 +295,7 @@ class AppointmentService:
         no_show_count = 0
         for appointment in past_appointments:
             appointment.status = AppointmentStatus.NO_SHOW.value
-            appointment.updated_at = datetime.utcnow()
+            appointment.updated_at = datetime.now(timezone.utc)
             no_show_count += 1
 
         if no_show_count > 0:

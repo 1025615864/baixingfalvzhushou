@@ -1,5 +1,5 @@
 """律所管理员表"""
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, DateTime, Integer, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
@@ -13,7 +13,7 @@ class LawFirmAdmin(Base):
     lawfirm_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     role: Mapped[str] = mapped_column(String(20), default="admin")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index("idx_firmadmin_firm_user", "lawfirm_id", "user_id", unique=True),

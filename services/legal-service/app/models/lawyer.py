@@ -1,5 +1,5 @@
 """Lawyer and LawyerSchedule models"""
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, DateTime, Integer, Text, Float, Index, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -29,8 +29,8 @@ class Lawyer(Base):
     firm_role: Mapped[str] = mapped_column(String(20), nullable=True)
     joined_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     invited_by: Mapped[int] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index("idx_lawyers_specialty_status", text("specialties"), postgresql_using="gin"),
@@ -51,8 +51,8 @@ class LawyerSchedule(Base):
     start_time: Mapped[str] = mapped_column(String(10), nullable=False)
     end_time: Mapped[str] = mapped_column(String(10), nullable=False)
     is_available: Mapped[bool] = mapped_column(Integer, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index("idx_schedule_lawyer_date", "lawyer_id", "date"),

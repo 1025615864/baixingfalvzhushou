@@ -1,6 +1,6 @@
 """Kafka Outbox 事件表模型"""
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, Integer, JSON, DateTime, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
@@ -28,7 +28,7 @@ class OutboxEvent(Base):
     max_retries: Mapped[int] = mapped_column(Integer, default=5)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         index=True
     )
     published_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)

@@ -1,5 +1,5 @@
 """设备管理服务"""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import logging
 
@@ -51,14 +51,14 @@ class DeviceService:
         device = result.scalar_one_or_none()
 
         if device:
-            device.last_active_at = datetime.utcnow()
+            device.last_active_at = datetime.now(timezone.utc)
             if device_name:
                 device.device_name = device_name
             if device_type:
                 device.device_type = device_type
             if fcm_token:
                 device.fcm_token = fcm_token
-            device.updated_at = datetime.utcnow()
+            device.updated_at = datetime.now(timezone.utc)
         else:
             device_count = await self._count_user_devices(user_id)
             if device_count >= MAX_DEVICES_PER_USER:
@@ -79,7 +79,7 @@ class DeviceService:
                 device_name=device_name,
                 device_type=device_type,
                 fcm_token=fcm_token,
-                last_active_at=datetime.utcnow(),
+                last_active_at=datetime.now(timezone.utc),
             )
             self.db.add(device)
 
@@ -277,7 +277,7 @@ class DeviceService:
             return False
 
         device.fcm_token = fcm_token
-        device.updated_at = datetime.utcnow()
+        device.updated_at = datetime.now(timezone.utc)
         await self.db.commit()
 
         return True
@@ -302,7 +302,7 @@ class DeviceService:
         if not device:
             return False
 
-        device.last_active_at = datetime.utcnow()
+        device.last_active_at = datetime.now(timezone.utc)
         await self.db.commit()
 
         return True

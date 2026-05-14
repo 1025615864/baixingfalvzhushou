@@ -4,7 +4,7 @@
 建议使用 APScheduler 或系统 cron 定期调用
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -32,7 +32,7 @@ async def process_expired_deletions() -> dict:
         "processed": 0,
         "deleted": [],
         "errors": [],
-        "started_at": datetime.utcnow().isoformat(),
+        "started_at": datetime.now(timezone.utc).isoformat(),
     }
 
     logger.info("Starting expired deletion processing...")
@@ -44,7 +44,7 @@ async def process_expired_deletions() -> dict:
             result_detail = await service.process_expired_deletions()
             result["processed"] = result_detail["count"]
             result["deleted"] = result_detail["deleted_user_ids"]
-            result["ended_at"] = datetime.utcnow().isoformat()
+            result["ended_at"] = datetime.now(timezone.utc).isoformat()
 
             logger.info(
                 f"Expired deletion processing completed: "
@@ -54,7 +54,7 @@ async def process_expired_deletions() -> dict:
     except Exception as e:
         logger.error(f"Expired deletion processing failed: {e}")
         result["errors"].append(str(e))
-        result["ended_at"] = datetime.utcnow().isoformat()
+        result["ended_at"] = datetime.now(timezone.utc).isoformat()
 
     return result
 
@@ -72,12 +72,11 @@ async def get_pending_deletions() -> list[dict]:
             )
             users = result.scalars().all()
 
-            from datetime import timedelta
             pending_list = []
             for user in users:
                 if user.deletion_requested_at:
                     grace_end = user.deletion_requested_at + timedelta(days=7)
-                    remaining = grace_end - datetime.utcnow()
+                    remaining = grace_end - datetime.now(timezone.utc)
                     pending_list.append({
                         "user_id": user.id,
                         "requested_at": user.deletion_requested_at.isoformat(),
@@ -102,11 +101,9 @@ async def cleanup_deleted_users(days: int = 90) -> int:
     Returns:
         清理的账号数量
     """
-    from datetime import timedelta
-
     try:
         async with AsyncSessionLocal() as db:
-            cutoff = datetime.utcnow() - timedelta(days=days)
+            cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
             result = await db.execute(
                 select(User).where(

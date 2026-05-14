@@ -1,5 +1,5 @@
 """会员服务 - 会员等级管理"""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import logging
 
@@ -63,7 +63,7 @@ class MembershipService:
         if user.role == "admin":
             return MembershipTier.ADMIN
 
-        if user.vip_expires_at and user.vip_expires_at > datetime.utcnow():
+        if user.vip_expires_at and user.vip_expires_at > datetime.now(timezone.utc):
             if user.role == "svip":
                 return MembershipTier.SVIP
             return MembershipTier.VIP
@@ -84,9 +84,9 @@ class MembershipService:
         """获取VIP剩余天数"""
         if not user.vip_expires_at:
             return 0
-        if user.vip_expires_at <= datetime.utcnow():
+        if user.vip_expires_at <= datetime.now(timezone.utc):
             return 0
-        delta = user.vip_expires_at - datetime.utcnow()
+        delta = user.vip_expires_at - datetime.now(timezone.utc)
         return delta.days
 
     async def upgrade_to_vip(self, user_id: int, days: int, tier: str = MembershipTier.VIP) -> bool:
@@ -105,7 +105,7 @@ class MembershipService:
             return False
 
         old_level = self.get_tier(user)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         if user.vip_expires_at and user.vip_expires_at > now:
             user.vip_expires_at = user.vip_expires_at + timedelta(days=days)
         else:
@@ -138,7 +138,7 @@ class MembershipService:
             return False
 
         old_level = self.get_tier(user)
-        user.vip_expires_at = datetime.utcnow()
+        user.vip_expires_at = datetime.now(timezone.utc)
         user.role = "user"
         await self.db.commit()
         logger.info(f"User {user_id} VIP cancelled")

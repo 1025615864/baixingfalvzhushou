@@ -363,10 +363,10 @@ class UserServiceServicer(user_service_pb2_grpc.UserServiceServicer):
                 user.status = "banned"
                 user.is_active = False
 
-                from datetime import datetime, timedelta
+                from datetime import datetime, timedelta, timezone
                 ban_end = None
                 if request.ban_duration_hours > 0:
-                    ban_end = datetime.utcnow() + timedelta(hours=request.ban_duration_hours)
+                    ban_end = datetime.now(timezone.utc) + timedelta(hours=request.ban_duration_hours)
                     user.banned_until = ban_end
 
                 await session.commit()

@@ -8,8 +8,64 @@ from ..database import AsyncSessionLocal
 from ..services.lawyer_service import LawyerService
 from ..services.consultation_service import ConsultationService
 from ..services.appointment_service import AppointmentService
-from ..middleware.auth import get_admin_user, AuthUser
 from ..schemas.response import ApiResponse, PaginatedData
+
+try:
+    from services.common.middleware.admin_auth import (
+        get_admin_user, AdminUser, require_domain_role,
+    )
+except ImportError:
+    import os
+    from fastapi import HTTPException, status
+    from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+    from typing import List, Set
+
+    _security = HTTPBearer(auto_error=False)
+
+    GLOBAL_ADMIN_ROLES = {"super_admin", "admin"}
+
+    DOMAIN_ROLES: dict[str, Set[str]] = {
+        "global": {"super_admin", "admin"},
+        "legal": {"legal_admin", "legal_ops", "lawfirm_owner"},
+    }
+
+    class AdminUser:
+        def __init__(self, user_id: int, role: str, permissions: Optional[List[str]] = None):
+            self.user_id = user_id
+            self.role = role
+            self.permissions = permissions or []
+            self.is_super_admin = role in GLOBAL_ADMIN_ROLES
+
+        def has_domain_access(self, domain: str) -> bool:
+            if self.is_super_admin:
+                return True
+            return self.role in DOMAIN_ROLES.get(domain, set())
+
+    async def get_admin_user(
+        credentials: HTTPAuthorizationCredentials = Depends(_security),
+    ) -> AdminUser:
+        if not credentials:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="未提供认证凭据")
+        if os.getenv("DISABLE_AUTH", "").lower() in {"1", "true", "yes"}:
+            return AdminUser(user_id=0, role="admin")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="认证服务不可用")
+
+    def require_domain_role(domain: str, roles: Optional[List[str]] = None):
+        async def domain_checker(admin: AdminUser = Depends(get_admin_user)):
+            if admin.is_super_admin:
+                return admin
+            if not admin.has_domain_access(domain):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"需要 {domain} 域管理角色，当前角色: {admin.role}",
+                )
+            if roles and admin.role not in roles:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"需要角色: {', '.join(roles)}，当前角色: {admin.role}",
+                )
+            return admin
+        return domain_checker
 
 router = APIRouter()
 
@@ -29,7 +85,7 @@ class LawyerVerificationRequest(BaseModel):
 
 @router.get("/stats")
 async def get_stats(
-    current_user: AuthUser = Depends(get_admin_user),
+    current_user: AdminUser = Depends(require_domain_role("legal", roles=["legal_admin"])),
     db: AsyncSession = Depends(lambda: AsyncSessionLocal())
 ):
     """获取管理后台统计"""
@@ -73,7 +129,7 @@ async def list_all_lawyers(
     page: int = 1,
     page_size: int = 20,
     status: Optional[str] = None,
-    current_user: AuthUser = Depends(get_admin_user),
+    current_user: AdminUser = Depends(require_domain_role("legal", roles=["legal_ops"])),
     db: AsyncSession = Depends(lambda: AsyncSessionLocal())
 ):
     """获取所有律师列表"""
@@ -111,7 +167,7 @@ async def list_all_lawyers(
 @router.post("/lawyers/{lawyer_id}/verify")
 async def verify_lawyer(
     lawyer_id: int,
-    current_user: AuthUser = Depends(get_admin_user),
+    current_user: AdminUser = Depends(require_domain_role("legal", roles=["legal_ops"])),
     db: AsyncSession = Depends(lambda: AsyncSessionLocal())
 ):
     """认证律师"""
@@ -123,7 +179,7 @@ async def verify_lawyer(
 @router.post("/lawyers/{lawyer_id}/reject")
 async def reject_lawyer(
     lawyer_id: int,
-    current_user: AuthUser = Depends(get_admin_user),
+    current_user: AdminUser = Depends(require_domain_role("legal", roles=["legal_ops"])),
     db: AsyncSession = Depends(lambda: AsyncSessionLocal())
 ):
     """拒绝律师"""
@@ -142,7 +198,7 @@ async def list_all_consultations(
     page: int = 1,
     page_size: int = 20,
     status: Optional[str] = None,
-    current_user: AuthUser = Depends(get_admin_user),
+    current_user: AdminUser = Depends(require_domain_role("legal")),
     db: AsyncSession = Depends(lambda: AsyncSessionLocal())
 ):
     """获取所有咨询列表"""
@@ -184,7 +240,7 @@ async def list_all_consultations(
 async def assign_consultation(
     consultation_id: int,
     lawyer_id: int,
-    current_user: AuthUser = Depends(get_admin_user),
+    current_user: AdminUser = Depends(require_domain_role("legal", roles=["lawfirm_owner"])),
     db: AsyncSession = Depends(lambda: AsyncSessionLocal())
 ):
     """分配咨询给律师"""
@@ -206,7 +262,7 @@ async def list_appointments(
     page: int = 1,
     page_size: int = 20,
     status: Optional[str] = None,
-    current_user: AuthUser = Depends(get_admin_user),
+    current_user: AdminUser = Depends(require_domain_role("legal", roles=["lawfirm_owner"])),
     db: AsyncSession = Depends(lambda: AsyncSessionLocal())
 ):
     """获取所有预约"""

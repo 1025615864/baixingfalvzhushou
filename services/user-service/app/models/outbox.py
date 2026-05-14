@@ -1,6 +1,6 @@
 """Outbox 模型 - 确保事件可靠发布"""
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy import String, DateTime, Integer, Text, JSON, Index
 from sqlalchemy.orm import Mapped, mapped_column
@@ -31,7 +31,7 @@ class OutboxEvent(Base):
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         index=True
     )
     published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

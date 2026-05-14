@@ -1,6 +1,6 @@
 """律师领域服务"""
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -123,7 +123,7 @@ class LawyerDomainService:
             if hasattr(lawyer, key) and value is not None:
                 setattr(lawyer, key, value)
 
-        lawyer.updated_at = datetime.utcnow()
+        lawyer.updated_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(lawyer)
 
@@ -139,7 +139,7 @@ class LawyerDomainService:
             raise ValueError("Lawyer not found")
 
         lawyer.status = "verified"
-        lawyer.verified_at = datetime.utcnow()
+        lawyer.verified_at = datetime.now(timezone.utc)
         await self.db.commit()
 
         if self.cache:
@@ -159,7 +159,7 @@ class LawyerDomainService:
             return None
 
         lawyer.rating = new_rating
-        lawyer.updated_at = datetime.utcnow()
+        lawyer.updated_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(lawyer)
 
@@ -175,7 +175,7 @@ class LawyerDomainService:
             return None
 
         lawyer.consultation_count = (lawyer.consultation_count or 0) + 1
-        lawyer.updated_at = datetime.utcnow()
+        lawyer.updated_at = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(lawyer)
 

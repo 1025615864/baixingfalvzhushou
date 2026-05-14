@@ -1,5 +1,5 @@
 """认证服务"""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import uuid
 import logging
@@ -67,8 +67,8 @@ class AuthService:
             "role": user.role,
             "jti": jti,
             "type": "access",
-            "iat": datetime.utcnow(),
-            "exp": datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes),
+            "iat": datetime.now(timezone.utc),
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes),
         }
         if family:
             payload["family"] = family
@@ -95,8 +95,8 @@ class AuthService:
             "jti": jti,
             "type": "refresh",
             "family": family,
-            "iat": datetime.utcnow(),
-            "exp": datetime.utcnow() + timedelta(days=settings.refresh_token_expire_days),
+            "iat": datetime.now(timezone.utc),
+            "exp": datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days),
         }
         signing_key = _get_signing_key()
         return jwt.encode(payload, signing_key, algorithm=jwt_key_manager.algorithm), jti

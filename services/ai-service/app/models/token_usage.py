@@ -1,5 +1,5 @@
 """Token消耗记录数据模型"""
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, DateTime, Integer, Float, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
@@ -18,7 +18,7 @@ class TokenUsageRecord(Base):
     cost_usd: Mapped[float] = mapped_column(Float, nullable=True)
     cost_cny: Mapped[float] = mapped_column(Float, nullable=True)
     latency_ms: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
     __table_args__ = (
         Index("idx_token_usage_created", "created_at"),

@@ -2,7 +2,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -93,7 +93,7 @@ class AppointmentScheduler:
     async def _process_timeouts(self):
         """处理超时预约"""
         self._metrics.total_executions += 1
-        execution_start = datetime.utcnow()
+        execution_start = datetime.now(timezone.utc)
 
         try:
             async with self.db_session_factory() as db:
@@ -125,12 +125,12 @@ class AppointmentScheduler:
                 self._metrics.successful_executions += 1
                 self._metrics.total_expired_appointments += expired_count
                 self._metrics.total_no_shows += no_show_count
-                self._metrics.last_execution_time = datetime.utcnow()
+                self._metrics.last_execution_time = datetime.now(timezone.utc)
 
         except Exception as e:
             self._metrics.failed_executions += 1
             self._metrics.last_error = str(e)
-            self._metrics.last_error_time = datetime.utcnow()
+            self._metrics.last_error_time = datetime.now(timezone.utc)
             logger.error(
                 "appointment_scheduler_process_error",
                 extra={

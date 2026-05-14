@@ -1,6 +1,6 @@
 """账号注销服务 - 冷静期机制"""
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -53,9 +53,9 @@ class AccountDeletionService:
         if user.status == AccountStatus.DELETED:
             return False, "账号已注销"
 
-        grace_end = datetime.utcnow() + timedelta(days=DELETION_GRACE_PERIOD_DAYS)
+        grace_end = datetime.now(timezone.utc) + timedelta(days=DELETION_GRACE_PERIOD_DAYS)
         user.status = AccountStatus.DELETION_PENDING
-        user.deletion_requested_at = datetime.utcnow()
+        user.deletion_requested_at = datetime.now(timezone.utc)
         await self.db.commit()
 
         try:
@@ -163,7 +163,7 @@ class AccountDeletionService:
         for user in pending_users:
             if user.deletion_requested_at:
                 grace_end = user.deletion_requested_at + timedelta(days=DELETION_GRACE_PERIOD_DAYS)
-                if datetime.utcnow() >= grace_end:
+                if datetime.now(timezone.utc) >= grace_end:
                     user_id = user.id
                     await self._perform_deletion(user)
                     count += 1
@@ -174,7 +174,7 @@ class AccountDeletionService:
     async def _perform_deletion(self, user: User, ip_address: Optional[str] = None):
         """执行账号注销"""
         user.status = AccountStatus.DELETED
-        user.deleted_at = datetime.utcnow()
+        user.deleted_at = datetime.now(timezone.utc)
         user.is_active = False
         user.hashed_password = "[DELETED]"
         user.phone = None
@@ -220,7 +220,7 @@ class AccountDeletionService:
 
         remaining_days = 0
         if grace_end:
-            remaining = grace_end - datetime.utcnow()
+            remaining = grace_end - datetime.now(timezone.utc)
             remaining_days = max(0, remaining.days)
 
         return {

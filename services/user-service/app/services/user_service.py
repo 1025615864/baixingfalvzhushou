@@ -1,7 +1,7 @@
 """用户服务"""
 import logging
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -118,7 +118,7 @@ class UserService:
         if not user:
             return False
 
-        user.deleted_at = datetime.utcnow()
+        user.deleted_at = datetime.now(timezone.utc)
         user.is_active = False
         await self.db.commit()
 

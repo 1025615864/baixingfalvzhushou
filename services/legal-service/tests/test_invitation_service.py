@@ -1,6 +1,6 @@
 """InvitationService 单元测试"""
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.invitation_service import InvitationService
@@ -21,7 +21,7 @@ class TestInvitationService:
             user_id=10,
             name="测试律师",
             status="verified",
-            verified_at=datetime.utcnow(),
+            verified_at=datetime.now(timezone.utc),
         )
         db_session.add(lawyer)
         await db_session.commit()
@@ -41,7 +41,7 @@ class TestInvitationService:
         assert invitation.lawyer_id == lawyer.id
         assert invitation.status == "pending"
         assert invitation.firm_role == "associate"
-        assert invitation.expires_at > datetime.utcnow()
+        assert invitation.expires_at > datetime.now(timezone.utc)
 
     @pytest.mark.asyncio
     async def test_create_invitation_unverified_lawyer(self, db_session: AsyncSession):
@@ -77,7 +77,7 @@ class TestInvitationService:
             user_id=10,
             name="已有律所律师",
             status="verified",
-            verified_at=datetime.utcnow(),
+            verified_at=datetime.now(timezone.utc),
             lawfirm_id=firm1.id,
         )
         db_session.add(lawyer)
@@ -102,7 +102,7 @@ class TestInvitationService:
             user_id=10,
             name="测试律师",
             status="verified",
-            verified_at=datetime.utcnow(),
+            verified_at=datetime.now(timezone.utc),
         )
         db_session.add(lawyer)
         await db_session.commit()
@@ -136,7 +136,7 @@ class TestInvitationService:
             user_id=10,
             name="测试律师",
             status="verified",
-            verified_at=datetime.utcnow(),
+            verified_at=datetime.now(timezone.utc),
         )
         db_session.add(lawyer)
         await db_session.commit()
@@ -148,7 +148,7 @@ class TestInvitationService:
             invited_by_user_id=1,
             status="pending",
             firm_role="associate",
-            expires_at=datetime.utcnow() - timedelta(days=1),
+            expires_at=datetime.now(timezone.utc) - timedelta(days=1),
         )
         db_session.add(invitation)
         await db_session.commit()
@@ -168,7 +168,7 @@ class TestInvitationService:
             user_id=10,
             name="测试律师",
             status="verified",
-            verified_at=datetime.utcnow(),
+            verified_at=datetime.now(timezone.utc),
         )
         db_session.add(lawyer)
         await db_session.commit()
@@ -196,7 +196,7 @@ class TestInvitationService:
             user_id=10,
             name="测试律师",
             status="verified",
-            verified_at=datetime.utcnow(),
+            verified_at=datetime.now(timezone.utc),
         )
         db_session.add(lawyer)
         await db_session.commit()
@@ -208,7 +208,7 @@ class TestInvitationService:
             invited_by_user_id=1,
             status="accepted",
             firm_role="associate",
-            expires_at=datetime.utcnow() + timedelta(days=7),
+            expires_at=datetime.now(timezone.utc) + timedelta(days=7),
         )
         db_session.add(invitation)
         await db_session.commit()
@@ -228,7 +228,7 @@ class TestInvitationService:
             user_id=10,
             name="测试律师",
             status="verified",
-            verified_at=datetime.utcnow(),
+            verified_at=datetime.now(timezone.utc),
         )
         db_session.add(lawyer)
         await db_session.commit()
@@ -240,7 +240,7 @@ class TestInvitationService:
             invited_by_user_id=1,
             status="pending",
             firm_role="associate",
-            expires_at=datetime.utcnow() - timedelta(days=1),
+            expires_at=datetime.now(timezone.utc) - timedelta(days=1),
         )
         new_invitation = LawFirmInvitation(
             lawfirm_id=firm.id,
@@ -248,7 +248,7 @@ class TestInvitationService:
             invited_by_user_id=1,
             status="pending",
             firm_role="associate",
-            expires_at=datetime.utcnow() + timedelta(days=7),
+            expires_at=datetime.now(timezone.utc) + timedelta(days=7),
         )
         db_session.add(old_invitation)
         db_session.add(new_invitation)
@@ -274,7 +274,7 @@ class TestInvitationService:
             user_id=10,
             name="测试律师",
             status="verified",
-            verified_at=datetime.utcnow(),
+            verified_at=datetime.now(timezone.utc),
         )
         db_session.add(lawyer)
         await db_session.commit()

@@ -1,6 +1,6 @@
 """状态机基类"""
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TypeVar, Generic, Optional, Set, Dict, List
 
 T = TypeVar('T')
@@ -83,7 +83,7 @@ class TimestampedStateMachine(StateMachine[T]):
             "to": target.value if hasattr(target, 'value') else target,
             "operator_id": operator_id,
             "reason": reason,
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(timezone.utc),
         })
 
     def get_transition_history(self) -> List[dict]:

@@ -1,6 +1,6 @@
 """会员服务测试"""
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 from app.services.membership_service import MembershipService, MembershipTier
@@ -29,7 +29,7 @@ class TestMembershipService:
         user = MagicMock(spec=User)
         user.id = 1
         user.role = "vip"
-        user.vip_expires_at = datetime.utcnow() + timedelta(days=30)
+        user.vip_expires_at = datetime.now(timezone.utc) + timedelta(days=30)
 
         service = MembershipService(db_session)
         tier = service.get_tier(user)
@@ -55,7 +55,7 @@ class TestMembershipService:
         user = MagicMock(spec=User)
         user.id = 1
         user.role = "vip"
-        user.vip_expires_at = datetime.utcnow() + timedelta(days=30)
+        user.vip_expires_at = datetime.now(timezone.utc) + timedelta(days=30)
 
         service = MembershipService(db_session)
         assert service.is_vip(user) is True
@@ -92,7 +92,7 @@ class TestMembershipService:
         user = MagicMock(spec=User)
         user.id = 1
         user.role = "vip"
-        user.vip_expires_at = datetime.utcnow() + timedelta(days=30)
+        user.vip_expires_at = datetime.now(timezone.utc) + timedelta(days=30)
 
         service = MembershipService(db_session)
         permissions = service.get_permissions(user)
@@ -107,7 +107,7 @@ class TestMembershipService:
         user = MagicMock(spec=User)
         user.id = 1
         user.role = "svip"
-        user.vip_expires_at = datetime.utcnow() + timedelta(days=30)
+        user.vip_expires_at = datetime.now(timezone.utc) + timedelta(days=30)
 
         service = MembershipService(db_session)
         permissions = service.get_permissions(user)
@@ -123,7 +123,7 @@ class TestMembershipService:
         user = MagicMock(spec=User)
         user.id = 1
         user.role = "vip"
-        user.vip_expires_at = datetime.utcnow() + timedelta(days=15)
+        user.vip_expires_at = datetime.now(timezone.utc) + timedelta(days=15)
 
         service = MembershipService(db_session)
         remaining = service.get_vip_remaining_days(user)
@@ -136,7 +136,7 @@ class TestMembershipService:
         user = MagicMock(spec=User)
         user.id = 1
         user.role = "vip"
-        user.vip_expires_at = datetime.utcnow() - timedelta(days=1)
+        user.vip_expires_at = datetime.now(timezone.utc) - timedelta(days=1)
 
         service = MembershipService(db_session)
         remaining = service.get_vip_remaining_days(user)

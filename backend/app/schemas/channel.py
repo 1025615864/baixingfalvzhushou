@@ -1,7 +1,7 @@
 """渠道相关 Pydantic 模式"""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Any, Dict
 
 from pydantic import BaseModel, Field
@@ -136,7 +136,7 @@ class TrackEvent(BaseModel):
     session_id: Optional[str] = Field(None, description="会话ID")
     channel_params: ChannelParams = Field(..., description="渠道参数")
     metadata: Optional[Dict[str, Any]] = Field(None, description="额外数据")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="时间戳")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="时间戳")
 
 
 # ============ 查询参数 Schema ============

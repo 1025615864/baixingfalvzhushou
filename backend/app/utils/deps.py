@@ -170,6 +170,84 @@ async def require_lawyer(
     return current_user
 
 
+async def require_super_admin(
+        current_user: Annotated[User, Depends(get_current_user)]) -> User:
+    """要求超级管理员权限"""
+    if _should_skip_verify():
+        return current_user
+    if not has_role(current_user, Role.SUPER_ADMIN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="需要超级管理员权限"
+        )
+    return current_user
+
+
+async def require_forum_admin(
+        current_user: Annotated[User, Depends(get_current_user)]) -> User:
+    """要求论坛服务管理员权限"""
+    if _should_skip_verify():
+        return current_user
+    if not has_any_role(current_user, [Role.FORUM_ADMIN, Role.ADMIN, Role.SUPER_ADMIN]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="需要论坛管理权限"
+        )
+    return current_user
+
+
+async def require_news_admin(
+        current_user: Annotated[User, Depends(get_current_user)]) -> User:
+    """要求新闻服务管理员权限"""
+    if _should_skip_verify():
+        return current_user
+    if not has_any_role(current_user, [Role.NEWS_ADMIN, Role.ADMIN, Role.SUPER_ADMIN]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="需要新闻管理权限"
+        )
+    return current_user
+
+
+async def require_ai_admin(
+        current_user: Annotated[User, Depends(get_current_user)]) -> User:
+    """要求 AI 服务管理员权限"""
+    if _should_skip_verify():
+        return current_user
+    if not has_any_role(current_user, [Role.AI_ADMIN, Role.ADMIN, Role.SUPER_ADMIN]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="需要 AI 管理权限"
+        )
+    return current_user
+
+
+async def require_lawyer_admin(
+        current_user: Annotated[User, Depends(get_current_user)]) -> User:
+    """要求律师服务管理员权限"""
+    if _should_skip_verify():
+        return current_user
+    if not has_any_role(current_user, [Role.LAWYER_ADMIN, Role.ADMIN, Role.SUPER_ADMIN]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="需要律师管理权限"
+        )
+    return current_user
+
+
+async def require_cs_agent(
+        current_user: Annotated[User, Depends(get_current_user)]) -> User:
+    """要求客服权限"""
+    if _should_skip_verify():
+        return current_user
+    if not has_any_role(current_user, [Role.CS_AGENT, Role.ADMIN, Role.SUPER_ADMIN]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="需要客服权限"
+        )
+    return current_user
+
+
 async def require_phone_verified(
         current_user: Annotated[User, Depends(get_current_user)]) -> User:
     """要求手机号已验证（敏感操作兜底）"""

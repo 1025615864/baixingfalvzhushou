@@ -25,7 +25,7 @@ from .video_consultation import VideoConsultation, VideoConsultationUsage, Video
 from .payment import PaymentOrder, PaymentStatus, RefundStatus, PaymentMethod, OrderType, UserBalance, BalanceTransaction
 from .forum import Post, Comment
 from .news import News, NewsTopic, NewsTopicItem, NewsComment, NewsSubscription
-from .points import PointsUser, PointsDailyCount, PointsHistory
+from .points import PointsUser, PointsDailyCount, PointsHistory, PointsExchangeItem
 
 __all__ = [
     "TimestampMixin",
@@ -93,4 +93,5 @@ __all__ = [
     "PointsUser",
     "PointsDailyCount",
     "PointsHistory",
+    "PointsExchangeItem",
 ]

@@ -37,7 +37,7 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     avatar: Mapped[str | None] = mapped_column(String(255), nullable=True)
     role: Mapped[str] = mapped_column(
-        String(20), default="user")  # user/lawyer/admin
+        String(20), default="user")  # user/lawyer/moderator/forum_admin/news_admin/ai_admin/lawyer_admin/cs_agent/admin/super_admin
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     vip_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True)

@@ -20,7 +20,7 @@ class Permission:
     POST_READ = "post:read"
     POST_WRITE = "post:write"
     POST_DELETE = "post:delete"
-    POST_MANAGE = "post:manage"  # 管理帖子（置顶、加精等）
+    POST_MANAGE = "post:manage"
 
     # 评论权限
     COMMENT_READ = "comment:read"
@@ -31,11 +31,32 @@ class Permission:
     NEWS_READ = "news:read"
     NEWS_WRITE = "news:write"
     NEWS_DELETE = "news:delete"
+    NEWS_MANAGE = "news:manage"
 
     # 知识库权限
     KNOWLEDGE_READ = "knowledge:read"
     KNOWLEDGE_WRITE = "knowledge:write"
     KNOWLEDGE_DELETE = "knowledge:delete"
+
+    # 论坛管理权限
+    FORUM_READ = "forum:read"
+    FORUM_MODERATE = "forum:moderate"
+    FORUM_MANAGE = "forum:manage"
+
+    # AI 服务权限
+    AI_CONFIG = "ai:config"
+    AI_MONITOR = "ai:monitor"
+    AI_TEMPLATES = "ai:templates"
+
+    # 律师服务权限
+    LAWYER_VERIFY = "lawyer:verify"
+    LAWYER_FIRM = "lawyer:firm"
+    LAWYER_CASES = "lawyer:cases"
+    LAWYER_DOCUMENTS = "lawyer:documents"
+
+    # 客服权限
+    CS_TICKETS = "cs:tickets"
+    CS_FEEDBACK = "cs:feedback"
 
     # 管理员权限
     ADMIN_ACCESS = "admin:access"
@@ -46,11 +67,53 @@ class Permission:
 
 class Role:
     """角色常量"""
-    USER = "user"           # 普通用户
-    LAWYER = "lawyer"       # 律师
-    MODERATOR = "moderator"  # 版主
-    ADMIN = "admin"         # 管理员
-    SUPER_ADMIN = "super_admin"  # 超级管理员
+    USER = "user"
+    LAWYER = "lawyer"
+    MODERATOR = "moderator"
+    FORUM_ADMIN = "forum_admin"
+    NEWS_ADMIN = "news_admin"
+    AI_ADMIN = "ai_admin"
+    LAWYER_ADMIN = "lawyer_admin"
+    CS_AGENT = "cs_agent"
+    ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
+
+
+ROLE_LABELS: dict[str, str] = {
+    Role.USER: "普通用户",
+    Role.LAWYER: "律师",
+    Role.MODERATOR: "审核员",
+    Role.FORUM_ADMIN: "论坛服务管理员",
+    Role.NEWS_ADMIN: "新闻服务管理员",
+    Role.AI_ADMIN: "AI 服务管理员",
+    Role.LAWYER_ADMIN: "律师服务管理员",
+    Role.CS_AGENT: "客服",
+    Role.ADMIN: "管理员",
+    Role.SUPER_ADMIN: "超级管理员",
+}
+
+
+ROLE_DASHBOARD_MAP: dict[str, str] = {
+    Role.SUPER_ADMIN: "/admin/super",
+    Role.ADMIN: "/admin/general",
+    Role.FORUM_ADMIN: "/admin/forum",
+    Role.NEWS_ADMIN: "/admin/news",
+    Role.AI_ADMIN: "/admin/ai",
+    Role.LAWYER_ADMIN: "/admin/lawyer",
+    Role.CS_AGENT: "/admin/cs",
+}
+
+
+ROLE_ADMIN_HIERARCHY: dict[str, str | None] = {
+    Role.SUPER_ADMIN: None,
+    Role.ADMIN: Role.SUPER_ADMIN,
+    Role.FORUM_ADMIN: Role.SUPER_ADMIN,
+    Role.NEWS_ADMIN: Role.SUPER_ADMIN,
+    Role.AI_ADMIN: Role.SUPER_ADMIN,
+    Role.LAWYER_ADMIN: Role.SUPER_ADMIN,
+    Role.CS_AGENT: Role.SUPER_ADMIN,
+    Role.MODERATOR: Role.FORUM_ADMIN,
+}
 
 
 # 角色权限映射
@@ -65,7 +128,6 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         Permission.KNOWLEDGE_READ,
     },
     Role.LAWYER: {
-        # 律师拥有用户的所有权限
         Permission.USER_READ,
         Permission.POST_READ,
         Permission.POST_WRITE,
@@ -73,10 +135,9 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         Permission.COMMENT_WRITE,
         Permission.NEWS_READ,
         Permission.KNOWLEDGE_READ,
-        Permission.KNOWLEDGE_WRITE,  # 可以贡献知识库
+        Permission.KNOWLEDGE_WRITE,
     },
     Role.MODERATOR: {
-        # 版主拥有内容管理权限
         Permission.USER_READ,
         Permission.POST_READ,
         Permission.POST_WRITE,
@@ -87,10 +148,73 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         Permission.COMMENT_DELETE,
         Permission.NEWS_READ,
         Permission.KNOWLEDGE_READ,
+        Permission.FORUM_READ,
+        Permission.FORUM_MODERATE,
         Permission.ADMIN_CONTENT,
     },
+    Role.FORUM_ADMIN: {
+        Permission.USER_READ,
+        Permission.POST_READ,
+        Permission.POST_WRITE,
+        Permission.POST_DELETE,
+        Permission.POST_MANAGE,
+        Permission.COMMENT_READ,
+        Permission.COMMENT_WRITE,
+        Permission.COMMENT_DELETE,
+        Permission.NEWS_READ,
+        Permission.KNOWLEDGE_READ,
+        Permission.FORUM_READ,
+        Permission.FORUM_MODERATE,
+        Permission.FORUM_MANAGE,
+        Permission.ADMIN_ACCESS,
+        Permission.ADMIN_CONTENT,
+    },
+    Role.NEWS_ADMIN: {
+        Permission.USER_READ,
+        Permission.POST_READ,
+        Permission.COMMENT_READ,
+        Permission.NEWS_READ,
+        Permission.NEWS_WRITE,
+        Permission.NEWS_DELETE,
+        Permission.NEWS_MANAGE,
+        Permission.KNOWLEDGE_READ,
+        Permission.ADMIN_ACCESS,
+        Permission.ADMIN_CONTENT,
+    },
+    Role.AI_ADMIN: {
+        Permission.USER_READ,
+        Permission.POST_READ,
+        Permission.COMMENT_READ,
+        Permission.NEWS_READ,
+        Permission.KNOWLEDGE_READ,
+        Permission.AI_CONFIG,
+        Permission.AI_MONITOR,
+        Permission.AI_TEMPLATES,
+        Permission.ADMIN_ACCESS,
+    },
+    Role.LAWYER_ADMIN: {
+        Permission.USER_READ,
+        Permission.POST_READ,
+        Permission.COMMENT_READ,
+        Permission.NEWS_READ,
+        Permission.KNOWLEDGE_READ,
+        Permission.LAWYER_VERIFY,
+        Permission.LAWYER_FIRM,
+        Permission.LAWYER_CASES,
+        Permission.LAWYER_DOCUMENTS,
+        Permission.ADMIN_ACCESS,
+    },
+    Role.CS_AGENT: {
+        Permission.USER_READ,
+        Permission.POST_READ,
+        Permission.COMMENT_READ,
+        Permission.NEWS_READ,
+        Permission.KNOWLEDGE_READ,
+        Permission.CS_TICKETS,
+        Permission.CS_FEEDBACK,
+        Permission.ADMIN_ACCESS,
+    },
     Role.ADMIN: {
-        # 管理员拥有大部分权限
         Permission.USER_READ,
         Permission.USER_WRITE,
         Permission.POST_READ,
@@ -106,12 +230,13 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         Permission.KNOWLEDGE_READ,
         Permission.KNOWLEDGE_WRITE,
         Permission.KNOWLEDGE_DELETE,
+        Permission.FORUM_READ,
+        Permission.FORUM_MODERATE,
         Permission.ADMIN_ACCESS,
         Permission.ADMIN_USERS,
         Permission.ADMIN_CONTENT,
     },
     Role.SUPER_ADMIN: {
-        # 超级管理员拥有所有权限
         Permission.USER_READ,
         Permission.USER_WRITE,
         Permission.USER_DELETE,
@@ -125,9 +250,22 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         Permission.NEWS_READ,
         Permission.NEWS_WRITE,
         Permission.NEWS_DELETE,
+        Permission.NEWS_MANAGE,
         Permission.KNOWLEDGE_READ,
         Permission.KNOWLEDGE_WRITE,
         Permission.KNOWLEDGE_DELETE,
+        Permission.FORUM_READ,
+        Permission.FORUM_MODERATE,
+        Permission.FORUM_MANAGE,
+        Permission.AI_CONFIG,
+        Permission.AI_MONITOR,
+        Permission.AI_TEMPLATES,
+        Permission.LAWYER_VERIFY,
+        Permission.LAWYER_FIRM,
+        Permission.LAWYER_CASES,
+        Permission.LAWYER_DOCUMENTS,
+        Permission.CS_TICKETS,
+        Permission.CS_FEEDBACK,
         Permission.ADMIN_ACCESS,
         Permission.ADMIN_USERS,
         Permission.ADMIN_CONTENT,

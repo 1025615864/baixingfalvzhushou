@@ -104,6 +104,7 @@ def _import_all_models() -> None:
         "app.models.payment",
         "app.models.forum",
         "app.models.news",
+        "app.models.points",
     ]
     for module_name in module_names:
         _ = importlib.import_module(module_name)

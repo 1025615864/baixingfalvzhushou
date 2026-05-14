@@ -53,3 +53,18 @@ class PointsHistory(Base):
     balance_after: Mapped[int] = mapped_column(Integer, default=0)
     description: Mapped[str | None] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PointsExchangeItem(Base):
+    __tablename__ = "points_exchange_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    price: Mapped[int] = mapped_column(Integer, nullable=False)
+    original_price: Mapped[int] = mapped_column(Integer, default=0)
+    category: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    stock: Mapped[int] = mapped_column(Integer, default=0)
+    image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

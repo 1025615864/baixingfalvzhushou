@@ -1,5 +1,5 @@
 """通知数据模型"""
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, DateTime, Integer, Boolean, Text, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
@@ -15,7 +15,7 @@ class Notification(Base):
     content: Mapped[str] = mapped_column(Text, nullable=True)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
     sent_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
     __table_args__ = (
         Index("idx_notifications_user_read", "user_id", "is_read"),
@@ -34,5 +34,5 @@ class NotificationSettings(Base):
     push_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     quiet_hours_start: Mapped[str] = mapped_column(String(5), nullable=True)
     quiet_hours_end: Mapped[str] = mapped_column(String(5), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

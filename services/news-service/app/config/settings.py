@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     kafka_bootstrap_servers: str = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 
+    ai_service_url: str = os.getenv("AI_SERVICE_URL", "http://localhost:8004")
+    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+    openai_base_url: str = os.getenv("OPENAI_BASE_URL", "https://api.deepseek.com/v1")
+    news_llm_model: str = os.getenv("NEWS_LLM_MODEL", "deepseek-chat")
+    internal_api_key: str = os.getenv("INTERNAL_API_KEY", "internal-api-key-change-in-production")
+
     class Config:
         env_file = ".env"
         extra = "ignore"

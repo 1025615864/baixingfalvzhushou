@@ -1,5 +1,5 @@
 """搜索服务模型"""
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from sqlalchemy import String, DateTime, Integer, Index, Text, func
 from sqlalchemy.dialects.postgresql import TSVECTOR
@@ -27,8 +27,8 @@ class SearchIndex(Base):
     content: Mapped[str] = mapped_column(Text, nullable=True)
     keywords: Mapped[str] = mapped_column(String(1000), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="active")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     search_vector = mapped_column(TSVECTOR)
 
     __table_args__ = (
@@ -46,7 +46,7 @@ class HotSearch(Base):
     keyword: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     search_count: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(20), default="active")
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class SearchLog(Base):
@@ -57,7 +57,7 @@ class SearchLog(Base):
     query: Mapped[str] = mapped_column(String(200), nullable=False)
     search_type: Mapped[str] = mapped_column(String(20), default="all")
     result_count: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
     __table_args__ = (
         Index("idx_search_log_query", "query"),

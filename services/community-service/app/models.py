@@ -1,5 +1,5 @@
 """社区数据模型"""
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, DateTime, Integer, Text, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
@@ -16,8 +16,8 @@ class Post(Base):
     view_count: Mapped[int] = mapped_column(default=0)
     like_count: Mapped[int] = mapped_column(default=0)
     comment_count: Mapped[int] = mapped_column(default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class Comment(Base):
@@ -27,4 +27,4 @@ class Comment(Base):
     user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     parent_id: Mapped[int] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))

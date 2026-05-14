@@ -1,7 +1,7 @@
 """Outbox 模式单元测试"""
 import pytest
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, AsyncMock, patch
 
 from services.common.outbox.publisher import (
@@ -274,7 +274,7 @@ class TestOutboxPublisher:
             topic="order-events",
             payload=json.dumps({}),
             status=OutboxStatus.PUBLISHED.value,
-            published_at=datetime.utcnow() - timedelta(days=60),
+            published_at=datetime.now(timezone.utc) - timedelta(days=60),
         )
         db.messages.append(old_message)
 
@@ -292,7 +292,7 @@ class TestOutboxPublisher:
             topic="order-events",
             payload=json.dumps({}),
             status=OutboxStatus.PUBLISHED.value,
-            published_at=datetime.utcnow() - timedelta(days=10),
+            published_at=datetime.now(timezone.utc) - timedelta(days=10),
         )
         db.messages.append(recent_message)
 

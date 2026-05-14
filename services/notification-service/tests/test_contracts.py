@@ -224,7 +224,7 @@ class TestNotificationServiceResponseContract:
     def test_notification_response_schema(self):
         """测试通知响应格式"""
         from app.routers.notification import NotificationResponse
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         response = NotificationResponse(
             id=1,
@@ -233,7 +233,7 @@ class TestNotificationServiceResponseContract:
             title="测试通知",
             content="测试内容",
             is_read=False,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
 
         assert response.id == 1

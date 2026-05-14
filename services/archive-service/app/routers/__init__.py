@@ -7,5 +7,6 @@ from .vector_ops import router as vector_ops_router
 from .vector_search import router as vector_search_router
 from .batch import router as batch_router
 from .recommendations import router as recommendations_router
+from .admin import router as admin_router
 
-__all__ = ["stats_router", "archive_router", "case_categories_router", "search_router", "vector_ops_router", "vector_search_router", "batch_router", "recommendations_router"]
+__all__ = ["stats_router", "archive_router", "case_categories_router", "search_router", "vector_ops_router", "vector_search_router", "batch_router", "recommendations_router", "admin_router"]

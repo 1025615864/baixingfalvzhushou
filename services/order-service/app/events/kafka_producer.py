@@ -52,13 +52,13 @@ class EventPublisher:
         try:
             from services.common.events.kafka_events import BaseEvent
             import uuid
-            from datetime import datetime
+            from datetime import datetime, timezone
 
             if isinstance(payload, dict):
                 event = BaseEvent(
                     event_id=str(uuid.uuid4()),
                     event_type=event_type,
-                    timestamp=datetime.utcnow().isoformat(),
+                    timestamp=datetime.now(timezone.utc).isoformat(),
                     version="1.0",
                     source="order-service",
                 )

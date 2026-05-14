@@ -43,8 +43,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    from app.routers import embedding_router
+    from app.routers import embedding_router, admin_router
     app.include_router(embedding_router, prefix="/api/v1/embeddings", tags=["Embedding"])
+    app.include_router(admin_router, prefix="/api/v1/admin", tags=["Admin"])
 
     @app.get("/health", response_model=HealthResponse)
     async def health_check():

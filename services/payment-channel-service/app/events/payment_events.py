@@ -63,7 +63,7 @@ def create_payment_event(
     return PaymentEvent(
         event_id=str(uuid.uuid4()),
         event_type=event_type,
-        timestamp=datetime.utcnow().isoformat(),
+        timestamp=datetime.now(timezone.utc).isoformat(),
         version="1.0",
         source=source,
         order_id=order_id,

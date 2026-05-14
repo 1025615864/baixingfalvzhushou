@@ -4,10 +4,16 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
+
+import logging
 
 from ..database import get_db
 from ..models import NewsSubscription
+from ..services.subscription_service import subscription_service
+from ..events.kafka_producer import publish_subscription_created
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -15,7 +21,7 @@ router = APIRouter()
 class SubscriptionResponse(BaseModel):
     id: int
     user_id: int
-    category: str
+    category_id: int
     enabled: bool
     created_at: datetime
 
@@ -30,7 +36,7 @@ class SubscriptionListResponse(BaseModel):
 
 class SubscriptionCreateRequest(BaseModel):
     user_id: int
-    category: str
+    category_id: int
 
 
 @router.get("/", response_model=SubscriptionListResponse)
@@ -39,11 +45,7 @@ async def list_subscriptions(
     db: AsyncSession = Depends(get_db)
 ):
     """获取用户订阅列表"""
-    query = select(NewsSubscription).where(NewsSubscription.user_id == user_id)
-    
-    result = await db.execute(query)
-    subscriptions = result.scalars().all()
-    
+    subscriptions = await subscription_service.get_subscriptions(db, user_id, enabled_only=False)
     return SubscriptionListResponse(
         items=[SubscriptionResponse.model_validate(s) for s in subscriptions],
         total=len(subscriptions)
@@ -56,24 +58,17 @@ async def create_subscription(
     db: AsyncSession = Depends(get_db)
 ):
     """创建订阅"""
-    existing = await db.execute(
-        select(NewsSubscription).where(
-            NewsSubscription.user_id == request.user_id,
-            NewsSubscription.category == request.category
-        )
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Subscription already exists")
-    
-    subscription = NewsSubscription(
-        user_id=request.user_id,
-        category=request.category,
-        enabled=True,
-    )
-    db.add(subscription)
+    subscription = await subscription_service.subscribe(db, request.user_id, request.category_id)
     await db.commit()
     await db.refresh(subscription)
-    
+    try:
+        await publish_subscription_created(
+            subscription_id=str(subscription.id),
+            user_id=str(request.user_id),
+            category=str(request.category_id),
+        )
+    except Exception as e:
+        logger.error(f"Failed to publish subscription event: {e}")
     return SubscriptionResponse.model_validate(subscription)
 
 
@@ -86,15 +81,13 @@ async def toggle_subscription(
     result = await db.execute(
         select(NewsSubscription).where(NewsSubscription.id == subscription_id)
     )
-    subscription = result.scalar_one_or_none()
-    
-    if not subscription:
+    sub = result.scalar_one_or_none()
+    if not sub:
         raise HTTPException(status_code=404, detail="Subscription not found")
-    
-    subscription.enabled = not subscription.enabled
+    new_enabled = not sub.enabled
+    await subscription_service.update_subscription(db, sub.user_id, sub.category_id, new_enabled)
     await db.commit()
-    
-    return {"success": True, "enabled": subscription.enabled}
+    return {"success": True, "enabled": new_enabled}
 
 
 @router.delete("/{subscription_id}")
@@ -106,12 +99,9 @@ async def delete_subscription(
     result = await db.execute(
         select(NewsSubscription).where(NewsSubscription.id == subscription_id)
     )
-    subscription = result.scalar_one_or_none()
-    
-    if not subscription:
+    sub = result.scalar_one_or_none()
+    if not sub:
         raise HTTPException(status_code=404, detail="Subscription not found")
-    
-    await db.delete(subscription)
+    await subscription_service.unsubscribe(db, sub.user_id, sub.category_id)
     await db.commit()
-    
     return {"success": True}

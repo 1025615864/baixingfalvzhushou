@@ -88,8 +88,9 @@ def create_app() -> FastAPI:
     cors_config = get_cors_config()
     app.add_middleware(CORSMiddleware, **cors_config)
 
-    from .routers import notification_router
+    from .routers import notification_router, admin_router
     app.include_router(notification_router, prefix="/api/v1/notifications", tags=["通知"])
+    app.include_router(admin_router, prefix="/api/v1/admin", tags=["管理后台"])
 
     @app.get("/health")
     async def health_check():

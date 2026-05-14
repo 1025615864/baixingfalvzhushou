@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config.settings import get_settings
 from .database import engine, AsyncSessionLocal, Base
 from sqlalchemy import text
-from .routers import order_router, callback_router, refund_router
+from .routers import order_router, callback_router, refund_router, admin_router
 from .services.channels import init_adapters
 
 try:
@@ -94,6 +94,7 @@ def create_app() -> FastAPI:
     app.include_router(order_router, prefix="/api/v1/payment", tags=["支付订单"])
     app.include_router(callback_router, prefix="/api/v1/payment/callbacks", tags=["支付回调"])
     app.include_router(refund_router, prefix="/api/v1/payment", tags=["退款管理"])
+    app.include_router(admin_router, prefix="/api/v1/payment/admin", tags=["支付管理"])
 
     @app.get("/health")
     async def health_check():

@@ -1,7 +1,7 @@
 """安全模块单元测试（密码策略、JWT 管理）"""
 import pytest
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 from services.common.security.password_policy import (
@@ -281,7 +281,7 @@ class TestJWTKeyManager:
         assert version1 == 1
 
         old_key = sessions[0].keys[0]
-        old_key.expires_at = datetime.utcnow() - timedelta(days=1)
+        old_key.expires_at = datetime.now(timezone.utc) - timedelta(days=1)
 
         version2, secret2 = manager.get_active_key()
         assert version2 == 2
@@ -322,7 +322,7 @@ class TestJWTKeyManager:
             version=1,
             secret="expired-secret",
             is_active=False,
-            rotated_at=datetime.utcnow() - timedelta(days=120),
+            rotated_at=datetime.now(timezone.utc) - timedelta(days=120),
         )
         factory_instance = factory()
         factory_instance.keys.append(old_key)

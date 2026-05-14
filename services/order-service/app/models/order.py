@@ -3,7 +3,7 @@
 提供订单管理、订单状态流转、SAGA 事务集成。
 """
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import (
@@ -91,8 +91,8 @@ class Order(Base):
     business_type = Column(String(64), nullable=True, comment="关联业务类型")
 
     # 时间戳
-    created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment="更新时间")
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), comment="创建时间")
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), comment="更新时间")
     paid_at = Column(DateTime, nullable=True, comment="支付完成时间")
     completed_at = Column(DateTime, nullable=True, comment="订单完成时间")
     cancelled_at = Column(DateTime, nullable=True, comment="订单取消时间")
@@ -125,8 +125,8 @@ class OrderItem(Base):
     unit_price = Column(Float, nullable=False, comment="单价(分)")
     total_price = Column(Float, nullable=False, comment="总价(分)")
 
-    created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment="更新时间")
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), comment="创建时间")
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), comment="更新时间")
 
     def __repr__(self):
         return f"<OrderItem(id={self.id}, order_id={self.order_id}, name='{self.item_name}')>"

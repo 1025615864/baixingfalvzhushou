@@ -181,7 +181,7 @@ def create_app() -> FastAPI:
 
     from .routers import (
         post_router, comment_router, hot_router,
-        admin_router, report_router, favorite_router, topic_router
+        admin_router, report_router, favorite_router, topic_router, agent_router
     )
     from .routers.metrics import router as metrics_router
     from .routers.moderation import router as moderation_router
@@ -210,6 +210,7 @@ def create_app() -> FastAPI:
     app.include_router(analytics_ops_router, prefix="/api/v1/community/ops/analytics", tags=["运营分析"])
     app.include_router(config_ops_router, prefix="/api/v1/community/ops/config", tags=["运营配置"])
     app.include_router(announcement_router, prefix="/api/v1/community/ops/announcements", tags=["社区公告"])
+    app.include_router(agent_router, prefix="/api/v1/community/agent", tags=["AI运营助手"])
 
     @app.get("/health")
     async def health_check():

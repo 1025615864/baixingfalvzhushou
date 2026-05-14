@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine
 from sqlalchemy import text
 from app.models.order import Base as OrderBase
+from app.models.admin import RefundAudit, OrderStats
 
 try:
     from services.common.security import get_cors_config
@@ -133,8 +134,10 @@ def create_app() -> FastAPI:
     # 注册路由
     from app.routers.orders import router as orders_router
     from app.routers.orders import admin_router as admin_orders_router
+    from app.routers.admin import admin_router
     app.include_router(orders_router, prefix="/api/v1/orders")
     app.include_router(admin_orders_router, prefix="/api/v1/orders/admin")
+    app.include_router(admin_router, prefix="/api/v1/admin")
 
     return app
 

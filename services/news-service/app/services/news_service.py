@@ -1,6 +1,6 @@
 """新闻服务 - 服务层"""
 from typing import List, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -71,7 +71,7 @@ class NewsService:
 
         if news and increment_view:
             news.view_count += 1
-            news.updated_at = datetime.utcnow()
+            news.updated_at = datetime.now(timezone.utc)
             await session.flush()
 
         return news

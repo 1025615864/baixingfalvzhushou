@@ -2,7 +2,7 @@
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.services.post_service import PostService
 from app.services.comment_service import CommentService
@@ -54,7 +54,7 @@ class TestHotScoreCalculation:
             views=10000,
             favorites=20,
             is_lawyer_post=False,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         assert new_post_score > old_post_score
 
@@ -135,7 +135,7 @@ class TestPostModel:
         mock_post.view_count = 1000
         mock_post.favorite_count = 2
         mock_post.is_lawyer = True
-        mock_post.created_at = datetime.utcnow()
+        mock_post.created_at = datetime.now(timezone.utc)
 
         score = recalculate_post_hot_score(mock_post)
         assert score > 0

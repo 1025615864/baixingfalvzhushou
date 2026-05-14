@@ -171,7 +171,7 @@ class TestNewsServiceResponseContract:
 
     def test_news_out_schema(self):
         """测试新闻输出响应格式"""
-        from datetime import datetime
+        from datetime import datetime, timezone
         from app.routers.news import NewsOut
 
         news = NewsOut(
@@ -183,7 +183,7 @@ class TestNewsServiceResponseContract:
             view_count=100,
             like_count=10,
             share_count=5,
-            published_at=datetime.utcnow()
+            published_at=datetime.now(timezone.utc)
         )
 
         assert news.id == 1

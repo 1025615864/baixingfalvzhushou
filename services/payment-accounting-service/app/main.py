@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config.settings import get_settings
 from .database import engine, Base
-from .routers import balance_router, settlement_router
+from .routers import balance_router, settlement_router, admin_router
 
 try:
     from services.common.security import get_cors_config
@@ -86,6 +86,7 @@ def create_app() -> FastAPI:
 
     app.include_router(balance_router, prefix="/api/v1/balance", tags=["余额"])
     app.include_router(settlement_router, prefix="/api/v1/settlement", tags=["结算"])
+    app.include_router(admin_router, prefix="/api/v1/admin", tags=["管理"])
 
     @app.get("/health")
     async def health_check():

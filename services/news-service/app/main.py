@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config.settings import get_settings
 from .database import engine, Base
 from sqlalchemy import text
-from .routers import news_router, comment_router, subscription_router
+from .routers import news_router, comment_router, subscription_router, admin_router, agent_router
 
 try:
     from services.common.security import get_cors_config
@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI):
             health_check_url=f"http://{host}:{port}/health",
         )
 
-    if os.getenv("ENABLE_KAFKA_PRODUCER", "false").lower() == "true":
+    if os.getenv("KAFKA_ENABLED", "false").lower() == "true":
         from .events import init_kafka_producer
         kafka_bootstrap = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
         await init_kafka_producer(kafka_bootstrap)
@@ -74,9 +74,12 @@ async def lifespan(app: FastAPI):
         port = int(os.getenv("SERVICE_PORT", "8006"))
         await consul.deregister_service(f"news-service-{port}")
 
-    if os.getenv("ENABLE_KAFKA_PRODUCER", "false").lower() == "true":
+    if os.getenv("KAFKA_ENABLED", "false").lower() == "true":
         from .events import close_kafka_producer
         await close_kafka_producer()
+
+    from .services.news_agent_service import news_agent_service
+    await news_agent_service.close()
 
     logger.info("News service shutting down...")
     await engine.dispose()
@@ -91,6 +94,8 @@ def create_app() -> FastAPI:
     app.include_router(news_router, prefix="/api/v1/news", tags=["新闻"])
     app.include_router(comment_router, prefix="/api/v1/news/comments", tags=["评论"])
     app.include_router(subscription_router, prefix="/api/v1/news/subscriptions", tags=["订阅"])
+    app.include_router(admin_router, prefix="/api/v1/news/admin", tags=["新闻管理"])
+    app.include_router(agent_router, prefix="/api/v1/news/agent", tags=["新闻运营助手"])
 
     @app.get("/health")
     async def health_check():

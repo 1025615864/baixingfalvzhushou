@@ -14,11 +14,9 @@ class SubscriptionService:
         self,
         session: AsyncSession,
         user_id: int,
-        category: str,
+        category_id: int,
     ) -> NewsSubscription:
-        """订阅分类"""
-        # 检查是否已存在
-        existing = await self.get_subscription(session, user_id, category)
+        existing = await self.get_subscription(session, user_id, category_id)
         if existing:
             if not existing.enabled:
                 existing.enabled = True
@@ -27,7 +25,7 @@ class SubscriptionService:
 
         subscription = NewsSubscription(
             user_id=user_id,
-            category=category,
+            category_id=category_id,
             enabled=True,
         )
         session.add(subscription)
@@ -38,10 +36,9 @@ class SubscriptionService:
         self,
         session: AsyncSession,
         user_id: int,
-        category: str,
+        category_id: int,
     ) -> bool:
-        """取消订阅分类"""
-        subscription = await self.get_subscription(session, user_id, category)
+        subscription = await self.get_subscription(session, user_id, category_id)
         if not subscription:
             return False
 
@@ -53,12 +50,11 @@ class SubscriptionService:
         self,
         session: AsyncSession,
         user_id: int,
-        category: str,
+        category_id: int,
     ) -> Optional[NewsSubscription]:
-        """获取订阅信息"""
         query = select(NewsSubscription).where(
             NewsSubscription.user_id == user_id,
-            NewsSubscription.category == category,
+            NewsSubscription.category_id == category_id,
         )
         result = await session.execute(query)
         return result.scalar_one_or_none()
@@ -83,11 +79,10 @@ class SubscriptionService:
         self,
         session: AsyncSession,
         user_id: int,
-        category: str,
+        category_id: int,
         enabled: bool,
     ) -> Optional[NewsSubscription]:
-        """更新订阅状态"""
-        subscription = await self.get_subscription(session, user_id, category)
+        subscription = await self.get_subscription(session, user_id, category_id)
         if not subscription:
             return None
 

@@ -1,8 +1,8 @@
 """支付通道数据模型"""
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, DateTime, Integer, Numeric, Text, Index
 from sqlalchemy.orm import Mapped, mapped_column
-from .database import Base
+from ..database import Base
 
 
 class PaymentOrder(Base):
@@ -26,8 +26,8 @@ class PaymentOrder(Base):
     related_type: Mapped[str] = mapped_column(String(50), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     paid_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         Index("idx_orders_user_status", "user_id", "status"),
@@ -49,7 +49,7 @@ class PaymentCallback(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     raw_payload: Mapped[str] = mapped_column(Text, nullable=False)
     processed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self) -> str:
         return f"<PaymentCallback(order_no={self.order_no}, provider={self.provider}, status={self.status})>"
@@ -66,7 +66,7 @@ class PaymentRefund(Base):
     status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
     provider: Mapped[str] = mapped_column(String(20), nullable=False)
     provider_refund_no: Mapped[str] = mapped_column(String(64), nullable=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     completed_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
 
     __table_args__ = (

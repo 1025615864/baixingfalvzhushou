@@ -1,5 +1,5 @@
 """积分数据模型"""
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, DateTime, Integer, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
@@ -12,8 +12,8 @@ class PointsUser(Base):
     balance: Mapped[int] = mapped_column(default=0)
     total_earned: Mapped[int] = mapped_column(default=0)
     total_spent: Mapped[int] = mapped_column(default=0)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class PointsHistory(Base):
@@ -30,7 +30,7 @@ class PointsHistory(Base):
     source: Mapped[str] = mapped_column(String(50))
     reference_id: Mapped[str] = mapped_column(String(100), nullable=True)
     description: Mapped[str] = mapped_column(String(200), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), index=True)
 
 
 class PointsMallItem(Base):
@@ -46,8 +46,8 @@ class PointsMallItem(Base):
     stock: Mapped[int] = mapped_column(Integer, default=0)
     image_url: Mapped[str] = mapped_column(String(500), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="active")
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class PointsExchangeOrder(Base):
@@ -57,7 +57,7 @@ class PointsExchangeOrder(Base):
     item_id: Mapped[int] = mapped_column(Integer)
     points_cost: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(20), default="pending")
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     completed_at: Mapped[datetime] = mapped_column(nullable=True)
 
 
@@ -70,4 +70,4 @@ class DailyCheckIn(Base):
     user_id: Mapped[int] = mapped_column(Integer, index=True)
     check_in_date: Mapped[str] = mapped_column(String(10))
     points_awarded: Mapped[int] = mapped_column(Integer)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))

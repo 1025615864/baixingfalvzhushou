@@ -1,6 +1,6 @@
 """订单服务 - 服务层"""
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy import select, update, func, cast, Date
@@ -111,8 +111,8 @@ class OrderService:
             .values(
                 status=OrderStatus.PAID,
                 payment_method=payment_method,
-                payment_time=datetime.utcnow(),
-                paid_at=datetime.utcnow(),
+                payment_time=datetime.now(timezone.utc),
+                paid_at=datetime.now(timezone.utc),
                 saga_id=saga_id,
             )
             .returning(Order)
@@ -139,7 +139,7 @@ class OrderService:
             .values(
                 status=OrderStatus.CANCELLED,
                 cancel_reason=reason,
-                cancelled_at=datetime.utcnow(),
+                cancelled_at=datetime.now(timezone.utc),
             )
             .returning(Order)
         )
@@ -163,7 +163,7 @@ class OrderService:
             .where(Order.order_no == order_no, Order.status == OrderStatus.PAID)
             .values(
                 status=OrderStatus.COMPLETED,
-                completed_at=datetime.utcnow(),
+                completed_at=datetime.now(timezone.utc),
             )
             .returning(Order)
         )
@@ -189,7 +189,7 @@ class OrderService:
             .values(
                 status=OrderStatus.REFUNDED,
                 refund_reason=reason,
-                updated_at=datetime.utcnow(),
+                updated_at=datetime.now(timezone.utc),
             )
             .returning(Order)
         )
@@ -212,7 +212,7 @@ class OrderService:
         stmt = (
             update(Order)
             .where(Order.saga_id == saga_id)
-            .values(saga_status=saga_status, updated_at=datetime.utcnow())
+            .values(saga_status=saga_status, updated_at=datetime.now(timezone.utc))
         )
 
         result = await session.execute(stmt)
@@ -224,7 +224,7 @@ class OrderService:
         timeout_minutes: int = 30,
     ) -> int:
         """自动取消超时未支付的订单"""
-        cutoff_time = datetime.utcnow() - timedelta(minutes=timeout_minutes)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=timeout_minutes)
         stmt = (
             update(Order)
             .where(
@@ -234,8 +234,8 @@ class OrderService:
             .values(
                 status=OrderStatus.CANCELLED,
                 cancel_reason=f"订单超时未支付，自动取消（超时{timeout_minutes}分钟）",
-                cancelled_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                cancelled_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
             )
         )
         result = await session.execute(stmt)
@@ -347,8 +347,8 @@ class OrderService:
             .values(
                 status=OrderStatus.CANCELLED,
                 cancel_reason=reason or "管理员强制取消",
-                cancelled_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                cancelled_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
             )
             .returning(Order)
         )
@@ -363,7 +363,7 @@ class OrderService:
     @staticmethod
     def _generate_order_no() -> str:
         """生成订单号"""
-        timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
         uuid_short = uuid.uuid4().hex[:8]
         return f"ORD{timestamp}{uuid_short}"
 

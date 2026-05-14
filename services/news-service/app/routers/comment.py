@@ -4,10 +4,15 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
+
+import logging
 
 from ..database import get_db
 from ..models import NewsComment
+from ..services.comment_service import comment_service
+from ..events.kafka_producer import publish_comment_added
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -45,21 +50,7 @@ async def list_comments(
     db: AsyncSession = Depends(get_db)
 ):
     """获取新闻评论列表"""
-    query = select(NewsComment).where(
-        NewsComment.news_id == news_id,
-        NewsComment.status == status
-    )
-    
-    count_query = select(func.count()).select_from(query.subquery())
-    total_result = await db.execute(count_query)
-    total = total_result.scalar() or 0
-    
-    query = query.order_by(desc(NewsComment.created_at))
-    query = query.offset((page - 1) * page_size).limit(page_size)
-    
-    result = await db.execute(query)
-    comments = result.scalars().all()
-    
+    comments, total = await comment_service.list_comments(db, news_id, page, page_size, status)
     return CommentListResponse(
         items=[CommentResponse.model_validate(c) for c in comments],
         total=total,
@@ -75,59 +66,49 @@ async def create_comment(
     db: AsyncSession = Depends(get_db)
 ):
     """创建评论"""
-    comment = NewsComment(
-        news_id=news_id,
-        user_id=request.user_id,
-        content=request.content,
-        status="pending",
-    )
-    db.add(comment)
+    comment = await comment_service.create_comment(db, news_id, request.user_id, request.content)
     await db.commit()
     await db.refresh(comment)
-    
+    try:
+        await publish_comment_added(
+            news_id=str(news_id),
+            comment_id=str(comment.id),
+            user_id=str(request.user_id),
+            content=request.content,
+        )
+    except Exception as e:
+        logger.error(f"Failed to publish comment event: {e}")
     return CommentResponse.model_validate(comment)
 
 
 @router.patch("/{comment_id}/approve")
 async def approve_comment(comment_id: int, db: AsyncSession = Depends(get_db)):
     """审核通过评论"""
-    result = await db.execute(select(NewsComment).where(NewsComment.id == comment_id))
-    comment = result.scalar_one_or_none()
-    
-    if not comment:
+    try:
+        await comment_service.approve_comment(db, comment_id)
+    except ValueError:
         raise HTTPException(status_code=404, detail="Comment not found")
-    
-    comment.status = "approved"
     await db.commit()
-    
     return {"success": True}
 
 
 @router.patch("/{comment_id}/reject")
 async def reject_comment(comment_id: int, db: AsyncSession = Depends(get_db)):
     """审核拒绝评论"""
-    result = await db.execute(select(NewsComment).where(NewsComment.id == comment_id))
-    comment = result.scalar_one_or_none()
-    
-    if not comment:
+    try:
+        await comment_service.reject_comment(db, comment_id)
+    except ValueError:
         raise HTTPException(status_code=404, detail="Comment not found")
-    
-    comment.status = "rejected"
     await db.commit()
-    
     return {"success": True}
 
 
 @router.delete("/{comment_id}")
 async def delete_comment(comment_id: int, db: AsyncSession = Depends(get_db)):
     """删除评论"""
-    result = await db.execute(select(NewsComment).where(NewsComment.id == comment_id))
-    comment = result.scalar_one_or_none()
-    
-    if not comment:
+    try:
+        await comment_service.delete_comment(db, comment_id)
+    except ValueError:
         raise HTTPException(status_code=404, detail="Comment not found")
-    
-    await db.delete(comment)
     await db.commit()
-    
     return {"success": True}

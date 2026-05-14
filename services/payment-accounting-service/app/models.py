@@ -1,5 +1,5 @@
 """账务数据模型"""
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, DateTime, Integer, Numeric, Text, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
@@ -17,8 +17,8 @@ class UserBalance(Base):
     total_recharged_cents: Mapped[int] = mapped_column(Integer, default=0)
     total_consumed: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0)
     total_consumed_cents: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     def __repr__(self) -> str:
         return f"<UserBalance(user_id={self.user_id}, balance={self.balance})>"
@@ -39,7 +39,7 @@ class BalanceTransaction(Base):
     balance_before_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     balance_after_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[str] = mapped_column(String(200), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
 
     __table_args__ = (
         Index("idx_tx_user_type", "user_id", "type"),
@@ -66,8 +66,8 @@ class LawyerWallet(Base):
     total_withdrawn_cents: Mapped[int] = mapped_column(Integer, default=0)
     frozen_amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0)
     frozen_amount_cents: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     def __repr__(self) -> str:
         return f"<LawyerWallet(lawyer_id={self.lawyer_id}, balance={self.balance})>"
@@ -92,8 +92,8 @@ class Settlement(Base):
     settle_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     settle_amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="pending")  # pending, processing, completed, failed
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     def __repr__(self) -> str:
         return f"<Settlement(lawyer_id={self.lawyer_id}, amount={self.total_amount}, status={self.status})>"

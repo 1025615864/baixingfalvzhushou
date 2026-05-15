@@ -20,6 +20,7 @@ class PointsUser(Base):
     balance: Mapped[int] = mapped_column(Integer, default=0)
     total_earned: Mapped[int] = mapped_column(Integer, default=0)
     total_spent: Mapped[int] = mapped_column(Integer, default=0)
+    level: Mapped[int] = mapped_column(Integer, default=1)
     continuous_signin_days: Mapped[int] = mapped_column(Integer, default=0)
     last_signin_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

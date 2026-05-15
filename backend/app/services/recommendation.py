@@ -6,6 +6,7 @@ from typing import Optional, Any
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from fastapi import HTTPException
 
 from ..models.user_profile import UserProfile, UserInterestHistory, UserTagInteraction, UserOnboarding
 from ..models.lawfirm import Lawyer, LawFirm, LawyerConsultation, LawyerReview
@@ -215,6 +216,7 @@ class RecommendationService:
         user_id: int,
         limit: int = 10,
     ) -> list[dict]:
+        limit = min(limit, 100)
         tag_weights = await self._get_user_tag_weights(user_id)
 
         if not tag_weights:
@@ -300,6 +302,7 @@ class RecommendationService:
         recommendation_type: str = "hybrid",
         limit: int = 10,
     ) -> dict:
+        limit = min(limit, 100)
         user_id = self.user.id if self.user else None
 
         cache_key = f"rec:enhanced:{user_id}:{recommendation_type}:{limit}"
@@ -403,6 +406,7 @@ class RecommendationService:
         self,
         recommendation_limit: int = 10,
     ) -> dict:
+        recommendation_limit = min(recommendation_limit, 100)
         user_id = self.user.id if self.user else None
 
         lawyers = await self.get_lawyer_recommendations(limit=recommendation_limit)
@@ -426,68 +430,72 @@ class RecommendationService:
         interaction_type: str = "viewed",
         weight: float = 1.0,
     ) -> dict:
-        now = datetime.now(timezone.utc)
+        try:
+            now = datetime.now(timezone.utc)
 
-        history = UserInterestHistory(
-            user_id=user_id,
-            behavior_type=content_type,
-            content_tags=tags or [],
-            interaction_type=interaction_type,
-            weight=weight,
-            content_id=content_id,
-            content_type=content_type,
-            created_at=now,
-        )
-        self.db.add(history)
+            history = UserInterestHistory(
+                user_id=user_id,
+                behavior_type=content_type,
+                content_tags=tags or [],
+                interaction_type=interaction_type,
+                weight=weight,
+                content_id=content_id,
+                content_type=content_type,
+                created_at=now,
+            )
+            self.db.add(history)
 
-        if tags:
-            for tag in tags:
-                result = await self.db.execute(
-                    select(UserTagInteraction).where(
-                        UserTagInteraction.user_id == user_id,
-                        UserTagInteraction.tag == tag,
-                    )
-                )
-                tag_interaction = result.scalar_one_or_none()
-
-                if tag_interaction:
-                    tag_interaction.interaction_count += 1
-                    tag_interaction.total_weight += weight
-                    tag_interaction.last_interaction_at = now
-                    tag_interaction.updated_at = now
-                else:
-                    self.db.add(UserTagInteraction(
-                        user_id=user_id,
-                        tag=tag,
-                        interaction_count=1,
-                        total_weight=weight,
-                        last_interaction_at=now,
-                        created_at=now,
-                        updated_at=now,
-                    ))
-
-        result = await self.db.execute(
-            select(UserProfile).where(UserProfile.user_id == user_id)
-        )
-        profile = result.scalar_one_or_none()
-
-        if profile:
-            current_weights = profile.interest_weights or {}
             if tags:
                 for tag in tags:
-                    current_weights[tag] = current_weights.get(tag, 0) + weight
-            profile.interest_weights = current_weights
-            profile.updated_at = now
+                    result = await self.db.execute(
+                        select(UserTagInteraction).where(
+                            UserTagInteraction.user_id == user_id,
+                            UserTagInteraction.tag == tag,
+                        )
+                    )
+                    tag_interaction = result.scalar_one_or_none()
 
-            current_tags = set(profile.interest_tags or [])
-            if tags:
-                current_tags.update(tags)
-            profile.interest_tags = list(current_tags)
+                    if tag_interaction:
+                        tag_interaction.interaction_count += 1
+                        tag_interaction.total_weight += weight
+                        tag_interaction.last_interaction_at = now
+                        tag_interaction.updated_at = now
+                    else:
+                        self.db.add(UserTagInteraction(
+                            user_id=user_id,
+                            tag=tag,
+                            interaction_count=1,
+                            total_weight=weight,
+                            last_interaction_at=now,
+                            created_at=now,
+                            updated_at=now,
+                        ))
 
-        await self.db.flush()
-        await self._invalidate_user_cache(user_id)
+            result = await self.db.execute(
+                select(UserProfile).where(UserProfile.user_id == user_id)
+            )
+            profile = result.scalar_one_or_none()
 
-        return {"success": True}
+            if profile:
+                current_weights = profile.interest_weights or {}
+                if tags:
+                    for tag in tags:
+                        current_weights[tag] = current_weights.get(tag, 0) + weight
+                profile.interest_weights = current_weights
+                profile.updated_at = now
+
+                current_tags = set(profile.interest_tags or [])
+                if tags:
+                    current_tags.update(tags)
+                profile.interest_tags = list(current_tags)
+
+            await self.db.flush()
+            await self._invalidate_user_cache(user_id)
+
+            return {"success": True}
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def submit_feedback(
         self,
@@ -496,20 +504,24 @@ class RecommendationService:
         rating: int,
         reason: Optional[str] = None,
     ) -> dict:
-        now = datetime.now(timezone.utc)
+        try:
+            now = datetime.now(timezone.utc)
 
-        log = UserBehaviorLog(
-            user_id=user_id,
-            action="recommendation_feedback",
-            resource_type="recommendation",
-            resource_id=int(recommendation_id) if recommendation_id.isdigit() else None,
-            metadata_json=str({"rating": rating, "reason": reason}),
-            created_at=now,
-        )
-        self.db.add(log)
-        await self.db.flush()
+            log = UserBehaviorLog(
+                user_id=user_id,
+                action="recommendation_feedback",
+                resource_type="recommendation",
+                resource_id=int(recommendation_id) if recommendation_id.isdigit() else None,
+                metadata_json=str({"rating": rating, "reason": reason}),
+                created_at=now,
+            )
+            self.db.add(log)
+            await self.db.flush()
 
-        return {"success": True}
+            return {"success": True}
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def get_survey(self) -> list[dict]:
         return [
@@ -582,90 +594,94 @@ class RecommendationService:
         user_id: int,
         answers: dict,
     ) -> dict:
-        now = datetime.now(timezone.utc)
+        try:
+            now = datetime.now(timezone.utc)
 
-        result = await self.db.execute(
-            select(UserProfile).where(UserProfile.user_id == user_id)
-        )
-        profile = result.scalar_one_or_none()
-
-        if not profile:
-            profile = UserProfile(user_id=user_id)
-            self.db.add(profile)
-
-        interest_tags = []
-        interest_weights = {}
-        preferred_content_types = []
-
-        if "legal_needs" in answers:
-            needs = answers["legal_needs"]
-            if isinstance(needs, list):
-                interest_tags.extend(needs)
-                for tag in needs:
-                    interest_weights[tag] = 2.0
-
-        if "role" in answers:
-            role = answers["role"]
-            if isinstance(role, str):
-                interest_tags.append(role)
-                interest_weights[role] = 1.5
-                if role == "individual":
-                    preferred_content_types.extend(["consultation", "knowledge"])
-                elif role == "business":
-                    preferred_content_types.extend(["contract", "corporate", "lawyer"])
-                elif role == "lawyer":
-                    preferred_content_types.extend(["knowledge", "case"])
-
-        profile.interest_tags = interest_tags
-        profile.interest_weights = interest_weights
-        profile.preferred_content_types = preferred_content_types
-        profile.experience_level = answers.get("experience", "novice")
-        profile.usage_frequency = answers.get("usage_frequency", "unknown")
-        profile.budget_range = answers.get("budget", None)
-        profile.location = answers.get("location", None)
-        profile.onboarding_completed = True
-        profile.onboarding_completed_at = now
-        profile.updated_at = now
-
-        for tag in interest_tags:
-            tag_result = await self.db.execute(
-                select(UserTagInteraction).where(
-                    UserTagInteraction.user_id == user_id,
-                    UserTagInteraction.tag == tag,
-                )
+            result = await self.db.execute(
+                select(UserProfile).where(UserProfile.user_id == user_id)
             )
-            tag_interaction = tag_result.scalar_one_or_none()
-            if tag_interaction:
-                tag_interaction.interaction_count += 1
-                tag_interaction.total_weight += interest_weights.get(tag, 1.0)
-                tag_interaction.last_interaction_at = now
-                tag_interaction.updated_at = now
-            else:
-                self.db.add(UserTagInteraction(
-                    user_id=user_id,
-                    tag=tag,
-                    interaction_count=1,
-                    total_weight=interest_weights.get(tag, 1.0),
-                    last_interaction_at=now,
-                    created_at=now,
-                    updated_at=now,
-                ))
+            profile = result.scalar_one_or_none()
 
-        await self.db.flush()
+            if not profile:
+                profile = UserProfile(user_id=user_id)
+                self.db.add(profile)
 
-        return {
-            "success": True,
-            "profile": {
-                "interest_tags": profile.interest_tags,
-                "interest_weights": profile.interest_weights,
-                "preferred_content_types": profile.preferred_content_types,
-                "usage_frequency": profile.usage_frequency,
-                "onboarding_completed": profile.onboarding_completed,
-                "experience_level": profile.experience_level,
-                "location": profile.location,
-                "budget_range": profile.budget_range,
-            },
-        }
+            interest_tags = []
+            interest_weights = {}
+            preferred_content_types = []
+
+            if "legal_needs" in answers:
+                needs = answers["legal_needs"]
+                if isinstance(needs, list):
+                    interest_tags.extend(needs)
+                    for tag in needs:
+                        interest_weights[tag] = 2.0
+
+            if "role" in answers:
+                role = answers["role"]
+                if isinstance(role, str):
+                    interest_tags.append(role)
+                    interest_weights[role] = 1.5
+                    if role == "individual":
+                        preferred_content_types.extend(["consultation", "knowledge"])
+                    elif role == "business":
+                        preferred_content_types.extend(["contract", "corporate", "lawyer"])
+                    elif role == "lawyer":
+                        preferred_content_types.extend(["knowledge", "case"])
+
+            profile.interest_tags = interest_tags
+            profile.interest_weights = interest_weights
+            profile.preferred_content_types = preferred_content_types
+            profile.experience_level = answers.get("experience", "novice")
+            profile.usage_frequency = answers.get("usage_frequency", "unknown")
+            profile.budget_range = answers.get("budget", None)
+            profile.location = answers.get("location", None)
+            profile.onboarding_completed = True
+            profile.onboarding_completed_at = now
+            profile.updated_at = now
+
+            for tag in interest_tags:
+                tag_result = await self.db.execute(
+                    select(UserTagInteraction).where(
+                        UserTagInteraction.user_id == user_id,
+                        UserTagInteraction.tag == tag,
+                    )
+                )
+                tag_interaction = tag_result.scalar_one_or_none()
+                if tag_interaction:
+                    tag_interaction.interaction_count += 1
+                    tag_interaction.total_weight += interest_weights.get(tag, 1.0)
+                    tag_interaction.last_interaction_at = now
+                    tag_interaction.updated_at = now
+                else:
+                    self.db.add(UserTagInteraction(
+                        user_id=user_id,
+                        tag=tag,
+                        interaction_count=1,
+                        total_weight=interest_weights.get(tag, 1.0),
+                        last_interaction_at=now,
+                        created_at=now,
+                        updated_at=now,
+                    ))
+
+            await self.db.flush()
+
+            return {
+                "success": True,
+                "profile": {
+                    "interest_tags": profile.interest_tags,
+                    "interest_weights": profile.interest_weights,
+                    "preferred_content_types": profile.preferred_content_types,
+                    "usage_frequency": profile.usage_frequency,
+                    "onboarding_completed": profile.onboarding_completed,
+                    "experience_level": profile.experience_level,
+                    "location": profile.location,
+                    "budget_range": profile.budget_range,
+                },
+            }
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def should_show_onboarding(
         self,

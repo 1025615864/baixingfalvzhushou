@@ -152,6 +152,47 @@ async def pending_settlements(
     }
 
 
+@router.get("/settlements", dependencies=[Depends(require_domain_role("payment", roles=["payment_admin"]))])
+async def list_settlements_admin(
+    status: Optional[str] = Query(None),
+    lawyer_id: Optional[int] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    admin: AdminUser = Depends(get_admin_user),
+    db: AsyncSession = Depends(lambda: AsyncSessionLocal()),
+):
+    from ..services.settlement_service import SettlementService
+    svc = SettlementService(db)
+    return await svc.list_settlements(status=status, lawyer_id=lawyer_id, page=page, page_size=page_size)
+
+
+@router.post("/settlements/{settlement_id}/approve", dependencies=[Depends(require_domain_role("payment", roles=["payment_admin"]))])
+async def approve_settlement_admin(
+    settlement_id: int,
+    admin: AdminUser = Depends(require_domain_role("payment", roles=["payment_admin"])),
+    db: AsyncSession = Depends(lambda: AsyncSessionLocal()),
+):
+    from ..services.settlement_service import SettlementService
+    svc = SettlementService(db)
+    settlement = await svc.approve_settlement(settlement_id, admin.user_id, getattr(admin, 'username', str(admin.user_id)))
+    await db.commit()
+    return {"id": settlement.id, "status": settlement.status}
+
+
+@router.post("/settlements/{settlement_id}/reject", dependencies=[Depends(require_domain_role("payment", roles=["payment_admin"]))])
+async def reject_settlement_admin(
+    settlement_id: int,
+    reason: str = Query("", description="拒绝原因"),
+    admin: AdminUser = Depends(require_domain_role("payment", roles=["payment_admin"])),
+    db: AsyncSession = Depends(lambda: AsyncSessionLocal()),
+):
+    from ..services.settlement_service import SettlementService
+    svc = SettlementService(db)
+    settlement = await svc.reject_settlement(settlement_id, admin.user_id, getattr(admin, 'username', str(admin.user_id)), reason)
+    await db.commit()
+    return {"id": settlement.id, "status": settlement.status}
+
+
 @router.post("/settlements/{settlement_id}/audit", dependencies=[Depends(require_domain_role("payment", roles=["payment_admin"]))])
 async def audit_settlement(
     settlement_id: int,

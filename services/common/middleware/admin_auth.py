@@ -45,6 +45,8 @@ ALL_ADMIN_ROLE_CODES = {
     "archive_admin", "archive_ops",
     "notification_admin", "notification_ops",
     "embedding_admin",
+    "ai_admin", "ai_ops",
+    "search_admin", "search_ops",
 }
 
 DOMAIN_ROLES: dict[str, Set[str]] = {
@@ -58,6 +60,8 @@ DOMAIN_ROLES: dict[str, Set[str]] = {
     "archive": {"archive_admin", "archive_ops"},
     "notification": {"notification_admin", "notification_ops"},
     "embedding": {"embedding_admin"},
+    "ai": {"ai_admin", "ai_ops"},
+    "points": {"points_admin", "points_ops"},
 }
 
 USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://localhost:8001")

@@ -16,16 +16,20 @@ class FeedbackService:
     async def create_feedback(
         self, user_id: int, subject: str, content: str
     ) -> FeedbackTicket:
-        ticket = FeedbackTicket(
-            user_id=user_id,
-            subject=subject,
-            content=content,
-            status="open",
-        )
-        self.db.add(ticket)
-        await self.db.commit()
-        await self.db.refresh(ticket)
-        return ticket
+        try:
+            ticket = FeedbackTicket(
+                user_id=user_id,
+                subject=subject,
+                content=content,
+                status="open",
+            )
+            self.db.add(ticket)
+            await self.db.commit()
+            await self.db.refresh(ticket)
+            return ticket
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def get_feedback_list(
         self, user_id: int, page: int, page_size: int
@@ -97,6 +101,7 @@ class FeedbackService:
         status: str | None = None,
         keyword: str | None = None,
     ) -> dict[str, Any]:
+        page_size = min(page_size, 100)
         conditions = []
         if status:
             conditions.append(FeedbackTicket.status == status)
@@ -129,17 +134,23 @@ class FeedbackService:
     async def update_feedback(
         self, ticket_id: int, data: dict[str, Any]
     ) -> FeedbackTicket:
-        ticket = await self.db.get(FeedbackTicket, ticket_id)
-        if ticket is None:
-            raise HTTPException(status_code=404, detail="反馈记录不存在")
+        try:
+            ticket = await self.db.get(FeedbackTicket, ticket_id)
+            if ticket is None:
+                raise HTTPException(status_code=404, detail="反馈记录不存在")
 
-        for field, value in data.items():
-            if value is not None and hasattr(ticket, field):
-                setattr(ticket, field, value)
+            for field, value in data.items():
+                if value is not None and hasattr(ticket, field):
+                    setattr(ticket, field, value)
 
-        await self.db.commit()
-        await self.db.refresh(ticket)
-        return ticket
+            await self.db.commit()
+            await self.db.refresh(ticket)
+            return ticket
+        except HTTPException:
+            raise
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     @staticmethod
     def _ticket_to_dict(ticket: FeedbackTicket) -> dict[str, Any]:

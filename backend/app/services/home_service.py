@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-import time
 from typing import Any
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import HTTPException
 
 from ..models.user import User
 from ..models.lawfirm import Lawyer
 from ..models.knowledge import LegalKnowledge
 from ..models.analytics import UserBehaviorLog
 from ..models.user_profile import UserProfile
+from .cache_service import cache_service
 
 _BANNERS = [
     {"id": "1", "title": "AI 智能法律咨询", "subtitle": "专业律师 24 小时在线为您服务", "image_url": "/assets/banners/ai-banner.png", "link": "/ai-consultation", "sort_order": 1, "is_active": True},
@@ -29,14 +30,6 @@ _QUICK_ACTIONS = [
     {"id": "forum", "label": "法律社区", "icon": "users", "type": "community", "link": "/forum", "badge": 12, "content": "法律交流社区"},
     {"id": "news", "label": "法律资讯", "icon": "newspaper", "type": "content", "link": "/news", "badge": None, "content": "法律热点解读"},
 ]
-
-_stats_cache: dict[str, Any] = {"data": None, "expires": 0.0}
-_banners_cache: dict[str, Any] = {"data": None, "expires": 0.0}
-_quick_actions_cache: dict[str, Any] = {"data": None, "expires": 0.0}
-
-_STATS_TTL = 300.0
-_BANNERS_TTL = 3600.0
-_QUICK_ACTIONS_TTL = 3600.0
 
 
 class HomeService:
@@ -96,17 +89,16 @@ class HomeService:
         }
 
     async def get_quick_actions(self) -> list[dict[str, Any]]:
-        now = time.time()
-        if _quick_actions_cache["data"] is not None and _quick_actions_cache["expires"] > now:
-            return _quick_actions_cache["data"]
-        _quick_actions_cache["data"] = _QUICK_ACTIONS
-        _quick_actions_cache["expires"] = now + _QUICK_ACTIONS_TTL
+        cached = await cache_service.get_json("home:quick_actions")
+        if cached is not None:
+            return cached
+        await cache_service.set_json("home:quick_actions", _QUICK_ACTIONS, expire=3600)
         return _QUICK_ACTIONS
 
     async def get_stats(self) -> dict[str, Any]:
-        now = time.time()
-        if _stats_cache["data"] is not None and _stats_cache["expires"] > now:
-            return _stats_cache["data"]
+        cached = await cache_service.get_json("home:stats")
+        if cached is not None:
+            return cached
 
         total_users = await self.db.scalar(select(func.count()).select_from(User))
         total_lawyers = await self.db.scalar(select(func.count()).select_from(Lawyer))
@@ -121,51 +113,57 @@ class HomeService:
             "monthly_resolved_cases": 0,
             "total_knowledge": total_knowledge or 0,
         }
-        _stats_cache["data"] = data
-        _stats_cache["expires"] = now + _STATS_TTL
+        await cache_service.set_json("home:stats", data, expire=300)
         return data
 
     async def get_banners(self) -> list[dict[str, Any]]:
-        now = time.time()
-        if _banners_cache["data"] is not None and _banners_cache["expires"] > now:
-            return _banners_cache["data"]
-        _banners_cache["data"] = _BANNERS
-        _banners_cache["expires"] = now + _BANNERS_TTL
+        cached = await cache_service.get_json("home:banners")
+        if cached is not None:
+            return cached
+        await cache_service.set_json("home:banners", _BANNERS, expire=3600)
         return _BANNERS
 
     async def track_click(self, user_id: int | None, data: dict[str, Any]) -> None:
-        import json
-        log = UserBehaviorLog(
-            user_id=user_id,
-            action="click",
-            resource_type=data.get("resource_type"),
-            resource_id=data.get("resource_id"),
-            metadata_json=json.dumps(data, ensure_ascii=False) if data else None,
-            ip_address=data.get("ip_address"),
-            user_agent=data.get("user_agent"),
-            referrer=data.get("referrer"),
-            session_id=data.get("session_id"),
-        )
-        self.db.add(log)
-        await self.db.commit()
+        try:
+            import json
+            log = UserBehaviorLog(
+                user_id=user_id,
+                action="click",
+                resource_type=data.get("resource_type"),
+                resource_id=data.get("resource_id"),
+                metadata_json=json.dumps(data, ensure_ascii=False) if data else None,
+                ip_address=data.get("ip_address"),
+                user_agent=data.get("user_agent"),
+                referrer=data.get("referrer"),
+                session_id=data.get("session_id"),
+            )
+            self.db.add(log)
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def set_interests(self, user_id: int | None, interests: list[str]) -> dict[str, Any]:
         if user_id is None:
             return {"success": False, "interests": interests}
 
-        result = await self.db.execute(
-            select(UserProfile).where(UserProfile.user_id == user_id)
-        )
-        profile = result.scalar_one_or_none()
+        try:
+            result = await self.db.execute(
+                select(UserProfile).where(UserProfile.user_id == user_id)
+            )
+            profile = result.scalar_one_or_none()
 
-        if profile is None:
-            profile = UserProfile(user_id=user_id, interest_tags=interests)
-            self.db.add(profile)
-        else:
-            profile.interest_tags = interests
+            if profile is None:
+                profile = UserProfile(user_id=user_id, interest_tags=interests)
+                self.db.add(profile)
+            else:
+                profile.interest_tags = interests
 
-        await self.db.commit()
-        return {"success": True, "interests": interests}
+            await self.db.commit()
+            return {"success": True, "interests": interests}
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def _build_recommendations(self, limit: int = 6) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []

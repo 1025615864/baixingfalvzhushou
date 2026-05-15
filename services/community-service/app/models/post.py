@@ -1,6 +1,6 @@
 """Post 模型"""
 from datetime import datetime, timezone
-from sqlalchemy import String, DateTime, Integer, Text, Boolean, Float, Index
+from sqlalchemy import String, DateTime, Integer, Text, Boolean, Float, Index, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -22,6 +22,7 @@ class Post(Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     category: Mapped[str] = mapped_column(String(50), nullable=True, index=True)
+    topic_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("topics.id"), nullable=True, index=True)
 
     status: Mapped[str] = mapped_column(String(20), default="published", index=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)

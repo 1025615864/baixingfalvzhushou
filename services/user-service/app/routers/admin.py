@@ -14,9 +14,9 @@ from ..models.rbac import (
     Role, Permission, UserAuditLog, user_roles, role_permissions,
     BUSINESS_DOMAINS, DOMAIN_ROLE_HIERARCHY,
 )
-from services.common.middleware.admin_auth import get_admin_user, AdminUser
+from services.common.middleware.admin_auth import get_admin_user, AdminUser, require_domain_role
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_domain_role("global", roles=["super_admin", "admin"]))])
 
 
 class DashboardResponse(BaseModel):

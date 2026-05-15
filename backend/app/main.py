@@ -24,6 +24,8 @@ from .middleware.request_id_middleware import RequestIdMiddleware
 from .middleware.rate_limit import RateLimitMiddleware
 from .middleware.metrics_middleware import MetricsMiddleware
 from .middleware.envelope_middleware import EnvelopeMiddleware
+from .middleware.audit_middleware import AuditLogMiddleware
+from .utils.logging import setup_logging
 from .utils.periodic_task_runner import PeriodicLockedRunner
 
 try:
@@ -41,6 +43,8 @@ except ImportError:
 settings = get_settings()
 
 logger = logging.getLogger(__name__)
+
+setup_logging(log_level="DEBUG" if settings.debug else "INFO")
 
 
 def _normalize_base_url(url: str) -> str:
@@ -249,8 +253,8 @@ app.add_middleware(EnvelopeMiddleware)
 
 app.add_middleware(SentryContextMiddleware)
 app.add_middleware(AuthContextMiddleware)
-
 app.add_middleware(RequestIdMiddleware)
+app.add_middleware(AuditLogMiddleware)
 
 # AI Chat 直接路由 - 必须在 api_router 代理之前注册
 # 否则代理的 /api/ai/{path:path} 通配符会优先匹配

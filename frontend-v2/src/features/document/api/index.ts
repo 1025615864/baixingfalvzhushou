@@ -264,7 +264,7 @@ export async function apiGetDocumentTypes(): Promise<DocumentTypeInfo[]> {
 
 // ==================== 文档模板管理API（管理员用） ====================
 
-const ADMIN_API_BASE = '/v1/admin';
+const ADMIN_API_BASE = '/admin/documents';
 
 /** API 错误响应 */
 interface ApiErrorResponse {

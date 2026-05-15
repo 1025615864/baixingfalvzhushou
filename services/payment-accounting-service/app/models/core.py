@@ -15,6 +15,8 @@ class UserBalance(Base):
     total_recharged_cents: Mapped[int] = mapped_column(Integer, default=0)
     total_consumed: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0)
     total_consumed_cents: Mapped[int] = mapped_column(Integer, default=0)
+    frozen_amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0)
+    frozen_amount_cents: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

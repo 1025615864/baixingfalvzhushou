@@ -1,4 +1,4 @@
-"""Legal Document and Template models"""
+"""Legal Document model"""
 from datetime import datetime, timezone
 from sqlalchemy import String, DateTime, Integer, Text, JSON, Boolean, Index
 from sqlalchemy.orm import Mapped, mapped_column
@@ -40,27 +40,3 @@ class LegalDocument(Base):
 
     def __repr__(self) -> str:
         return f"<LegalDocument(id={self.id}, type={self.document_type}, status={self.status})>"
-
-
-class DocumentTemplate(Base):
-    """文书模板表"""
-    __tablename__ = "document_templates"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
-    category: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-
-    template_content: Mapped[str] = mapped_column(Text, nullable=False)
-
-    required_fields: Mapped[list] = mapped_column(JSON, default=list)
-    optional_fields: Mapped[list] = mapped_column(JSON, default=list)
-
-    description: Mapped[str] = mapped_column(Text, nullable=True)
-
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-
-    def __repr__(self) -> str:
-        return f"<DocumentTemplate(id={self.id}, name={self.name})>"

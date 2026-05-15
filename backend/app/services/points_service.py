@@ -13,6 +13,7 @@ def _points_user_to_dict(pu: PointsUser) -> dict:
         "balance": pu.balance,
         "total_earned": pu.total_earned,
         "total_spent": pu.total_spent,
+        "level": pu.level,
         "continuous_signin_days": pu.continuous_signin_days,
         "last_signin_at": pu.last_signin_at.isoformat() if pu.last_signin_at else None,
         "created_at": pu.created_at.isoformat() if pu.created_at else None,
@@ -74,6 +75,7 @@ class PointsService:
         page_size: int = 20,
         trans_type: str | None = None,
     ) -> dict:
+        page_size = min(page_size, 100)
         query = select(PointsHistory).where(PointsHistory.user_id == user_id)
         count_query = select(func.count()).select_from(PointsHistory).where(PointsHistory.user_id == user_id)
 
@@ -101,45 +103,49 @@ class PointsService:
         source: str | None = None,
         reference_id: str | None = None,
     ) -> dict:
-        result = await self.db.execute(
-            select(PointsUser).where(PointsUser.user_id == user_id)
-        )
-        pu = result.scalar_one_or_none()
-
-        if pu is None:
-            pu = PointsUser(
-                user_id=user_id,
-                balance=points,
-                total_earned=points,
-                total_spent=0,
+        try:
+            result = await self.db.execute(
+                select(PointsUser).where(PointsUser.user_id == user_id)
             )
-            self.db.add(pu)
+            pu = result.scalar_one_or_none()
+
+            if pu is None:
+                pu = PointsUser(
+                    user_id=user_id,
+                    balance=points,
+                    total_earned=points,
+                    total_spent=0,
+                )
+                self.db.add(pu)
+                await self.db.flush()
+                balance_after = points
+            else:
+                pu.balance += points
+                pu.total_earned += points
+                balance_after = pu.balance
+
+            desc = description or f"获得{points}积分"
+            history = PointsHistory(
+                user_id=user_id,
+                action=type,
+                points=points,
+                balance_after=balance_after,
+                description=desc,
+            )
+            self.db.add(history)
             await self.db.flush()
-            balance_after = points
-        else:
-            pu.balance += points
-            pu.total_earned += points
-            balance_after = pu.balance
 
-        desc = description or f"获得{points}积分"
-        history = PointsHistory(
-            user_id=user_id,
-            action=type,
-            points=points,
-            balance_after=balance_after,
-            description=desc,
-        )
-        self.db.add(history)
-        await self.db.flush()
+            tx = _points_history_to_dict(history)
+            tx["source"] = source
+            tx["reference_id"] = reference_id
 
-        tx = _points_history_to_dict(history)
-        tx["source"] = source
-        tx["reference_id"] = reference_id
+            balance_data = await self.get_balance(user_id)
 
-        balance_data = await self.get_balance(user_id)
-
-        await self.db.commit()
-        return {"balance": balance_data, "transaction": tx}
+            await self.db.commit()
+            return {"balance": balance_data, "transaction": tx}
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def get_transaction_stats(self, user_id: int) -> dict:
         earned_result = await self.db.execute(
@@ -212,59 +218,65 @@ class PointsService:
         return _exchange_item_to_dict(item)
 
     async def redeem_item(self, user_id: int, item_id: int) -> dict:
-        result = await self.db.execute(
-            select(PointsExchangeItem).where(PointsExchangeItem.id == item_id)
-        )
-        item = result.scalar_one_or_none()
-        if item is None:
-            raise HTTPException(status_code=404, detail="兑换项目不存在")
-
-        if not item.is_active:
-            raise HTTPException(status_code=400, detail="该兑换项目已下架")
-
-        if item.stock <= 0:
-            raise HTTPException(status_code=400, detail="库存不足")
-
-        pu_result = await self.db.execute(
-            select(PointsUser).where(PointsUser.user_id == user_id)
-        )
-        pu = pu_result.scalar_one_or_none()
-        if pu is None or pu.balance < item.price:
-            available = pu.balance if pu else 0
-            raise HTTPException(
-                status_code=400,
-                detail="积分不足以兑换",
+        try:
+            result = await self.db.execute(
+                select(PointsExchangeItem).where(PointsExchangeItem.id == item_id)
             )
+            item = result.scalar_one_or_none()
+            if item is None:
+                raise HTTPException(status_code=404, detail="兑换项目不存在")
 
-        pu.balance -= item.price
-        pu.total_spent += item.price
-        item.stock -= 1
+            if not item.is_active:
+                raise HTTPException(status_code=400, detail="该兑换项目已下架")
 
-        history = PointsHistory(
-            user_id=user_id,
-            action="exchange",
-            points=-item.price,
-            balance_after=pu.balance,
-            description=f"兑换{item.name}",
-        )
-        self.db.add(history)
-        await self.db.flush()
+            if item.stock <= 0:
+                raise HTTPException(status_code=400, detail="库存不足")
 
-        record = {
-            "id": history.id,
-            "user_id": user_id,
-            "exchange_item_id": item_id,
-            "exchange_item_name": item.name,
-            "points_spent": item.price,
-            "status": "completed",
-            "shipment_info": "已兑换",
-            "created_at": history.created_at.isoformat() if history.created_at else None,
-        }
+            pu_result = await self.db.execute(
+                select(PointsUser).where(PointsUser.user_id == user_id)
+            )
+            pu = pu_result.scalar_one_or_none()
+            if pu is None or pu.balance < item.price:
+                available = pu.balance if pu else 0
+                raise HTTPException(
+                    status_code=400,
+                    detail="积分不足以兑换",
+                )
 
-        balance_data = await self.get_balance(user_id)
+            pu.balance -= item.price
+            pu.total_spent += item.price
+            item.stock -= 1
 
-        await self.db.commit()
-        return {"message": "兑换成功", "exchange_record": record, "balance": balance_data}
+            history = PointsHistory(
+                user_id=user_id,
+                action="exchange",
+                points=-item.price,
+                balance_after=pu.balance,
+                description=f"兑换{item.name}",
+            )
+            self.db.add(history)
+            await self.db.flush()
+
+            record = {
+                "id": history.id,
+                "user_id": user_id,
+                "exchange_item_id": item_id,
+                "exchange_item_name": item.name,
+                "points_spent": item.price,
+                "status": "completed",
+                "shipment_info": "已兑换",
+                "created_at": history.created_at.isoformat() if history.created_at else None,
+            }
+
+            balance_data = await self.get_balance(user_id)
+
+            await self.db.commit()
+            return {"message": "兑换成功", "exchange_record": record, "balance": balance_data}
+        except HTTPException:
+            raise
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def get_exchange_history(
         self,
@@ -272,6 +284,7 @@ class PointsService:
         page: int = 1,
         page_size: int = 20,
     ) -> dict:
+        page_size = min(page_size, 100)
         query = select(PointsHistory).where(
             PointsHistory.user_id == user_id,
             PointsHistory.action == "exchange",

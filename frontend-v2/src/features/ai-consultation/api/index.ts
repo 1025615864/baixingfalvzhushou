@@ -35,8 +35,8 @@ import type {
 } from '../types';
 
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api';
-const AI_BASE = `${API_BASE}/v1/ai`;
+const API_BASE = '/ai';
+const AI_BASE = `${API_BASE}`;
 
 interface ApiErrorResponse {
   detail?: string;

@@ -46,6 +46,7 @@ class KnowledgeService:
         keyword: Optional[str] = None,
         is_active: Optional[bool] = None,
     ) -> dict:
+        page_size = min(page_size, 100)
         query = select(LegalKnowledge)
         count_query = select(func.count()).select_from(LegalKnowledge)
 
@@ -94,39 +95,55 @@ class KnowledgeService:
         return self._to_dict(article)
 
     async def create_article(self, data: dict) -> dict:
-        article = LegalKnowledge(**data)
-        self.db.add(article)
-        await self.db.commit()
-        await self.db.refresh(article)
-        return self._to_dict(article)
+        try:
+            article = LegalKnowledge(**data)
+            self.db.add(article)
+            await self.db.commit()
+            await self.db.refresh(article)
+            return self._to_dict(article)
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def update_article(self, article_id: int, data: dict) -> dict:
-        result = await self.db.execute(
-            select(LegalKnowledge).where(LegalKnowledge.id == article_id)
-        )
-        article = result.scalar_one_or_none()
-        if not article:
-            raise HTTPException(status_code=404, detail="知识条目不存在")
+        try:
+            result = await self.db.execute(
+                select(LegalKnowledge).where(LegalKnowledge.id == article_id)
+            )
+            article = result.scalar_one_or_none()
+            if not article:
+                raise HTTPException(status_code=404, detail="知识条目不存在")
 
-        for field, value in data.items():
-            if value is not None:
-                setattr(article, field, value)
+            for field, value in data.items():
+                if value is not None:
+                    setattr(article, field, value)
 
-        await self.db.commit()
-        await self.db.refresh(article)
-        return self._to_dict(article)
+            await self.db.commit()
+            await self.db.refresh(article)
+            return self._to_dict(article)
+        except HTTPException:
+            raise
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def delete_article(self, article_id: int) -> dict:
-        result = await self.db.execute(
-            select(LegalKnowledge).where(LegalKnowledge.id == article_id)
-        )
-        article = result.scalar_one_or_none()
-        if not article:
-            raise HTTPException(status_code=404, detail="知识条目不存在")
+        try:
+            result = await self.db.execute(
+                select(LegalKnowledge).where(LegalKnowledge.id == article_id)
+            )
+            article = result.scalar_one_or_none()
+            if not article:
+                raise HTTPException(status_code=404, detail="知识条目不存在")
 
-        await self.db.delete(article)
-        await self.db.commit()
-        return {"message": "删除成功"}
+            await self.db.delete(article)
+            await self.db.commit()
+            return {"message": "删除成功"}
+        except HTTPException:
+            raise
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def get_distinct_categories(self) -> list[str]:
         result = await self.db.execute(
@@ -135,75 +152,93 @@ class KnowledgeService:
         return [row[0] for row in result.all()]
 
     async def batch_delete(self, ids: list[int]) -> dict:
-        result = await self.db.execute(
-            sa_delete(LegalKnowledge).where(LegalKnowledge.id.in_(ids))
-        )
-        await self.db.commit()
-        removed = result.rowcount
-        return {
-            "success_count": removed,
-            "failed_count": len(ids) - removed,
-            "message": f"成功删除{removed}条",
-        }
+        try:
+            result = await self.db.execute(
+                sa_delete(LegalKnowledge).where(LegalKnowledge.id.in_(ids))
+            )
+            await self.db.commit()
+            removed = result.rowcount
+            return {
+                "success_count": removed,
+                "failed_count": len(ids) - removed,
+                "message": f"成功删除{removed}条",
+            }
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def batch_import(self, items: list[dict], dry_run: bool = False) -> dict:
-        count = 0
-        for item in items:
-            row = LegalKnowledge(
-                knowledge_type=item.get("knowledge_type", "law"),
-                title=item.get("title", ""),
-                article_number=item.get("article_number"),
-                content=item.get("content"),
-                summary=item.get("summary"),
-                category=item.get("category", "法律"),
-                keywords=item.get("keywords"),
-                source=item.get("source"),
-                source_url=item.get("source_url"),
-                source_version=item.get("source_version"),
-                effective_date=item.get("effective_date"),
-                weight=item.get("weight", 1.0),
-                is_active=item.get("is_active", True),
-            )
+        try:
+            count = 0
+            for item in items:
+                row = LegalKnowledge(
+                    knowledge_type=item.get("knowledge_type", "law"),
+                    title=item.get("title", ""),
+                    article_number=item.get("article_number"),
+                    content=item.get("content"),
+                    summary=item.get("summary"),
+                    category=item.get("category", "法律"),
+                    keywords=item.get("keywords"),
+                    source=item.get("source"),
+                    source_url=item.get("source_url"),
+                    source_version=item.get("source_version"),
+                    effective_date=item.get("effective_date"),
+                    weight=item.get("weight", 1.0),
+                    is_active=item.get("is_active", True),
+                )
+                if not dry_run:
+                    self.db.add(row)
+                count += 1
+
             if not dry_run:
-                self.db.add(row)
-            count += 1
+                await self.db.commit()
 
-        if not dry_run:
-            await self.db.commit()
-
-        prefix = "预览" if dry_run else ""
-        return {
-            "success_count": count,
-            "failed_count": 0,
-            "message": f"{prefix}成功导入{count}条",
-        }
+            prefix = "预览" if dry_run else ""
+            return {
+                "success_count": count,
+                "failed_count": 0,
+                "message": f"{prefix}成功导入{count}条",
+            }
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def vectorize_article(self, article_id: int) -> dict:
-        result = await self.db.execute(
-            select(LegalKnowledge).where(LegalKnowledge.id == article_id)
-        )
-        article = result.scalar_one_or_none()
-        if not article:
-            raise HTTPException(status_code=404, detail="知识条目不存在")
+        try:
+            result = await self.db.execute(
+                select(LegalKnowledge).where(LegalKnowledge.id == article_id)
+            )
+            article = result.scalar_one_or_none()
+            if not article:
+                raise HTTPException(status_code=404, detail="知识条目不存在")
 
-        article.is_vectorized = True
-        await self.db.commit()
-        return {"message": "向量化成功"}
+            article.is_vectorized = True
+            await self.db.commit()
+            return {"message": "向量化成功"}
+        except HTTPException:
+            raise
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def batch_vectorize(self, ids: list[int]) -> dict:
-        result = await self.db.execute(
-            sa_update(LegalKnowledge)
-            .where(LegalKnowledge.id.in_(ids))
-            .where(LegalKnowledge.is_vectorized == False)
-            .values(is_vectorized=True)
-        )
-        await self.db.commit()
-        count = result.rowcount
-        return {
-            "success_count": count,
-            "failed_count": len(ids) - count,
-            "message": f"成功向量化{count}条",
-        }
+        try:
+            result = await self.db.execute(
+                sa_update(LegalKnowledge)
+                .where(LegalKnowledge.id.in_(ids))
+                .where(LegalKnowledge.is_vectorized == False)
+                .values(is_vectorized=True)
+            )
+            await self.db.commit()
+            count = result.rowcount
+            return {
+                "success_count": count,
+                "failed_count": len(ids) - count,
+                "message": f"成功向量化{count}条",
+            }
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def get_stats(self) -> dict:
         total_result = await self.db.execute(

@@ -223,6 +223,38 @@ services:
     networks:
       - backend-network
 
+  # 知识库服务
+  knowledge-service:
+    build:
+      context: ./services/knowledge-service
+      dockerfile: Dockerfile
+    container_name: baixing_knowledge_service
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/knowledge_service
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/0
+      ENABLE_KAFKA: "true"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      CORS_ALLOWED_ORIGINS: '["http://localhost:3000","http://localhost:5173"]'
+      DEBUG: "true"
+    ports:
+      - "8081:8081"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    volumes:
+      - ./services/knowledge-service:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - backend-network
+
 volumes:
   kafka_data:
   zookeeper_data:

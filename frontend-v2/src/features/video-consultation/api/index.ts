@@ -16,7 +16,7 @@ import type {
 } from '../types';
 
 
-const API_BASE = '/v1/video-consultations';
+const API_BASE = '/video-consultations';
 
 
 /**

@@ -1,3 +1,12 @@
+"""企业服务 BFF 路由
+
+迁移路径:
+  /info, /members → 待 enterprise-service 支持 (优先级 P2)
+  /orders → 待 order-service 企业订单支持
+  /contract-review → 待 legal-service 合同审查
+  /compliance/* → 待 enterprise-service 合规模块
+  /documents → 待 enterprise-service 文档管理
+"""
 from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional

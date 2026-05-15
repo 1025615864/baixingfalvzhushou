@@ -32,6 +32,11 @@ MICROSERVICES: dict[str, dict[str, Any]] = {
     "archive": {"prefix": "/archive", "url": "${ARCHIVE_SERVICE_URL:-http://archive-service:8013}"},
     "knowledge": {"prefix": "/knowledge", "url": "${KNOWLEDGE_SERVICE_URL:-http://knowledge-service:8081}"},
     "payment-accounting": {"prefix": "/accounting", "url": "${PAYMENT_ACCOUNTING_SERVICE_URL:-http://payment-accounting-service:8014}"},
+
+    # === 子路由代理（功能前缀与服务默认前缀不同）===
+    "user-membership": {"prefix": "/membership", "url": "${USER_SERVICE_URL:-http://user-service:8001}"},
+    "accounting-settlement": {"prefix": "/settlement", "url": "${PAYMENT_ACCOUNTING_SERVICE_URL:-http://payment-accounting-service:8014}"},
+    "knowledge-court-cases": {"prefix": "/court-cases", "url": "${KNOWLEDGE_SERVICE_URL:-http://knowledge-service:8007}"},
 }
 
 # 超时配置（秒）

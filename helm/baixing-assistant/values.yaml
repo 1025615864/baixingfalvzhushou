@@ -499,3 +499,35 @@ monitoring:
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    from:
+      - namespaceSelector:
+          matchLabels:
+            name: baixing-assistant
+      - podSelector: {}
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+    - to:
+        - podSelector: {}
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

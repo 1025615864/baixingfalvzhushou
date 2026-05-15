@@ -98,6 +98,79 @@ class BalanceService:
         await self.db.refresh(balance)
         return balance
 
+    async def freeze_balance(self, user_id: int, amount: float, reason: str = "") -> UserBalance:
+        balance = await self.get_or_create_balance(user_id)
+        if balance.balance < amount:
+            raise ValueError("余额不足，无法冻结")
+        balance_before = balance.balance
+        balance.balance -= amount
+        balance.frozen_amount = getattr(balance, 'frozen_amount', 0) + amount
+        balance.balance_cents = int(balance.balance * 100)
+        balance.frozen_amount_cents = int(balance.frozen_amount * 100)
+        transaction = BalanceTransaction(
+            user_id=user_id,
+            type="freeze",
+            amount=-amount,
+            amount_cents=int(-amount * 100),
+            balance_before=balance_before,
+            balance_after=balance.balance,
+            balance_before_cents=int(balance_before * 100),
+            balance_after_cents=int(balance.balance * 100),
+            description=f"冻结余额: {reason}" if reason else "冻结余额",
+        )
+        self.db.add(transaction)
+        await self.db.flush()
+        return balance
+
+    async def unfreeze_balance(self, user_id: int, amount: float, reason: str = "") -> UserBalance:
+        balance = await self.get_or_create_balance(user_id)
+        frozen = getattr(balance, 'frozen_amount', 0)
+        if frozen < amount:
+            raise ValueError("冻结余额不足，无法解冻")
+        balance_before = balance.balance
+        balance.frozen_amount = frozen - amount
+        balance.balance += amount
+        balance.balance_cents = int(balance.balance * 100)
+        balance.frozen_amount_cents = int(balance.frozen_amount * 100)
+        transaction = BalanceTransaction(
+            user_id=user_id,
+            type="unfreeze",
+            amount=amount,
+            amount_cents=int(amount * 100),
+            balance_before=balance_before,
+            balance_after=balance.balance,
+            balance_before_cents=int(balance_before * 100),
+            balance_after_cents=int(balance.balance * 100),
+            description=f"解冻余额: {reason}" if reason else "解冻余额",
+        )
+        self.db.add(transaction)
+        await self.db.flush()
+        return balance
+
+    async def deduct_frozen(self, user_id: int, amount: float, reason: str = "") -> UserBalance:
+        balance = await self.get_or_create_balance(user_id)
+        frozen = getattr(balance, 'frozen_amount', 0)
+        if frozen < amount:
+            raise ValueError("冻结余额不足，无法扣减")
+        balance.frozen_amount = frozen - amount
+        balance.total_consumed += amount
+        balance.frozen_amount_cents = int(balance.frozen_amount * 100)
+        balance.total_consumed_cents = int(balance.total_consumed * 100)
+        transaction = BalanceTransaction(
+            user_id=user_id,
+            type="deduct_frozen",
+            amount=-amount,
+            amount_cents=int(-amount * 100),
+            balance_before=balance.balance,
+            balance_after=balance.balance,
+            balance_before_cents=int(balance.balance * 100),
+            balance_after_cents=int(balance.balance * 100),
+            description=f"扣减冻结余额: {reason}" if reason else "扣减冻结余额",
+        )
+        self.db.add(transaction)
+        await self.db.flush()
+        return balance
+
     async def get_transactions(
         self,
         user_id: int,

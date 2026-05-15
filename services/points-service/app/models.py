@@ -1,6 +1,6 @@
 """积分数据模型"""
 from datetime import datetime, timezone
-from sqlalchemy import String, DateTime, Integer, Index
+from sqlalchemy import String, DateTime, Integer, Index, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
 
@@ -70,4 +70,19 @@ class DailyCheckIn(Base):
     user_id: Mapped[int] = mapped_column(Integer, index=True)
     check_in_date: Mapped[str] = mapped_column(String(10))
     points_awarded: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+
+
+class PointsAuditLog(Base):
+    __tablename__ = "points_audit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    target_user_id: Mapped[int] = mapped_column(Integer, index=True)
+    operator_id: Mapped[int] = mapped_column(Integer)
+    operator_name: Mapped[str] = mapped_column(String(100))
+    action: Mapped[str] = mapped_column(String(50))
+    change_amount: Mapped[int] = mapped_column(Integer, default=0)
+    balance_after: Mapped[int] = mapped_column(Integer, default=0)
+    comment: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    extra_data = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))

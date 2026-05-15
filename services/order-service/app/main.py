@@ -139,6 +139,9 @@ def create_app() -> FastAPI:
     app.include_router(admin_orders_router, prefix="/api/v1/orders/admin")
     app.include_router(admin_router, prefix="/api/v1/admin")
 
+    from app.routers import agent_router
+    app.include_router(agent_router, prefix="/api/agent", tags=["AI运营助手"])
+
     return app
 
 

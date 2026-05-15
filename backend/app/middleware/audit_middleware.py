@@ -1,148 +1,198 @@
-"""API安全审计中间件
-
-记录API访问日志、敏感操作审计日志、异常访问检测。
-"""
-from __future__ import annotations
-
+"""审计日志中间件 - 将操作记录写入数据库"""
 import time
-from collections.abc import Awaitable, Callable
-from typing import Any
-
-from fastapi import Request, Response
+import uuid
+import json
+import logging
+from typing import Callable
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response, JSONResponse
+from starlette.datastructures import Headers
 
-from app.utils.cache.rate_limiter import get_client_ip
-from ..services.audit_service import AuditAction, AuditSeverity, log_audit
+from app.services.audit_service import get_current_audit_context, get_audit_logger, AuditAction, AuditSeverity
+
+logger = logging.getLogger(__name__)
+
+SENSITIVE_PATHS = {"/admin", "/settings", "/payment", "/users", "/roles", "/permissions"}
+SENSITIVE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+AUDIT_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+HTTP_METHOD_TO_AUDIT_ACTION = {
+    "GET": AuditAction.READ,
+    "POST": AuditAction.CREATE,
+    "PUT": AuditAction.UPDATE,
+    "PATCH": AuditAction.UPDATE,
+    "DELETE": AuditAction.DELETE,
+}
 
 
-class AuditMiddleware(BaseHTTPMiddleware):
-    """安全审计中间件"""
+class AuditLogMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        if request.url.path in ("/health", "/metrics", "/docs", "/openapi.json", "/redoc"):
+            return await call_next(request)
 
-    # 敏感操作列表
-    SENSITIVE_OPERATIONS = {
-        "DELETE",
-        "admin",
-        "payment",
-        "user",
-        "config",
-    }
-
-    # 异常访问阈值
-    SUSPICIOUS_REQUESTS_THRESHOLD = 100  # 5分钟内超过100次请求
-    SUSPICIOUS_ERRORS_THRESHOLD = 10     # 5分钟内超过10次错误
-
-    def __init__(self, app: Any) -> None:
-        super().__init__(app)
-        self._request_counts: dict[str, int] = {}
-        self._error_counts: dict[str, int] = {}
-        self._last_cleanup: float = time.time()
-
-    def _cleanup_old_records(self) -> None:
-        """清理过期记录"""
-        current_time = time.time()
-        if current_time - self._last_cleanup < 300:  # 5分钟清理一次
-            return
-
-        self._request_counts.clear()
-        self._error_counts.clear()
-        self._last_cleanup = current_time
-
-    def _is_sensitive_operation(self, path: str) -> bool:
-        """判断是否为敏感操作"""
-        path_lower = path.lower()
-        for sensitive in self.SENSITIVE_OPERATIONS:
-            if sensitive in path_lower:
-                return True
-        return False
-
-    def _detect_suspicious_access(
-        self,
-        ip: str,
-        path: str,
-        status_code: int
-    ) -> bool:
-        """检测异常访问"""
-        self._cleanup_old_records()
-
-        # 统计请求次数
-        key = f"{ip}:{path}"
-        self._request_counts[key] = self._request_counts.get(key, 0) + 1
-
-        # 统计错误次数
-        error_key = f"{ip}:{path}"
-        if status_code >= 400:
-            self._error_counts[error_key] = self._error_counts.get(error_key, 0) + 1
-
-        # 检测异常
-        if self._request_counts.get(key, 0) > self.SUSPICIOUS_REQUESTS_THRESHOLD:
-            return True
-
-        if self._error_counts.get(error_key, 0) > self.SUSPICIOUS_ERRORS_THRESHOLD:
-            return True
-
-        return False
-
-    async def dispatch(
-        self,
-        request: Request,
-        call_next: Callable[[Request], Awaitable[Response]]
-    ) -> Response:
-        """处理请求"""
         start_time = time.time()
-        path = request.url.path
-        method = request.method
-        ip = get_client_ip(request)
+        request_id = str(uuid.uuid4())
+        ctx = get_current_audit_context()
+        user_id = ctx.get("user_id") if ctx else None
+        ip = self._get_client_ip(request)
+        user_agent = request.headers.get("user-agent", "")
 
-        # 检查是否为敏感操作
-        is_sensitive = self._is_sensitive_operation(path)
+        logger.info(f"[AUDIT] Incoming request: request_id={request_id}, method={request.method}, path={request.url.path}, user_id={user_id}, ip={ip}")
 
-        # 处理请求
-        response = await call_next(request)
-
-        # 记录审计日志
-        duration = time.time() - start_time
-        status_code = response.status_code
-
-        # 检测异常访问
-        is_suspicious = self._detect_suspicious_access(ip, path, status_code)
-
-        # 构建审计日志
-        audit_log = {
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "ip": ip,
-            "method": method,
-            "path": path,
-            "status_code": status_code,
-            "duration_ms": round(duration * 1000, 2),
-            "is_sensitive": is_sensitive,
-            "is_suspicious": is_suspicious,
-        }
-
-        # 添加用户ID（如果存在）
-        if hasattr(request.state, "user_id") and request.state.user_id:
-            audit_log["user_id"] = request.state.user_id
-
-        # 添加请求ID（如果存在）
-        if hasattr(request.state, "request_id") and request.state.request_id:
-            audit_log["request_id"] = request.state.request_id
-
-        # 输出审计日志
-        if is_sensitive or is_suspicious:
-            severity = AuditSeverity.WARNING if is_suspicious else AuditSeverity.INFO
+        body = None
+        if request.method in AUDIT_METHODS and not request.url.path.startswith("/docs"):
             try:
-                log_audit(
-                    action=AuditAction.API_CALL,
-                    resource_type="http_request",
-                    resource_id=path,
-                    details=audit_log,
-                    success=status_code < 400,
-                    error_message=None if status_code < 400 else f"status_{status_code}",
-                    severity=severity,
-                    user_id=getattr(request.state, "user_id", None),
-                    ip_address=ip,
-                    request_id=getattr(request.state, "request_id", None),
-                )
-            except Exception:
-                pass
+                body = await request.body()
+                logger.info(f"[AUDIT] Request body captured, length={len(body) if body else 0}")
+                async def receive():
+                    return {"type": "http.request", "body": body}
+                request._receive = receive
+            except Exception as e:
+                logger.warning(f"[AUDIT] Failed to read request body: {e}")
+                body = None
+
+        response = None
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            duration_ms = int((time.time() - start_time) * 1000)
+            logger.error(f"[AUDIT] Request failed: error={e}, duration={duration_ms}ms")
+            await self._persist_audit(
+                request, request_id, user_id, ip, user_agent, response, duration_ms,
+                action=str(request.method), success=False, error=str(e),
+            )
+            raise
+
+        duration_ms = int((time.time() - start_time) * 1000)
+        should_audit = self._should_audit(request)
+        logger.info(f"[AUDIT] Should audit: {should_audit} (path={request.url.path}, method={request.method})")
+
+        if should_audit:
+            logger.info(f"[AUDIT] Persisting audit log for: {request.method} {request.url.path}")
+            await self._persist_audit(
+                request, request_id, user_id, ip, user_agent, response, duration_ms,
+                action=str(request.method),
+            )
 
         return response
+
+    def _get_client_ip(self, request: Request) -> str:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+        if request.client:
+            return request.client.host
+        return "unknown"
+
+    def _should_audit(self, request: Request) -> bool:
+        path = request.url.path
+        logger.debug(f"[AUDIT] Should audit check: path={path}, method={request.method}")
+        
+        if not path.startswith("/api/"):
+            logger.debug(f"[AUDIT] Not auditing (not /api/ path)")
+            return False
+        
+        internal_path = path
+        if internal_path.startswith("/api/v1/"):
+            internal_path = internal_path[len("/api/v1/"):]
+        elif internal_path.startswith("/api/"):
+            internal_path = internal_path[len("/api/"):]
+        internal_path = "/" + internal_path
+        
+        sensitive_match = any(internal_path.startswith(sp) for sp in SENSITIVE_PATHS)
+        if not sensitive_match:
+            logger.debug(f"[AUDIT] Not auditing (internal_path={internal_path} not in SENSITIVE_PATHS={SENSITIVE_PATHS})")
+            return False
+        
+        method_match = request.method in SENSITIVE_METHODS
+        if not method_match:
+            logger.debug(f"[AUDIT] Not auditing (method not in SENSITIVE_METHODS={SENSITIVE_METHODS})")
+            return False
+        
+        logger.info(f"[AUDIT] AUDIT TRIGGERED: path={path}, internal_path={internal_path}, method={request.method}")
+        return True
+
+    async def _persist_audit(
+        self, request: Request, request_id: str, user_id: int | None,
+        ip: str, user_agent: str, response: Response | None,
+        duration_ms: int, action: str, success: bool = True, error: str | None = None,
+    ):
+        try:
+            audit_logger = get_audit_logger()
+            path = request.url.path
+
+            from app.services.audit_service import get_current_audit_context
+            ctx = get_current_audit_context()
+            user_role = ctx.get("user_role") if ctx else None
+
+            resource_type = self._extract_resource_type(path)
+            resource_id = self._extract_resource_id(path)
+            status_code = response.status_code if response else None
+            
+            audit_action = HTTP_METHOD_TO_AUDIT_ACTION.get(action, AuditAction.READ)
+            
+            logger.info(f"[AUDIT] Creating audit entry: request_id={request_id}, action={action}, resource={resource_type}, resource_id={resource_id}, status={status_code}")
+
+            entry = audit_logger.create_entry(
+                action=audit_action,
+                resource_type=resource_type,
+                resource_id=resource_id,
+                user_id=user_id,
+                username=None,
+                ip_address=ip,
+                user_agent=user_agent,
+                request_id=request_id,
+                duration_ms=duration_ms,
+                success=success,
+                error_message=error,
+                severity=AuditSeverity.WARNING if not success else AuditSeverity.INFO,
+                metadata={
+                    "method": request.method,
+                    "path": path,
+                    "query": str(request.query_params) if request.query_params else None,
+                    "status_code": status_code,
+                    "user_role": user_role,
+                },
+            )
+            logger.info(f"[AUDIT] About to log async: request_id={request_id}")
+            await audit_logger.log_async(
+                audit_action,
+                resource_type,
+                resource_id=resource_id,
+                user_id=user_id,
+                username=None,
+                ip_address=ip,
+                user_agent=user_agent,
+                request_id=request_id,
+                duration_ms=duration_ms,
+                success=success,
+                error_message=error,
+                severity=AuditSeverity.WARNING if not success else AuditSeverity.INFO,
+                metadata={
+                    "method": request.method,
+                    "path": path,
+                    "query": str(request.query_params) if request.query_params else None,
+                    "status_code": status_code,
+                    "user_role": user_role,
+                },
+            )
+            logger.info(f"[AUDIT] Audit log persisted successfully: request_id={request_id}")
+        except Exception as e:
+            logger.error(f"[AUDIT] Failed to persist audit log: request_id={request_id}, error={e}", exc_info=True)
+
+    def _extract_resource_type(self, path: str) -> str:
+        parts = path.strip("/").split("/")
+        if len(parts) >= 4:
+            return parts[3]
+        if len(parts) >= 3:
+            return parts[2]
+        return "unknown"
+
+    def _extract_resource_id(self, path: str) -> str | None:
+        parts = path.strip("/").split("/")
+        if len(parts) >= 5 and parts[4].isdigit():
+            return parts[4]
+        if len(parts) >= 5:
+            return parts[4]
+        return None

@@ -10,10 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import AsyncSessionLocal
 from ..models import PaymentOrder
 from ..services.channels import get_adapter
+from ..services.payment_service import PaymentService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+payment_service = PaymentService()
 
 
 class CreateOrderRequest(BaseModel):
@@ -69,22 +71,17 @@ async def create_order(
 ):
     order_no = generate_order_no()
 
-    order = PaymentOrder(
+    order = await payment_service.create_payment(
+        db=db,
         order_no=order_no,
         user_id=request.user_id,
         order_type=request.order_type,
         amount=request.amount,
-        actual_amount=request.amount,
-        amount_cents=int(request.amount * 100),
-        actual_amount_cents=int(request.amount * 100),
-        status="pending",
-        payment_method=request.payment_method,
         title=request.title,
         description=request.description,
-        expires_at=datetime.now() + timedelta(minutes=30),
+        payment_method=request.payment_method,
     )
 
-    db.add(order)
     await db.commit()
     await db.refresh(order)
 
@@ -186,15 +183,12 @@ async def query_payment_status(
     order_no: str,
     db: AsyncSession = Depends(lambda: AsyncSessionLocal()),
 ):
-    result = await db.execute(
-        select(PaymentOrder).where(PaymentOrder.order_no == order_no)
-    )
-    order = result.scalar_one_or_none()
-
-    if not order:
+    try:
+        status_info = await payment_service.query_payment_status(db, order_no)
+    except ValueError:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    provider = order.payment_method or "alipay"
+    provider = status_info["payment_method"] or "alipay"
 
     try:
         adapter = get_adapter(provider)
@@ -214,9 +208,9 @@ async def query_payment_status(
 
     return PaymentStatusResponse(
         order_no=order_no,
-        status=order.status,
+        status=status_info["status"],
         provider=provider,
         provider_status=provider_status,
-        trade_no=order.trade_no,
-        paid_at=order.paid_at,
+        trade_no=status_info.get("trade_no"),
+        paid_at=status_info.get("paid_at"),
     )

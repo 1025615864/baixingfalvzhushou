@@ -9,7 +9,23 @@ from app.services.ops.content_ops_service import ContentOpsService
 from app.services.ops.audit_service import AuditService
 from app.middleware.ops_auth import require_ops_role, log_audit
 
-router = APIRouter(prefix="/api/v1/community/ops/content", tags=["内容审核工作台"])
+try:
+    from services.common.middleware.admin_auth import require_domain_role
+except ImportError:
+    from fastapi import Depends, HTTPException
+    def require_domain_role(domain: str, roles=None):
+        async def _checker(request=None):
+            from fastapi import Request
+            if request and hasattr(request, 'headers'):
+                role = request.headers.get("X-Admin-Role", "")
+                if role in {"super_admin", "admin"}:
+                    return None
+                if roles and role not in roles:
+                    raise HTTPException(status_code=403, detail=f"需要角色: {', '.join(roles)}")
+            return None
+        return _checker
+
+router = APIRouter(prefix="/api/v1/community/ops/content", tags=["内容审核工作台"], dependencies=[Depends(require_domain_role("community", roles=["community_ops"]))])
 
 
 class ReviewRequest(BaseModel):

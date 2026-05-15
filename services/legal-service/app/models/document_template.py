@@ -1,6 +1,6 @@
 """文书模板模型"""
 from datetime import datetime
-from sqlalchemy import String, DateTime, Integer, Boolean, ForeignKey, Text
+from sqlalchemy import String, DateTime, Integer, Float, Boolean, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 

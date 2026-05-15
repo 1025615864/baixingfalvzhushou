@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config.settings import get_settings
-from app.routers import stats_router, archive_router, case_categories_router, search_router, vector_ops_router, vector_search_router, batch_router, recommendations_router, admin_router
+from app.routers import stats_router, archive_router, case_categories_router, search_router, vector_ops_router, vector_search_router, batch_router, recommendations_router, admin_router, agent_router
 
 try:
     from shared.discovery import get_registration
@@ -84,6 +84,7 @@ app.include_router(vector_ops_router)
 app.include_router(vector_search_router)
 app.include_router(batch_router)
 app.include_router(admin_router)
+app.include_router(agent_router, prefix="/api/agent", tags=["AI运营助手"])
 
 
 @app.get("/health")

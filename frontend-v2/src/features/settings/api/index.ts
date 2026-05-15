@@ -18,7 +18,7 @@ import type {
 } from '../types';
 
 // API 基础路径
-const API_BASE = '/v1/admin';
+const API_BASE = '/admin/settings';
 
 // ==================== 后端响应类型定义 ====================
 

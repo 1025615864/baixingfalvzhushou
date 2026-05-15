@@ -1,11 +1,15 @@
-"""Audit service."""
+"""Audit service - 支持数据库持久化"""
 from __future__ import annotations
 import enum
 import uuid
 import contextvars
+import json
+import logging
 from datetime import datetime, timezone
 from typing import Optional, Any
 from dataclasses import dataclass, field
+
+logger = logging.getLogger(__name__)
 
 
 class AuditAction(enum.Enum):
@@ -77,14 +81,54 @@ class AuditContext:
         _audit_context.reset(self._token)
 
 
+async def _persist_to_db(entry: AuditLogEntry) -> None:
+    """异步将审计日志写入数据库"""
+    try:
+        from app.models.audit_log import AuditLog
+        from app.database import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as db:
+            log_record = AuditLog(
+                user_id=entry.user_id,
+                user_name=entry.username,
+                user_role=entry.metadata.get("user_role") if entry.metadata else None,
+                action=entry.action.value,
+                resource_type=entry.resource_type,
+                resource_id=entry.resource_id,
+                method=entry.metadata.get("method") if entry.metadata else None,
+                path=entry.metadata.get("path") if entry.metadata else None,
+                query_params=entry.metadata.get("query") if entry.metadata else None,
+                ip_address=entry.ip_address,
+                user_agent=entry.user_agent,
+                request_id=entry.request_id,
+                status_code=entry.metadata.get("status_code") if entry.metadata else None,
+                duration_ms=entry.duration_ms,
+                error_message=entry.error_message,
+                is_sensitive=entry.severity in (AuditSeverity.WARNING, AuditSeverity.ERROR, AuditSeverity.CRITICAL),
+                extra_data=entry.metadata,
+            )
+            db.add(log_record)
+            await db.commit()
+    except Exception as e:
+        logger.warning(f"Failed to persist audit log to DB: {e}")
+
+
 class AuditLogger:
-    def __init__(self, async_mode: bool = True, batch_size: int = 100, flush_interval: float = 5.0):
+    def __init__(self, async_mode: bool = True, batch_size: int = 100, flush_interval: float = 5.0, persist_db: bool = True):
         self.async_mode = async_mode
         self.batch_size = batch_size
         self.flush_interval = flush_interval
+        self.persist_db = persist_db
+        self._pending: list[AuditLogEntry] = []
 
     def create_entry(self, action: AuditAction, resource_type: str, resource_id: Optional[str] = None, **kwargs) -> AuditLogEntry:
         return AuditLogEntry(action=action, resource_type=resource_type, resource_id=resource_id, **kwargs)
+
+    async def log_async(self, action: AuditAction, resource_type: str, resource_id: Optional[str] = None, **kwargs) -> AuditLogEntry:
+        entry = self.create_entry(action, resource_type, resource_id, **kwargs)
+        if self.persist_db:
+            await _persist_to_db(entry)
+        return entry
 
 
 def get_current_audit_context() -> Optional[dict]:
@@ -97,7 +141,7 @@ _logger_instance: Optional[AuditLogger] = None
 def get_audit_logger() -> AuditLogger:
     global _logger_instance
     if _logger_instance is None:
-        _logger_instance = AuditLogger(async_mode=False)
+        _logger_instance = AuditLogger(async_mode=False, persist_db=True)
     return _logger_instance
 
 

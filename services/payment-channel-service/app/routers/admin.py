@@ -12,7 +12,7 @@ from ..models.payment import PaymentOrder
 from ..models.admin import ChannelConfig, PaymentStats, PaymentAuditLog
 
 try:
-    from services.common.middleware.admin_auth import get_admin_user, AdminUser
+    from services.common.middleware.admin_auth import get_admin_user, AdminUser, require_domain_role
 except ImportError:
     from fastapi import Request
 
@@ -30,6 +30,17 @@ except ImportError:
             permissions = request.headers.get("X-Admin-Permissions", "").split(",")
             return AdminUser(user_id=user_id, role=role, permissions=permissions)
         return AdminUser()
+
+    def require_domain_role(domain: str, roles=None):
+        from fastapi import Depends
+        async def _checker(admin: AdminUser = Depends(get_admin_user)):
+            if admin.is_super_admin:
+                return admin
+            if roles and admin.role not in roles:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=403, detail=f"需要角色: {', '.join(roles)}")
+            return admin
+        return _checker
 
 
 admin_router = APIRouter()
@@ -52,10 +63,9 @@ class ChannelConfigUpdate(BaseModel):
     daily_limit: Optional[float] = None
 
 
-@admin_router.get("/dashboard")
+@admin_router.get("/dashboard", dependencies=[Depends(require_domain_role("payment", roles=["payment_admin"]))])
 async def dashboard(
     db: AsyncSession = Depends(get_db),
-    admin: AdminUser = Depends(get_admin_user),
 ):
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -147,10 +157,9 @@ async def dashboard(
     }
 
 
-@admin_router.get("/channels")
+@admin_router.get("/channels", dependencies=[Depends(require_domain_role("payment", roles=["payment_admin"]))])
 async def list_channels(
     db: AsyncSession = Depends(get_db),
-    admin: AdminUser = Depends(get_admin_user),
 ):
     stmt = select(ChannelConfig).order_by(ChannelConfig.id)
     result = await db.execute(stmt)
@@ -174,11 +183,11 @@ async def list_channels(
     }
 
 
-@admin_router.post("/channels")
+@admin_router.post("/channels", dependencies=[Depends(require_domain_role("payment", roles=["payment_admin"]))])
 async def create_channel(
     body: ChannelConfigCreate,
     db: AsyncSession = Depends(get_db),
-    admin: AdminUser = Depends(get_admin_user),
+    admin: AdminUser = Depends(require_domain_role("payment", roles=["payment_admin"])),
 ):
     existing = await db.execute(
         select(ChannelConfig).where(ChannelConfig.channel_code == body.channel_code)
@@ -217,12 +226,12 @@ async def create_channel(
     }
 
 
-@admin_router.put("/channels/{channel_id}")
+@admin_router.put("/channels/{channel_id}", dependencies=[Depends(require_domain_role("payment", roles=["payment_admin"]))])
 async def update_channel(
     channel_id: int,
     body: ChannelConfigUpdate,
     db: AsyncSession = Depends(get_db),
-    admin: AdminUser = Depends(get_admin_user),
+    admin: AdminUser = Depends(require_domain_role("payment", roles=["payment_admin"])),
 ):
     result = await db.execute(
         select(ChannelConfig).where(ChannelConfig.id == channel_id)
@@ -272,11 +281,11 @@ async def update_channel(
     }
 
 
-@admin_router.patch("/channels/{channel_id}/toggle")
+@admin_router.patch("/channels/{channel_id}/toggle", dependencies=[Depends(require_domain_role("payment", roles=["payment_admin"]))])
 async def toggle_channel(
     channel_id: int,
     db: AsyncSession = Depends(get_db),
-    admin: AdminUser = Depends(get_admin_user),
+    admin: AdminUser = Depends(require_domain_role("payment", roles=["payment_admin"])),
 ):
     result = await db.execute(
         select(ChannelConfig).where(ChannelConfig.id == channel_id)
@@ -309,7 +318,7 @@ async def toggle_channel(
     }
 
 
-@admin_router.get("/stats")
+@admin_router.get("/stats", dependencies=[Depends(require_domain_role("payment", roles=["payment_ops"]))])
 async def payment_stats(
     channel_code: Optional[str] = Query(None, description="渠道编码筛选"),
     start_date: Optional[str] = Query(None, description="开始日期 YYYY-MM-DD"),
@@ -317,7 +326,6 @@ async def payment_stats(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    admin: AdminUser = Depends(get_admin_user),
 ):
     filters = []
 
@@ -365,7 +373,7 @@ async def payment_stats(
     }
 
 
-@admin_router.get("/audit-logs")
+@admin_router.get("/audit-logs", dependencies=[Depends(require_domain_role("payment", roles=["payment_admin"]))])
 async def audit_logs(
     target_id: Optional[int] = Query(None, description="操作目标ID"),
     action: Optional[str] = Query(None, description="操作动作"),
@@ -374,7 +382,6 @@ async def audit_logs(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    admin: AdminUser = Depends(get_admin_user),
 ):
     filters = []
 

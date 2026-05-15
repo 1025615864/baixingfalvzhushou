@@ -34,6 +34,12 @@ try:
 except ImportError:
     logger.warning("admin_monitor路由未加载")
 
+try:
+    from . import audit_logs
+    api_router.include_router(audit_logs.router)
+except ImportError:
+    logger.warning("audit_logs路由未加载")
+
 # 首页聚合（可能聚合多个微服务数据）
 try:
     from . import home
@@ -268,7 +274,7 @@ except ImportError:
 # ==========================================
 import sys as _sys
 
-if "pytest" not in _sys:
+if "pytest" not in _sys.modules:
     try:
         from .microservice_proxy import MICROSERVICES, create_proxy_router, router as proxy_router
 

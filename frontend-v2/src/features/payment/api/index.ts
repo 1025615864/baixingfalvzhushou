@@ -248,7 +248,7 @@ export default paymentApi;
 
 // ==================== 支付回调管理API（管理员用） ====================
 
-const API_BASE = '/v1';
+const API_BASE = '/payment';
 
 /** API 错误响应 */
 interface ApiErrorResponse {

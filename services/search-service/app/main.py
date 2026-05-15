@@ -3,7 +3,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import search_router
+from app.routers import search_router, agent_router
+from app.routers.admin import admin_router
 from app.config.settings import settings
 from app.services.cache_service import cache_service
 from app.services.client_service import client_service
@@ -38,6 +39,8 @@ app.add_middleware(
 )
 
 app.include_router(search_router, prefix="/api/v1/search", tags=["search"])
+app.include_router(admin_router, prefix="/api/admin", tags=["搜索管理"])
+app.include_router(agent_router, prefix="/api/agent", tags=["AI运营助手"])
 
 
 @app.get("/health")

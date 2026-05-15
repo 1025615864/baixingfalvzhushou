@@ -26,6 +26,8 @@ class ConsultationPayment(Base):
         return f"<ConsultationPayment(id={self.id}, order_no={self.order_no}, status={self.status})>"
 
 
+# 本服务管理律师钱包，payment-accounting-service 通过 API 调用本服务同步数据
+# 两个服务各自有独立数据库，LawyerWallet 在不同服务中定义是合理的（微服务各自管理自己的数据）
 class LawyerWallet(Base):
     __tablename__ = "lawyer_wallets"
 

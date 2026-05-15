@@ -88,9 +88,9 @@ async def create_order(
 @router.post("/orders/{order_id}/cancel")
 async def cancel_order(
     order_id: int,
-    data: CancelOrderRequest = CancelOrderRequest(),
     current_user: Annotated[User, Depends(get_current_user)],
     service: Annotated[OrderService, Depends(get_order_service)],
+    data: CancelOrderRequest,
 ):
     return await service.cancel_order(
         user_id=current_user.id, order_id=order_id, reason=data.reason

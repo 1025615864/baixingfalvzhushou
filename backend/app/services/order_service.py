@@ -30,6 +30,7 @@ class OrderService:
             "paid_at": order.paid_at.isoformat() if order.paid_at else None,
             "title": order.title,
             "description": order.description,
+            "cancel_reason": order.cancel_reason,
             "created_at": order.created_at.isoformat() if order.created_at else None,
             "updated_at": order.updated_at.isoformat() if order.updated_at else None,
             "expires_at": order.expires_at.isoformat() if order.expires_at else None,
@@ -45,6 +46,7 @@ class OrderService:
         date_from: str | None = None,
         date_to: str | None = None,
     ) -> dict:
+        page_size = min(page_size, 100)
         conditions = [PaymentOrder.user_id == user_id]
 
         if status:
@@ -156,130 +158,148 @@ class OrderService:
         }
 
     async def create_order(self, user_id: int, data: dict) -> dict:
-        amount = data.get("amount", 0)
-        if amount <= 0:
-            raise HTTPException(status_code=400, detail="金额必须大于0")
+        try:
+            amount = data.get("amount", 0)
+            if amount <= 0:
+                raise HTTPException(status_code=400, detail="金额必须大于0")
 
-        valid_types = {"consultation", "document_review", "litigation", "membership", "service", "vip", "recharge", "light_consult_review"}
-        order_type = data.get("service_type", data.get("order_type", ""))
-        if order_type not in valid_types:
-            raise HTTPException(status_code=400, detail=f"无效的服务类型: {order_type}")
+            valid_types = {"consultation", "document_review", "litigation", "membership", "service", "vip", "recharge", "light_consult_review"}
+            order_type = data.get("service_type", data.get("order_type", ""))
+            if order_type not in valid_types:
+                raise HTTPException(status_code=400, detail=f"无效的服务类型: {order_type}")
 
-        order_no = f"ORD{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}{random.randint(1000, 9999)}"
+            order_no = f"ORD{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}{random.randint(1000, 9999)}"
 
-        order = PaymentOrder(
-            order_no=order_no,
-            user_id=user_id,
-            order_type=order_type,
-            amount=amount,
-            actual_amount=amount,
-            status=PaymentStatus.PENDING.value,
-            title=data.get("service_name", data.get("title", "支付订单")),
-            description=data.get("note"),
-            related_id=data.get("service_id", data.get("related_id")),
-            related_type=data.get("related_type"),
-            payment_method=data.get("payment_method"),
-        )
-        self.db.add(order)
-        await self.db.commit()
-        await self.db.refresh(order)
+            order = PaymentOrder(
+                order_no=order_no,
+                user_id=user_id,
+                order_type=order_type,
+                amount=amount,
+                actual_amount=amount,
+                status=PaymentStatus.PENDING.value,
+                title=data.get("service_name", data.get("title", "支付订单")),
+                description=data.get("note"),
+                related_id=data.get("service_id", data.get("related_id")),
+                related_type=data.get("related_type"),
+                payment_method=data.get("payment_method"),
+            )
+            self.db.add(order)
+            await self.db.commit()
+            await self.db.refresh(order)
 
-        return {
-            "id": order.id,
-            "order_no": order.order_no,
-            "amount": order.amount,
-            "payment_status": order.status,
-            "order_status": order.status,
-            "payment_url": f"https://pay.baixingfalv.com/order/{order.order_no}",
-            "created_at": order.created_at.isoformat() if order.created_at else None,
-        }
+            return {
+                "id": order.id,
+                "order_no": order.order_no,
+                "amount": order.amount,
+                "payment_status": order.status,
+                "order_status": order.status,
+                "payment_url": f"https://pay.baixingfalv.com/order/{order.order_no}",
+                "created_at": order.created_at.isoformat() if order.created_at else None,
+            }
+        except HTTPException:
+            raise
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def pay_order(self, user_id: int, order_id: int, payment_method: str) -> dict:
-        valid_methods = {"wechat", "alipay", "balance"}
-        if payment_method not in valid_methods:
-            raise HTTPException(status_code=400, detail="不支持的支付方式，可选: wechat, alipay, balance")
+        try:
+            valid_methods = {"wechat", "alipay", "balance"}
+            if payment_method not in valid_methods:
+                raise HTTPException(status_code=400, detail="不支持的支付方式，可选: wechat, alipay, balance")
 
-        stmt = select(PaymentOrder).where(
-            PaymentOrder.id == order_id, PaymentOrder.user_id == user_id
-        )
-        result = await self.db.execute(stmt)
-        order = result.scalar_one_or_none()
-
-        if not order:
-            raise HTTPException(status_code=404, detail="订单不存在")
-
-        if order.status != PaymentStatus.PENDING.value:
-            raise HTTPException(status_code=400, detail="订单当前状态不可支付")
-
-        if payment_method == "balance":
-            balance_stmt = select(UserBalance).where(UserBalance.user_id == user_id)
-            balance_result = await self.db.execute(balance_stmt)
-            user_balance = balance_result.scalar_one_or_none()
-            if not user_balance or user_balance.balance < order.actual_amount:
-                raise HTTPException(status_code=400, detail="余额不足")
-
-            balance_before = user_balance.balance
-            balance_after = balance_before - order.actual_amount
-            user_balance.balance = balance_after
-            user_balance.total_consumed = (user_balance.total_consumed or 0) + order.actual_amount
-
-            transaction = BalanceTransaction(
-                user_id=user_id,
-                order_id=order.id,
-                type="consume",
-                amount=-order.actual_amount,
-                balance_before=balance_before,
-                balance_after=balance_after,
-                description=f"支付订单 {order.order_no}",
+            stmt = select(PaymentOrder).where(
+                PaymentOrder.id == order_id, PaymentOrder.user_id == user_id
             )
-            self.db.add(transaction)
+            result = await self.db.execute(stmt)
+            order = result.scalar_one_or_none()
 
-        now = datetime.now(timezone.utc)
-        order.status = PaymentStatus.PAID.value
-        order.payment_method = payment_method
-        order.paid_at = now
-        order.trade_no = f"TRADE{now.strftime('%Y%m%d%H%M%S')}{random.randint(1000, 9999)}"
+            if not order:
+                raise HTTPException(status_code=404, detail="订单不存在")
 
-        await self.db.commit()
-        await self.db.refresh(order)
+            if order.status != PaymentStatus.PENDING.value:
+                raise HTTPException(status_code=400, detail="订单当前状态不可支付")
 
-        return {
-            "success": True,
-            "message": "支付成功",
-            "order_no": order.order_no,
-            "trade_no": order.trade_no,
-            "amount": order.actual_amount,
-            "payment_method": payment_method,
-            "payment_status": PaymentStatus.PAID.value,
-            "order_status": PaymentStatus.PAID.value,
-            "paid_at": now.isoformat(),
-        }
+            if payment_method == "balance":
+                balance_stmt = select(UserBalance).where(UserBalance.user_id == user_id)
+                balance_result = await self.db.execute(balance_stmt)
+                user_balance = balance_result.scalar_one_or_none()
+                if not user_balance or user_balance.balance < order.actual_amount:
+                    raise HTTPException(status_code=400, detail="余额不足")
+
+                balance_before = user_balance.balance
+                balance_after = balance_before - order.actual_amount
+                user_balance.balance = balance_after
+                user_balance.total_consumed = (user_balance.total_consumed or 0) + order.actual_amount
+
+                transaction = BalanceTransaction(
+                    user_id=user_id,
+                    order_id=order.id,
+                    type="consume",
+                    amount=-order.actual_amount,
+                    balance_before=balance_before,
+                    balance_after=balance_after,
+                    description=f"支付订单 {order.order_no}",
+                )
+                self.db.add(transaction)
+
+            now = datetime.now(timezone.utc)
+            order.status = PaymentStatus.PAID.value
+            order.payment_method = payment_method
+            order.paid_at = now
+            order.trade_no = f"TRADE{now.strftime('%Y%m%d%H%M%S')}{random.randint(1000, 9999)}"
+
+            await self.db.commit()
+            await self.db.refresh(order)
+
+            return {
+                "success": True,
+                "message": "支付成功",
+                "order_no": order.order_no,
+                "trade_no": order.trade_no,
+                "amount": order.actual_amount,
+                "payment_method": payment_method,
+                "payment_status": PaymentStatus.PAID.value,
+                "order_status": PaymentStatus.PAID.value,
+                "paid_at": now.isoformat(),
+            }
+        except HTTPException:
+            raise
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def cancel_order(self, user_id: int, order_id: int, reason: str | None = None) -> dict:
-        stmt = select(PaymentOrder).where(
-            PaymentOrder.id == order_id, PaymentOrder.user_id == user_id
-        )
-        result = await self.db.execute(stmt)
-        order = result.scalar_one_or_none()
+        try:
+            stmt = select(PaymentOrder).where(
+                PaymentOrder.id == order_id, PaymentOrder.user_id == user_id
+            )
+            result = await self.db.execute(stmt)
+            order = result.scalar_one_or_none()
 
-        if not order:
-            raise HTTPException(status_code=404, detail="订单不存在")
+            if not order:
+                raise HTTPException(status_code=404, detail="订单不存在")
 
-        if order.status != PaymentStatus.PENDING.value:
-            raise HTTPException(status_code=400, detail="只有待支付状态的订单才能取消")
+            if order.status != PaymentStatus.PENDING.value:
+                raise HTTPException(status_code=400, detail="只有待支付状态的订单才能取消")
 
-        order.status = PaymentStatus.CANCELLED.value
-        order.description = (order.description or "") + (f" | 取消原因: {reason}" if reason else " | 用户取消")
+            order.status = PaymentStatus.CANCELLED.value
+            order.description = (order.description or "") + (f" | 取消原因: {reason}" if reason else " | 用户取消")
 
-        await self.db.commit()
-        await self.db.refresh(order)
+            await self.db.commit()
+            await self.db.refresh(order)
 
-        return {
-            "success": True,
-            "message": "订单已取消",
-            "order_no": order.order_no,
-            "order_status": PaymentStatus.CANCELLED.value,
-        }
+            return {
+                "success": True,
+                "message": "订单已取消",
+                "order_no": order.order_no,
+                "order_status": PaymentStatus.CANCELLED.value,
+            }
+        except HTTPException:
+            raise
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def get_order_stats(self, user_id: int) -> dict:
         base_cond = PaymentOrder.user_id == user_id

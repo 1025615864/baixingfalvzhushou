@@ -98,6 +98,7 @@ class PaymentOrder(Base):
     # 订单描述
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cancel_reason: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)
 
     # 时间戳
     created_at: Mapped[datetime] = mapped_column(

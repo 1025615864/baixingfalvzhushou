@@ -7,6 +7,7 @@ from .websocket import router as websocket_router
 from .health import router as health_router
 from .ai_ops import router as ai_ops_router
 from .ocr import router as ocr_router
+from .admin import admin_router
 
 __all__ = [
     "chat_router",
@@ -17,4 +18,5 @@ __all__ = [
     "health_router",
     "ai_ops_router",
     "ocr_router",
+    "admin_router",
 ]

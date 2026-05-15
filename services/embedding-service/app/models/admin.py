@@ -1,8 +1,7 @@
 from sqlalchemy import Column, Integer, String, Numeric, DateTime, Index
-from sqlalchemy.orm import DeclarativeBase
 from datetime import datetime
 
-Base = DeclarativeBase()
+from app.database import Base
 
 
 class EmbeddingCallStats(Base):

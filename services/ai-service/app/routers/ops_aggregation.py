@@ -7,7 +7,37 @@ import httpx
 
 from app.dependencies.auth import require_admin, UserContext
 
-router = APIRouter(prefix="/api/v1/ai-ops", tags=["运营API聚合"])
+try:
+    from services.common.middleware.admin_auth import require_domain_role
+except ImportError:
+    from fastapi import Request
+    class _AdminUser:
+        def __init__(self, user_id: int = 0, role: str = "admin", permissions=None):
+            self.user_id = user_id
+            self.role = role
+            self.permissions = permissions or []
+            self.is_super_admin = role in {"super_admin", "admin"}
+    async def _get_admin_user(request: Request = None):
+        if request:
+            user_id = int(request.headers.get("X-Admin-User-Id", "0"))
+            role = request.headers.get("X-Admin-Role", "admin")
+            permissions = request.headers.get("X-Admin-Permissions", "").split(",")
+            return _AdminUser(user_id=user_id, role=role, permissions=permissions)
+        return _AdminUser()
+    def require_domain_role(domain: str, roles=None):
+        async def _checker(admin: _AdminUser = Depends(_get_admin_user)):
+            if admin.is_super_admin:
+                return admin
+            if roles and admin.role not in roles:
+                raise HTTPException(status_code=403, detail=f"需要角色: {', '.join(roles)}")
+            return admin
+        return _checker
+
+router = APIRouter(
+    prefix="/api/v1/ai-ops",
+    tags=["运营API聚合"],
+    dependencies=[Depends(require_domain_role("ai", roles=["ai_admin", "ai_ops"]))],
+)
 logger = logging.getLogger(__name__)
 
 

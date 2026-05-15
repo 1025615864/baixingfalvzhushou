@@ -26,7 +26,7 @@ import type {
 
 // API 基础路径
 // 注意：咨询模板实际在 /api/v1/admin/consultation-templates
-const API_BASE = '/v1/admin/consultation-templates';
+const API_BASE = '/admin/consultation-templates';
 
 // ==================== 后端响应类型定义 ====================
 
@@ -266,7 +266,7 @@ export async function completeConsultation(id: string | number): Promise<Consult
 
 // ==================== 咨询模板管理API（管理员用） ====================
 
-const ADMIN_API_BASE = '/v1/admin';
+const ADMIN_API_BASE = '/admin/consultations';
 
 /** API 错误响应 */
 interface ApiErrorResponse {

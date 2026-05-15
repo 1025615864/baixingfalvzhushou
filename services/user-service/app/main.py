@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .config.settings import get_settings
 from .database import engine, AsyncSessionLocal, Base
-from .routers import user_router, auth_router, profile_router, ai_session_router, membership_router, password_reset_router, account_router, data_export_router, email_verification_router, device_router, admin_router
+from .routers import user_router, auth_router, profile_router, ai_session_router, membership_router, password_reset_router, account_router, data_export_router, email_verification_router, device_router, admin_router, agent_router
 from .utils.security import setup_secure_logging
 
 try:
@@ -189,6 +189,7 @@ def create_app() -> FastAPI:
     app.include_router(ai_session_router, prefix="/api/v1", tags=["AI会话"])
     app.include_router(device_router, prefix="/api/v1/devices", tags=["设备管理"])
     app.include_router(admin_router, prefix="/api/v1/admin", tags=["管理员"])
+    app.include_router(agent_router, prefix="/api/agent", tags=["AI运营助手"])
 
     @app.get("/health")
     async def health_check():

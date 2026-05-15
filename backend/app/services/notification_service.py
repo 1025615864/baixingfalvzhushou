@@ -59,79 +59,103 @@ class NotificationService:
         return result.scalar() or 0
 
     async def mark_as_read(self, user_id: int, notification_id: int) -> dict:
-        stmt = select(Notification).where(Notification.id == notification_id)
-        result = await self.db.execute(stmt)
-        notification = result.scalar_one_or_none()
+        try:
+            stmt = select(Notification).where(Notification.id == notification_id)
+            result = await self.db.execute(stmt)
+            notification = result.scalar_one_or_none()
 
-        if notification is None:
-            raise HTTPException(status_code=404, detail="通知不存在")
-        if notification.user_id != user_id:
-            raise HTTPException(status_code=403, detail="无权操作此通知")
+            if notification is None:
+                raise HTTPException(status_code=404, detail="通知不存在")
+            if notification.user_id != user_id:
+                raise HTTPException(status_code=403, detail="无权操作此通知")
 
-        notification.is_read = True
-        notification.read_at = datetime.now(timezone.utc)
-        await self.db.commit()
-        return {"message": "已标记为已读"}
+            notification.is_read = True
+            notification.read_at = datetime.now(timezone.utc)
+            await self.db.commit()
+            return {"message": "已标记为已读"}
+        except HTTPException:
+            raise
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def mark_all_as_read(self, user_id: int) -> dict:
-        stmt = (
-            update(Notification)
-            .where(Notification.user_id == user_id, Notification.is_read == False)
-            .values(is_read=True, read_at=datetime.now(timezone.utc))
-        )
-        await self.db.execute(stmt)
-        await self.db.commit()
-        return {"message": "全部标记为已读"}
+        try:
+            stmt = (
+                update(Notification)
+                .where(Notification.user_id == user_id, Notification.is_read == False)
+                .values(is_read=True, read_at=datetime.now(timezone.utc))
+            )
+            await self.db.execute(stmt)
+            await self.db.commit()
+            return {"message": "全部标记为已读"}
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def delete_notification(self, user_id: int, notification_id: int) -> dict:
-        stmt = select(Notification).where(Notification.id == notification_id)
-        result = await self.db.execute(stmt)
-        notification = result.scalar_one_or_none()
+        try:
+            stmt = select(Notification).where(Notification.id == notification_id)
+            result = await self.db.execute(stmt)
+            notification = result.scalar_one_or_none()
 
-        if notification is None:
-            raise HTTPException(status_code=404, detail="通知不存在")
-        if notification.user_id != user_id:
-            raise HTTPException(status_code=403, detail="无权操作此通知")
+            if notification is None:
+                raise HTTPException(status_code=404, detail="通知不存在")
+            if notification.user_id != user_id:
+                raise HTTPException(status_code=403, detail="无权操作此通知")
 
-        await self.db.delete(notification)
-        await self.db.commit()
-        return {"message": "已删除"}
+            await self.db.delete(notification)
+            await self.db.commit()
+            return {"message": "已删除"}
+        except HTTPException:
+            raise
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def batch_mark_read(self, user_id: int, ids: list[int]) -> dict:
-        stmt = (
-            update(Notification)
-            .where(
-                Notification.user_id == user_id,
-                Notification.id.in_(ids),
-                Notification.is_read == False,
+        try:
+            stmt = (
+                update(Notification)
+                .where(
+                    Notification.user_id == user_id,
+                    Notification.id.in_(ids),
+                    Notification.is_read == False,
+                )
+                .values(is_read=True, read_at=datetime.now(timezone.utc))
             )
-            .values(is_read=True, read_at=datetime.now(timezone.utc))
-        )
-        result = await self.db.execute(stmt)
-        await self.db.commit()
-        success_count = result.rowcount
-        return {
-            "success_count": success_count,
-            "failed_count": len(ids) - success_count,
-            "message": f"已标记{success_count}条为已读",
-        }
+            result = await self.db.execute(stmt)
+            await self.db.commit()
+            success_count = result.rowcount
+            return {
+                "success_count": success_count,
+                "failed_count": len(ids) - success_count,
+                "message": f"已标记{success_count}条为已读",
+            }
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def batch_delete(self, user_id: int, ids: list[int]) -> dict:
-        stmt = (
-            delete(Notification)
-            .where(
-                Notification.user_id == user_id,
-                Notification.id.in_(ids),
+        try:
+            stmt = (
+                delete(Notification)
+                .where(
+                    Notification.user_id == user_id,
+                    Notification.id.in_(ids),
+                )
             )
-        )
-        result = await self.db.execute(stmt)
-        await self.db.commit()
-        success_count = result.rowcount
-        return {
-            "success_count": success_count,
-            "failed_count": len(ids) - success_count,
-            "message": f"已删除{success_count}条",
-        }
+            result = await self.db.execute(stmt)
+            await self.db.commit()
+            success_count = result.rowcount
+            return {
+                "success_count": success_count,
+                "failed_count": len(ids) - success_count,
+                "message": f"已删除{success_count}条",
+            }
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def get_notification_types(self, user_id: int) -> dict:
         stmt = (
@@ -151,6 +175,7 @@ class NotificationService:
         is_published: Optional[bool] = None,
         keyword: Optional[str] = None,
     ) -> dict:
+        page_size = min(page_size, 100)
         stmt = select(Notification).where(Notification.type == "system")
         count_stmt = select(func.count()).select_from(Notification).where(Notification.type == "system")
 
@@ -178,45 +203,61 @@ class NotificationService:
         }
 
     async def create_system_notification(self, data: dict) -> dict:
-        notification = Notification(
-            user_id=data.get("user_id", 1),
-            type="system",
-            title=data["title"],
-            content=data.get("content"),
-            link=data.get("link"),
-        )
-        self.db.add(notification)
-        await self.db.commit()
-        await self.db.refresh(notification)
-        return self._to_system_dict(notification)
+        try:
+            notification = Notification(
+                user_id=data.get("user_id", 1),
+                type="system",
+                title=data["title"],
+                content=data.get("content"),
+                link=data.get("link"),
+            )
+            self.db.add(notification)
+            await self.db.commit()
+            await self.db.refresh(notification)
+            return self._to_system_dict(notification)
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def update_system_notification(self, notification_id: int, data: dict) -> dict:
-        stmt = select(Notification).where(Notification.id == notification_id, Notification.type == "system")
-        result = await self.db.execute(stmt)
-        notification = result.scalar_one_or_none()
+        try:
+            stmt = select(Notification).where(Notification.id == notification_id, Notification.type == "system")
+            result = await self.db.execute(stmt)
+            notification = result.scalar_one_or_none()
 
-        if notification is None:
-            raise HTTPException(status_code=404, detail="系统通知不存在")
+            if notification is None:
+                raise HTTPException(status_code=404, detail="系统通知不存在")
 
-        for field, value in data.items():
-            if value is not None and hasattr(notification, field):
-                setattr(notification, field, value)
+            for field, value in data.items():
+                if value is not None and hasattr(notification, field):
+                    setattr(notification, field, value)
 
-        await self.db.commit()
-        await self.db.refresh(notification)
-        return self._to_system_dict(notification)
+            await self.db.commit()
+            await self.db.refresh(notification)
+            return self._to_system_dict(notification)
+        except HTTPException:
+            raise
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def delete_system_notification(self, notification_id: int) -> dict:
-        stmt = select(Notification).where(Notification.id == notification_id, Notification.type == "system")
-        result = await self.db.execute(stmt)
-        notification = result.scalar_one_or_none()
+        try:
+            stmt = select(Notification).where(Notification.id == notification_id, Notification.type == "system")
+            result = await self.db.execute(stmt)
+            notification = result.scalar_one_or_none()
 
-        if notification is None:
-            raise HTTPException(status_code=404, detail="系统通知不存在")
+            if notification is None:
+                raise HTTPException(status_code=404, detail="系统通知不存在")
 
-        await self.db.delete(notification)
-        await self.db.commit()
-        return {"message": "已删除"}
+            await self.db.delete(notification)
+            await self.db.commit()
+            return {"message": "已删除"}
+        except HTTPException:
+            raise
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     def _to_dict(self, notification: Notification) -> dict:
         return {

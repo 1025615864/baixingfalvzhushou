@@ -99,7 +99,7 @@ routes:
       type: roundrobin
       nodes:
         - host: legal-service
-          port: 8004
+          port: 8008
           weight: 100
     plugins:
       jwt-auth:
@@ -168,7 +168,7 @@ routes:
       type: roundrobin
       nodes:
         - host: points-service
-          port: 8008
+          port: 8012
           weight: 100
     plugins:
       jwt-auth:
@@ -183,7 +183,7 @@ routes:
       type: roundrobin
       nodes:
         - host: notification-service
-          port: 8009
+          port: 8011
           weight: 100
     plugins:
       jwt-auth:
@@ -213,13 +213,81 @@ routes:
       type: roundrobin
       nodes:
         - host: search-service
-          port: 8011
+          port: 8009
           weight: 100
     plugins:
       jwt-auth:
         key: user-key
     metadata:
       desc: "Search service routes"
+
+  # ============ Embedding Service Routes ============
+  - id: embedding-service
+    uri: /api/v1/embedding/*
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: embedding-service
+          port: 8003
+          weight: 100
+    plugins:
+      jwt-auth:
+        key: user-key
+      limit-req:
+        rate: 200
+        burst: 100
+        key: remote_addr
+    metadata:
+      desc: "Embedding service routes"
+
+  # ============ Archive Service Routes ============
+  - id: archive-service
+    uri: /api/v1/archive/*
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: archive-service
+          port: 8013
+          weight: 100
+    plugins:
+      jwt-auth:
+        key: user-key
+    metadata:
+      desc: "Archive service routes"
+
+  # ============ Knowledge Service Routes ============
+  - id: knowledge-service
+    uri: /api/v1/knowledge/*
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: knowledge-service
+          port: 8081
+          weight: 100
+    plugins:
+      jwt-auth:
+        key: user-key
+    metadata:
+      desc: "Knowledge service routes"
+
+  # ============ Payment Accounting Service Routes ============
+  - id: payment-accounting-service
+    uri: /api/v1/accounting/*
+    upstream:
+      type: roundrobin
+      nodes:
+        - host: payment-accounting-service
+          port: 8014
+          weight: 100
+    plugins:
+      jwt-auth:
+        key: user-key
+      limit-req:
+        rate: 50
+        burst: 25
+        key: remote_addr
+    metadata:
+      desc: "Payment accounting routes"
 
   # ============ Backend Legacy Service Routes ============
   - id: backend-service

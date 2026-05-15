@@ -1,9 +1,8 @@
 """知识库数据模型"""
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, JSON, Index
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, JSON, Index, ForeignKey
 from datetime import datetime
 
-Base = declarative_base()
+from app.database import Base
 
 
 class LegalKnowledge(Base):
@@ -17,6 +16,7 @@ class LegalKnowledge(Base):
     content = Column(Text, nullable=False)
     summary = Column(Text, nullable=True)
     category = Column(String(200), nullable=True, index=True)
+    category_id = Column(Integer, ForeignKey("knowledge_categories.id"), nullable=True, index=True)
     keywords = Column(String(500), nullable=True)
     source = Column(String(200), nullable=True)
 

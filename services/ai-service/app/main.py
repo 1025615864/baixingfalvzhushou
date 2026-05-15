@@ -137,6 +137,7 @@ def create_app() -> FastAPI:
     from .routers import chat_router, agent_router, config_router, metrics_router, websocket_router, health_router, ocr_router
     from .routers.ai_ops import router as ai_ops_router
     from .routers.audit_ops import router as audit_ops_router
+    from .routers import admin as admin_router_module
     app.include_router(chat_router, prefix="/api/v1/ai", tags=["AI对话"])
     app.include_router(ai_ops_router, tags=["AI质量运营"])
     app.include_router(agent_router, prefix="/api/v1/ai/admin/agents", tags=["Agent管理"])
@@ -146,6 +147,7 @@ def create_app() -> FastAPI:
     app.include_router(websocket_router, tags=["WebSocket"])
     app.include_router(audit_ops_router, tags=["审计日志运营"])
     app.include_router(ocr_router, prefix="/api/v1/ai/ocr", tags=["OCR识别"])
+    app.include_router(admin_router_module.admin_router, tags=["AI管理"])
 
     @app.get("/health")
     async def health_check():

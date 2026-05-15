@@ -134,7 +134,7 @@ export const notificationApi = {
 
 // ==================== 系统通知管理API（管理员用） ====================
 
-const API_BASE = '/v1';
+const API_BASE = '/notification';
 
 /** API 错误响应 */
 interface ApiErrorResponse {

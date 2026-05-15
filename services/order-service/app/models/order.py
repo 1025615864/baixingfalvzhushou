@@ -11,6 +11,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     Float,
+    ForeignKey,
     Integer,
     String,
     Text,
@@ -117,7 +118,7 @@ class OrderItem(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    order_id = Column(Integer, nullable=False, comment="订单 ID")
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False, comment="订单 ID")
 
     item_name = Column(String(255), nullable=False, comment="商品名称")
     item_description = Column(String(500), nullable=True, comment="商品描述")

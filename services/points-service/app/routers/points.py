@@ -3,7 +3,7 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.services import points_service
+from app.services.points_service import PointsService
 
 router = APIRouter()
 
@@ -37,10 +37,11 @@ async def get_history(
     end_date: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
+    svc = PointsService(db)
     source = action_type
     page = (offset // limit) + 1
-    result = await points_service.get_points_history(
-        db, user_id=user_id, source=source, page=page, page_size=limit,
+    result = await svc.get_points_history(
+        user_id=user_id, source=source, page=page, page_size=limit,
     )
     items = [_history_to_dict(h) for h in result["items"]]
     return {
@@ -58,7 +59,8 @@ async def get_products(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await points_service.list_mall_items(db, page=page, page_size=page_size)
+    svc = PointsService(db)
+    result = await svc.list_mall_items(page=page, page_size=page_size)
     items = [_mall_item_to_dict(i) for i in result["items"]]
     if product_type:
         items = [i for i in items if i.get("product_type") == product_type]
@@ -79,11 +81,10 @@ async def redeem_product(
     except (ValueError, TypeError):
         raise HTTPException(status_code=400, detail="无效的 item_id")
 
+    svc = PointsService(db)
     try:
-        order = await points_service.exchange_item(db, user_id=user_id, item_id=item_id)
-    except HTTPException:
-        raise
-    except Exception as e:
+        order = await svc.exchange_item(user_id=user_id, item_id=item_id)
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     await db.commit()
@@ -106,7 +107,8 @@ async def get_exchange_orders(
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await points_service.get_exchange_orders(db, user_id=user_id, page_size=limit)
+    svc = PointsService(db)
+    result = await svc.get_exchange_orders(user_id=user_id, page_size=limit)
     items = [_exchange_order_to_dict(o) for o in result["items"]]
     if status:
         items = [i for i in items if i.get("status") == status]
@@ -118,11 +120,10 @@ async def check_in(
     user_id: int = Query(default=1),
     db: AsyncSession = Depends(get_db),
 ):
+    svc = PointsService(db)
     try:
-        result = await points_service.daily_check_in(db, user_id=user_id)
-    except HTTPException:
-        raise
-    except Exception as e:
+        result = await svc.daily_check_in(user_id=user_id)
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     await db.commit()
@@ -139,7 +140,8 @@ async def get_check_in_status(
     user_id: int = Query(default=1),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await points_service.get_check_in_status(db, user_id=user_id)
+    svc = PointsService(db)
+    result = await svc.get_check_in_status(user_id=user_id)
     return result
 
 
@@ -148,7 +150,8 @@ async def get_daily_stats(
     user_id: int = Query(default=1),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await points_service.get_points_history(db, user_id=user_id, page=1, page_size=100)
+    svc = PointsService(db)
+    result = await svc.get_points_history(user_id=user_id, page=1, page_size=100)
     from datetime import datetime
     today = datetime.now().strftime("%Y-%m-%d")
     today_items = [h for h in result["items"] if h.created_at and h.created_at.isoformat().startswith(today)]

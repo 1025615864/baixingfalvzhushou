@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config.settings import get_settings
-from app.routers import stats_router, knowledge_router, categories_router, search_router, vector_ops_router, vector_search_router, batch_router, admin_router, agent_router
+from app.routers import stats_router, knowledge_router, categories_router, search_router, vector_ops_router, vector_search_router, batch_router, admin_router, agent_router, court_cases_router
 
 try:
     from shared.discovery import get_registration
@@ -85,6 +85,7 @@ app.include_router(vector_search_router)
 app.include_router(batch_router)
 app.include_router(admin_router)
 app.include_router(agent_router)
+app.include_router(court_cases_router)
 
 
 @app.get("/health")

@@ -85,6 +85,7 @@ class DocumentService:
         category: str | None = None,
         keyword: str | None = None,
     ) -> dict:
+        page_size = min(page_size, 100)
         query = select(DocumentTemplate).where(DocumentTemplate.is_active == True)
         count_query = select(func.count()).select_from(DocumentTemplate).where(DocumentTemplate.is_active == True)
 
@@ -124,41 +125,47 @@ class DocumentService:
         return _template_detail_to_dict(template, version)
 
     async def generate_document(self, user_id: int, template_id: int, fields: dict) -> dict:
-        template = await self.db.get(DocumentTemplate, template_id)
-        if template is None:
-            raise HTTPException(status_code=404, detail="模板不存在")
+        try:
+            template = await self.db.get(DocumentTemplate, template_id)
+            if template is None:
+                raise HTTPException(status_code=404, detail="模板不存在")
 
-        version = await self._get_latest_version(template.id)
-        content = version.content if version else ""
+            version = await self._get_latest_version(template.id)
+            content = version.content if version else ""
 
-        content = re.sub(
-            r"\{\{(\w+)\}\}",
-            lambda m: str(fields.get(m.group(1), m.group(0))),
-            content,
-        )
+            content = re.sub(
+                r"\{\{(\w+)\}\}",
+                lambda m: str(fields.get(m.group(1), m.group(0))),
+                content,
+            )
 
-        doc = GeneratedDocument(
-            user_id=user_id,
-            document_type=template.key,
-            title=template.title + "（已生成）",
-            content=content,
-            template_key=template.key,
-            template_version=version.version if version else 1,
-            payload_json=json.dumps(fields, ensure_ascii=False),
-        )
-        self.db.add(doc)
-        await self.db.flush()
-        await self.db.refresh(doc)
+            doc = GeneratedDocument(
+                user_id=user_id,
+                document_type=template.key,
+                title=template.title + "（已生成）",
+                content=content,
+                template_key=template.key,
+                template_version=version.version if version else 1,
+                payload_json=json.dumps(fields, ensure_ascii=False),
+            )
+            self.db.add(doc)
+            await self.db.flush()
+            await self.db.refresh(doc)
 
-        return {
-            "document_type": template.key,
-            "title": doc.title,
-            "content": content,
-            "created_at": doc.created_at.isoformat() if doc.created_at else datetime.now().isoformat(),
-            "template_key": template.key,
-            "template_version": version.version if version else 1,
-            "download_url": f"/api/documents/download/{template.key}_{datetime.now().strftime('%Y%m%d%H%M%S')}.docx",
-        }
+            return {
+                "document_type": template.key,
+                "title": doc.title,
+                "content": content,
+                "created_at": doc.created_at.isoformat() if doc.created_at else datetime.now().isoformat(),
+                "template_key": template.key,
+                "template_version": version.version if version else 1,
+                "download_url": f"/api/documents/download/{template.key}_{datetime.now().strftime('%Y%m%d%H%M%S')}.docx",
+            }
+        except HTTPException:
+            raise
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def get_categories(self) -> dict:
         query = select(DocumentTemplate.key).where(DocumentTemplate.is_active == True).distinct()
@@ -184,6 +191,7 @@ class DocumentService:
         page_size: int = 10,
         status: str | None = None,
     ) -> dict:
+        page_size = min(page_size, 100)
         query = select(ContractReviewHistory).where(ContractReviewHistory.user_id == user_id)
         count_query = (
             select(func.count())
@@ -210,32 +218,36 @@ class DocumentService:
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     async def submit_contract_review(self, user_id: int, data: dict) -> dict:
-        review = ContractReviewHistory(
-            user_id=user_id,
-            filename=data.get("filename", ""),
-            contract_type=data.get("contract_type"),
-            content_type=data.get("content_type"),
-            text_chars=data.get("text_chars", 0),
-            text_preview=data.get("text_preview", ""),
-            risk_level="low",
-            risk_count=0,
-            report_json=None,
-            report_markdown="",
-            request_id=data.get("request_id", uuid.uuid4().hex),
-            focus=data.get("focus"),
-        )
-        self.db.add(review)
-        await self.db.flush()
-        await self.db.refresh(review)
+        try:
+            review = ContractReviewHistory(
+                user_id=user_id,
+                filename=data.get("filename", ""),
+                contract_type=data.get("contract_type"),
+                content_type=data.get("content_type"),
+                text_chars=data.get("text_chars", 0),
+                text_preview=data.get("text_preview", ""),
+                risk_level="low",
+                risk_count=0,
+                report_json=None,
+                report_markdown="",
+                request_id=data.get("request_id", uuid.uuid4().hex),
+                focus=data.get("focus"),
+            )
+            self.db.add(review)
+            await self.db.flush()
+            await self.db.refresh(review)
 
-        return {
-            "review_id": review.id,
-            "request_id": review.request_id,
-            "status": "pending",
-            "message": "合同已提交审查，预计30秒内完成",
-            "estimated_seconds": 30,
-            "created_at": review.created_at.isoformat() if review.created_at else datetime.now().isoformat(),
-        }
+            return {
+                "review_id": review.id,
+                "request_id": review.request_id,
+                "status": "pending",
+                "message": "合同已提交审查，预计30秒内完成",
+                "estimated_seconds": 30,
+                "created_at": review.created_at.isoformat() if review.created_at else datetime.now().isoformat(),
+            }
+        except Exception:
+            await self.db.rollback()
+            raise HTTPException(status_code=500, detail="操作失败，请稍后重试")
 
     async def get_contract_review_detail(self, user_id: int, review_id: str) -> dict:
         review = await self.db.get(ContractReviewHistory, review_id)

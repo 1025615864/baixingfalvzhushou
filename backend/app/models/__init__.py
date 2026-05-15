@@ -26,6 +26,7 @@ from .payment import PaymentOrder, PaymentStatus, RefundStatus, PaymentMethod, O
 from .forum import Post, Comment
 from .news import News, NewsTopic, NewsTopicItem, NewsComment, NewsSubscription
 from .points import PointsUser, PointsDailyCount, PointsHistory, PointsExchangeItem
+from .settings import UserSettings, UserApiKey
 
 __all__ = [
     "TimestampMixin",
@@ -94,4 +95,6 @@ __all__ = [
     "PointsDailyCount",
     "PointsHistory",
     "PointsExchangeItem",
+    "UserSettings",
+    "UserApiKey",
 ]

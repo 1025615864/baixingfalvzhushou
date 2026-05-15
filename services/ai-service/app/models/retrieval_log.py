@@ -1,9 +1,8 @@
 """检索日志模型"""
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, JSON
-from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 
-Base = declarative_base()
+from app.database import Base
 
 
 class RetrievalLog(Base):

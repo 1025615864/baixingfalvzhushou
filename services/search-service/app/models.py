@@ -1,7 +1,7 @@
 """搜索服务模型"""
 from datetime import datetime, timezone
 from dataclasses import dataclass
-from sqlalchemy import String, DateTime, Integer, Index, Text, func
+from sqlalchemy import String, DateTime, Integer, Index, Text, JSON, func
 from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
@@ -63,3 +63,17 @@ class SearchLog(Base):
         Index("idx_search_log_query", "query"),
         Index("idx_search_log_user", "user_id", "created_at"),
     )
+
+
+class SearchAuditLog(Base):
+    __tablename__ = "search_audit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    operator_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    operator_name: Mapped[str] = mapped_column(String(100), nullable=True)
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    target_type: Mapped[str] = mapped_column(String(50), nullable=True)
+    target_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    comment: Mapped[str] = mapped_column(String(500), nullable=True)
+    extra_data = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
